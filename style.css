@@ -54,6 +54,13 @@ h2 {
     margin-bottom: 0;
 }
 
+.participant-count {
+    font-size: 1rem;
+    color: #667eea;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
 .description {
     color: #666;
     font-size: 0.9rem;

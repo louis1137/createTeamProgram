@@ -23,7 +23,8 @@ const elements = {
     peopleList: document.getElementById('peopleList'),
     shuffleBtn: document.getElementById('shuffleBtn'),
     resultsSection: document.getElementById('resultsSection'),
-    teamsDisplay: document.getElementById('teamsDisplay')
+    teamsDisplay: document.getElementById('teamsDisplay'),
+    participantCount: document.getElementById('participantCount')
 };
 
 function init() {
@@ -218,6 +219,8 @@ function renderPeople() {
             elements.peopleList.appendChild(personTag);
         }
     });
+    
+    elements.participantCount.textContent = `(${state.people.length}명)`;
 }
 
 function shuffleTeams() {
