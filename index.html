@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>팀 생성 프로그램</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 팀 생성 프로그램</h1>
+        </header>
+
+        <section class="people-section">
+            <div class="section-header">
+                <h2>참가자 관리</h2>
+                <button id="resetBtn" class="btn btn-reset">초기화</button>
+            </div>
+            <div id="peopleList" class="people-list"></div>
+            <div class="add-person-container">
+                <input type="text" id="nameInput" placeholder="이름 입력 (,는 그룹 /는 구분. 예: 가,나,다 / 라 / 마,바)" class="name-input">
+                <button id="addPersonBtn" class="btn btn-add">+</button>
+            </div>
+        </section>
+
+        <section class="options-section">
+            <div class="option">
+                <label>
+                    <input type="checkbox" id="genderBalanceCheckbox">
+                    성비 균등
+                </label>
+            </div>
+            <div class="option">
+                <label>
+                    <input type="checkbox" id="weightBalanceCheckbox">
+                    가중치 균등
+                </label>
+            </div>
+            <div class="option">
+                <label>
+                    팀 인원수:
+                    <input type="number" id="teamSizeInput" min="2" value="4">
+                </label>
+            </div>
+        </section>
+
+        <section class="action-section">
+            <button id="shuffleBtn" class="btn btn-primary">팀 생성</button>
+        </section>
+
+        <section class="results-section" id="resultsSection">
+            <h2>생성된 팀</h2>
+            <div id="teamsDisplay" class="teams-display"></div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
