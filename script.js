@@ -23,7 +23,8 @@ const elements = {
     peopleList: document.getElementById('peopleList'),
     shuffleBtn: document.getElementById('shuffleBtn'),
     resultsSection: document.getElementById('resultsSection'),
-    teamsDisplay: document.getElementById('teamsDisplay')
+    teamsDisplay: document.getElementById('teamsDisplay'),
+    participantCount: document.querySelector('.participantCount')
 };
 
 function init() {
@@ -190,7 +191,26 @@ function createPersonTag(person) {
     return personTag;
 }
 
+function updateParticipantCount() {
+    if (!elements.participantCount) return;
+
+    const count = state.people.length;
+    elements.participantCount.textContent = count;
+
+    const em = elements.participantCount.closest('em');
+    if (em) {
+        if (count === 0) {
+            em.style.display = 'none';
+            em.setAttribute('aria-hidden', 'true');
+        } else {
+            em.style.display = 'inline-flex';
+            em.setAttribute('aria-hidden', 'false');
+        }
+    }
+}
+
 function renderPeople() {
+    updateParticipantCount();
     elements.peopleList.innerHTML = '';
     
     const grouped = new Set();
