@@ -5,6 +5,7 @@ const state = {
     weightBalanceEnabled: false,
     membersPerTeam: 4,
     nextId: 1,
+    teamDisplayDelay: 600,
     ungroupedColor: '#94a3b8',
     groupColors: [
         '#f59e0b', '#10b981', '#ec4899', '#667eea',
@@ -342,52 +343,82 @@ function generateTeams(people) {
     return teams;
 }
 
-function displayTeams(teams) {
+async function displayTeams(teams) {
     elements.teamsDisplay.innerHTML = '';
     
+    // 1단계: 모든 팀 카드를 빈 상태로 생성
+    const teamCards = [];
     teams.forEach((team, index) => {
         const teamCard = document.createElement('div');
         teamCard.className = 'team-card';
         
         const teamTitle = document.createElement('h3');
+        teamTitle.dataset.teamIndex = index;
         let titleText = `팀 ${index + 1} (${team.length}명)`;
         if (state.weightBalanceEnabled) {
-            const teamWeight = team.reduce((sum, p) => sum + (p.weight || 0), 0);
-            titleText += ` - 가중치: ${teamWeight}`;
+            titleText += ` - 가중치: 0`;
         }
         teamTitle.textContent = titleText;
         teamCard.appendChild(teamTitle);
         
         const membersList = document.createElement('ul');
-        team.forEach(person => {
-            const li = document.createElement('li');
-            let displayText = person.name;
-            if (state.weightBalanceEnabled) {
-                displayText += ` (${person.weight})`;
-            }
-            li.textContent = displayText;
-            
-            if (state.genderBalanceEnabled) {
-                const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
-                li.style.borderLeft = `4px solid ${genderColor}`;
-            }
-            
-            const groupIndex = getPersonGroupIndex(person.id);
-            if (groupIndex !== -1) {
-                const color = getGroupColor(groupIndex);
-                const dotSpan = document.createElement('span');
-                dotSpan.className = 'result-group-dot';
-                dotSpan.style.backgroundColor = color;
-                li.appendChild(dotSpan);
-            }
-            membersList.appendChild(li);
-        });
-        
+        membersList.className = 'team-members-list';
         teamCard.appendChild(membersList);
+        
         elements.teamsDisplay.appendChild(teamCard);
+        teamCards.push({ card: teamCard, title: teamTitle, list: membersList, team: team, currentWeight: 0 });
     });
     
     elements.resultsSection.classList.add('visible');
+    
+    // 2단계: 모든 팀에 돌아가면서 인원을 추가 (라운드 로빈)
+    const maxMembers = Math.max(...teams.map(t => t.length));
+    
+    for (let memberIndex = 0; memberIndex < maxMembers; memberIndex++) {
+        for (let teamIndex = 0; teamIndex < teamCards.length; teamIndex++) {
+            const teamCardData = teamCards[teamIndex];
+            const { list, team, title } = teamCardData;
+            
+            if (memberIndex < team.length) {
+                const person = team[memberIndex];
+                const li = document.createElement('li');
+                let displayText = person.name;
+                if (state.weightBalanceEnabled) {
+                    displayText += ` (${person.weight})`;
+                }
+                li.textContent = displayText;
+                
+                if (state.genderBalanceEnabled) {
+                    const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
+                    li.style.borderLeft = `4px solid ${genderColor}`;
+                }
+                
+                const groupIndex = getPersonGroupIndex(person.id);
+                if (groupIndex !== -1) {
+                    const color = getGroupColor(groupIndex);
+                    const dotSpan = document.createElement('span');
+                    dotSpan.className = 'result-group-dot';
+                    dotSpan.style.backgroundColor = color;
+                    li.appendChild(dotSpan);
+                }
+                list.appendChild(li);
+                
+                // 가중치 업데이트
+                if (state.weightBalanceEnabled) {
+                    teamCardData.currentWeight += person.weight || 0;
+                    const titleText = `팀 ${teamIndex + 1} (${memberIndex + 1}명) - 가중치: ${teamCardData.currentWeight}`;
+                    title.textContent = titleText;
+                }
+                
+                // 마지막 인원이 아닌 경우에만 지연
+                const isLastMember = memberIndex === maxMembers - 1 && teamIndex === teamCards.length - 1;
+                if (!isLastMember) {
+                    await new Promise(resolve => setTimeout(resolve, state.teamDisplayDelay));
+                }
+            }
+        }
+    }
+    
     elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
