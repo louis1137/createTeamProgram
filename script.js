@@ -3,6 +3,7 @@ const state = {
 	requiredGroups: [],
 	forbiddenPairs: [], // array of [idA, idB]
 	forbiddenMap: {},   // built from forbiddenPairs for fast lookup
+	pendingConstraints: [], // array of {left: normalized, right: normalized}
 	genderBalanceEnabled: false,
 	weightBalanceEnabled: false,
 	membersPerTeam: 4,
@@ -46,15 +47,32 @@ function init() {
 	renderPeople();
 	// prepare forbidden pairs map
 	buildForbiddenMap();
+	// try to resolve any pending textual constraints (if users were added earlier)
+	tryResolvePendingConstraints();
+	// If viewing locally (file:// or localhost), reduce team display delay to 0 for instant feedback
+	adjustLocalSettings();
 }
 
 function resetAll() {
-	if (!confirm('모든 데이터를 초기화하시겠습니까?')) {
+	if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 기피 설정(금지 제약)은 초기화되지 않습니다.')) {
 		return;
 	}
+	// Convert any applied (id-based) forbidden pairs into pending name-based constraints so they persist
+	let converted = 0;
+	state.forbiddenPairs.forEach(([a, b]) => {
+		const pa = state.people.find(p => p.id === a);
+		const pb = state.people.find(p => p.id === b);
+		if (pa && pb) {
+			if (addPendingConstraint(pa.name, pb.name).ok) converted++;
+		}
+	});
+	if (converted > 0) console.log(`초기화: 기존 제약 ${converted}개가 보류 제약으로 변환되어 유지됩니다.`);
+	// Clear people and groups, keep pendingConstraints intact so constraints persist
 	state.people = [];
 	state.requiredGroups = [];
 	state.nextId = 1;
+	state.forbiddenPairs = []; // clear id-based pairs (they become pending)
+	state.forbiddenMap = {};
 	elements.resultsSection.style.display = 'none';
 	// show FAQ again when resetting
 	const faqSection = document.querySelector('.faq-section');
@@ -101,7 +119,24 @@ function addPerson() {
 			let i = 0;
 			while (i < parts.length) {
 				const part = parts[i];
-				if (part.includes('!')) {
+				// Removal has precedence: '!!' (e.g. A!!B removes an existing or pending constraint)
+				if (part.includes('!!')) {
+					const [leftRaw, rightRaw] = part.split('!!').map(s => s.trim());
+					const leftNames = leftRaw.split(',').map(n => n.trim()).filter(n => n !== '');
+					let rightNames = rightRaw ? rightRaw.split(',').map(n => n.trim()).filter(n => n !== '') : [];
+					let j = i + 1;
+					while (j < parts.length && !parts[j].includes('!')) {
+						rightNames.push(parts[j]);
+						j++;
+					}
+					leftNames.forEach(ln => {
+						rightNames.forEach(rn => {
+							if (!ln || !rn) return;
+							removeForbiddenPairByNames(ln, rn);
+						});
+					});
+					i = j;
+				} else if (part.includes('!')) {
 					const [leftRaw, rightRaw] = part.split('!').map(s => s.trim());
 					const leftNames = leftRaw.split(',').map(n => n.trim()).filter(n => n !== '');
 					let rightNames = rightRaw ? rightRaw.split(',').map(n => n.trim()).filter(n => n !== '') : [];
@@ -114,11 +149,15 @@ function addPerson() {
 					leftNames.forEach(ln => {
 						rightNames.forEach(rn => {
 							if (!ln || !rn) return;
-							const res = addForbiddenPairByNames(ln, rn);
-							if (!res.ok) {
-								console.log('금지 제약 추가 실패:', res.message);
+							const pa = findPersonByName(ln);
+							const pb = findPersonByName(rn);
+							if (pa && pb) {
+								const res = addForbiddenPairByNames(ln, rn);
+								if (!res.ok) console.log('금지 제약 추가 실패:', res.message);
+								else console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
 							} else {
-								console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
+								const pres = addPendingConstraint(ln, rn);
+								if (!pres.ok) console.log('보류 제약 추가 실패:', pres.message);
 							}
 						});
 					});
@@ -160,6 +199,8 @@ function addPerson() {
 	elements.nameInput.value = '';
 	elements.nameInput.focus();
 	if (addedAny) renderPeople();
+	// After possibly adding people, try to resolve pending textual constraints
+	tryResolvePendingConstraints();
 }
 
 function removePerson(id) {
@@ -229,6 +270,88 @@ function addForbiddenPairByNames(nameA, nameB) {
 		console.log(`금지 제약이 이미 존재함: ${pa.name} ! ${pb.name}`);
 	}
 	return { ok: true };
+}
+
+// Add a pending constraint by name (allows adding before people exist)
+function addPendingConstraint(leftName, rightName) {
+	const l = normalizeName(leftName);
+	const r = normalizeName(rightName);
+	if (l === r) return { ok: false, message: '동일인 제약은 불가능합니다.' };
+	// Avoid duplicates in pending
+	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
+	if (existsPending) return { ok: true };
+	state.pendingConstraints.push({ left: l, right: r });
+	console.log(`보류 제약 추가됨(사람 미등록): ${leftName} ! ${rightName}`);
+	return { ok: true };
+}
+
+// Try to resolve any pending constraints when new people are added
+function tryResolvePendingConstraints() {
+	if (!state.pendingConstraints.length) return;
+	let changed = false;
+	state.pendingConstraints = state.pendingConstraints.filter(pc => {
+		const pa = findPersonByName(pc.left);
+		const pb = findPersonByName(pc.right);
+		if (pa && pb) {
+			const res = addForbiddenPairByNames(pa.name, pb.name);
+			if (res.ok) console.log(`보류 제약이 해결되어 적용됨: ${pa.name} ! ${pb.name}`);
+			changed = true;
+			return false; // remove from pending
+		}
+		return true; // keep pending
+	});
+	if (changed) buildForbiddenMap();
+}
+
+// Detect local viewing (file:// or localhost) so we can adjust behavior for developer convenience
+function isLocalView() {
+	try {
+		const proto = window.location.protocol || '';
+		const host = window.location.hostname || '';
+		return proto === 'file:' || host === 'localhost' || host === '127.0.0.1' || host === '';
+	} catch (e) {
+		return false;
+	}
+}
+
+function adjustLocalSettings() {
+	if (isLocalView()) {
+		state.teamDisplayDelay = 0;
+		console.log('로컬 환경 감지: 팀 표시 지연을 0ms로 설정합니다. (빠른 로컬 미리보기)');
+	}
+}
+
+
+
+// Remove a forbidden pair by names (supports applied pairs or pending constraints). Accepts either order.
+function removeForbiddenPairByNames(nameA, nameB) {
+	const na = normalizeName(nameA);
+	const nb = normalizeName(nameB);
+	if (na === nb) {
+		console.log('제약 제거 실패: 동일인 제약은 불가능합니다.');
+		return { ok: false, message: '동일인 제약은 불가능합니다.' };
+	}
+	// Try removing applied (id-based) forbidden pair if both persons exist
+	const pa = findPersonByName(na);
+	const pb = findPersonByName(nb);
+	if (pa && pb) {
+		const before = state.forbiddenPairs.length;
+		state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => !((a === pa.id && b === pb.id) || (a === pb.id && b === pa.id)));
+		if (state.forbiddenPairs.length !== before) {
+			buildForbiddenMap();
+			console.log(`금지 제약 제거됨: ${pa.name} ! ${pb.name}`);
+			return { ok: true };
+		}
+	}
+	// If no applied pair found (or persons not present), remove matching pending textual constraints (either order)
+	const beforePending = state.pendingConstraints.length;
+	state.pendingConstraints = state.pendingConstraints.filter(pc => !( (pc.left === na && pc.right === nb) || (pc.left === nb && pc.right === na) ));
+	if (state.pendingConstraints.length !== beforePending) {
+		console.log(`보류 제약 제거됨: ${nameA} ! ${nameB}`);
+		return { ok: true };
+	}
+	console.log('제약 제거 실패: 해당 제약을 찾을 수 없습니다.');
+	return { ok: false, message: '해당 제약을 찾을 수 없습니다.' };
 }
 
 function buildForbiddenMap() {
