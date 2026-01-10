@@ -7,7 +7,7 @@ const state = {
 	weightBalanceEnabled: false,
 	membersPerTeam: 4,
 	nextId: 1,
-	teamDisplayDelay: 0,
+	teamDisplayDelay: 600,
 	ungroupedColor: '#94a3b8',
 	groupColors: [
 		'#f59e0b', '#10b981', '#ec4899', '#667eea',
