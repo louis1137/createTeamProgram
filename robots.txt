@@ -1,0 +1,5 @@
+# Allow all bots and point to sitemap
+User-agent: *
+Allow: /
+
+Sitemap: https://louis1137.github.io/createTeamProgram/sitemap.xml

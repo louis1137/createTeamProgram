@@ -1,63 +1,122 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>팀 생성 프로그램</title>
-    <link rel="stylesheet" href="style.css">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>팀섞기 — 온라인 팀 생성 도구 | 팀 생성 프로그램</title>
+	<meta name="description" content="팀섞기(팀 섞기) 온라인 도구 — 성비·가중치 고려한 팀 생성 기능으로 쉽게 팀을 나눌 수 있습니다. 무료로 바로 사용해보세요.">
+	<meta name="robots" content="index, follow">
+	<link rel="canonical" href="https://yourdomain.com/팀섞기">
+	<meta property="og:title" content="팀섞기 — 온라인 팀 생성 도구">
+	<meta property="og:description" content="성비·가중치 기반 팀 섞기 도구. 간편하게 팀을 나눠보세요.">
+	<meta property="og:type" content="website">
+	<meta property="og:url" content="https://yourdomain.com/팀섞기">
+	<meta name="twitter:card" content="summary">
+	<link rel="stylesheet" href="style.css">
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "WebPage",
+		"name": "팀섞기 — 팀 생성 프로그램",
+		"url": "https://yourdomain.com/팀섞기",
+		"description": "온라인 팀섞기 도구 — 성비와 가중치 고려한 팀 구성"
+	}
+	</script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎯 팀 생성 프로그램</h1>
-        </header>
+	<div class="container">
+		<header>
+			<h1>🎯 팀섞기 — 팀 생성 프로그램</h1>
+			<p class="description">온라인으로 빠르게 팀을 섞는 도구입니다. 성비 균등, 가중치 균등 옵션으로 공정한 팀 섞기를 지원합니다.</p>
+		</header>
 
-        <section class="people-section">
-            <div class="section-header">
-                <h2>참가자 관리</h2>
-                <div class="tool">
-                    <em><span class="participantCount">0</span>명 참여중</em>
-                    <button id="resetBtn" class="btn btn-reset">초기화</button>
-                </div>
-            </div>
-            <div id="peopleList" class="people-list"></div>
-            <div class="add-person-container">
-                <input type="text" id="nameInput" placeholder="이름 입력 (,는 그룹 /는 구분. 예: 가,나,다 / 라 / 마,바)" class="name-input">
-                <button id="addPersonBtn" class="btn btn-add">+</button>
-            </div>
-        </section>
+		<section class="people-section">
+			<div class="section-header">
+				<h2>참가자 관리</h2>
+				<div class="tool">
+					<em><span class="participantCount">0</span>명 참여중</em>
+					<button id="resetBtn" class="btn btn-reset">초기화</button>
+				</div>
+			</div>
+			<div id="peopleList" class="people-list"></div>
+			<div class="add-person-container">
+				<input type="text" id="nameInput" placeholder="이름 입력 (,는 그룹 /는 구분. 예: 가,나,다 / 라 / 마,바)" class="name-input">
+				<button id="addPersonBtn" class="btn btn-add">+</button>
+			</div>
+		</section>
 
-        <section class="options-section">
-            <div class="option">
-                <label>
-                    <input type="checkbox" id="genderBalanceCheckbox">
-                    성비 균등
-                </label>
-            </div>
-            <div class="option">
-                <label>
-                    <input type="checkbox" id="weightBalanceCheckbox">
-                    가중치 균등
-                </label>
-            </div>
-            <div class="option">
-                <label>
-                    팀 인원수:
-                    <input type="number" id="teamSizeInput" min="2" value="4">
-                </label>
-            </div>
-        </section>
+		<section class="options-section">
+			<div class="option">
+				<label>
+					<input type="checkbox" id="genderBalanceCheckbox">
+					성비 균등
+				</label>
+			</div>
+			<div class="option">
+				<label>
+					<input type="checkbox" id="weightBalanceCheckbox">
+					가중치 균등
+				</label>
+			</div>
+			<div class="option">
+				<label>
+					팀 인원수:
+					<input type="number" id="teamSizeInput" min="2" value="4">
+				</label>
+			</div>
+		</section>
 
-        <section class="action-section">
-            <button id="shuffleBtn" class="btn btn-primary">팀 생성</button>
-        </section>
+		<section class="action-section">
+			<button id="shuffleBtn" class="btn btn-primary">팀 생성</button>
+		</section>
 
-        <section class="results-section" id="resultsSection">
-            <h2>생성된 팀</h2>
-            <div id="teamsDisplay" class="teams-display"></div>
-        </section>
-    </div>
+		<section class="faq-section" aria-label="FAQ">
+			<h2>자주 묻는 질문 (FAQ)</h2>
+			<div class="faq">
+				<details><summary>팀섞기란 무엇인가요?</summary><p>팀섞기는 참가자들을 지정된 규칙(팀크기, 성비, 가중치 등)에 맞춰 무작위로 또는 균형 있게 나누는 도구입니다.</p></details>
+				<details><summary>성비 균등은 어떻게 동작하나요?</summary><p>성비 균등 체크 시 가능한 한 남/여 비율이 균형을 이루도록 팀을 배정합니다(성별 직접 설정 가능).</p></details>
+				<details><summary>가중치 균등은 무엇인가요?</summary><p>가중치 균등을 사용하면 각 참가자에게 부여한 점수를 고려해 팀의 총 가중치가 균형이 되도록 배정합니다.</p></details>
+			</div>
+			<script type="application/ld+json">
+			{
+			"@context": "https://schema.org",
+			"@type": "FAQPage",
+			"mainEntity": [
+				{
+				"@type": "Question",
+				"name": "팀섞기란 무엇인가요?",
+				"acceptedAnswer": {
+					"@type": "Answer",
+					"text": "팀섞기는 참가자들을 지정된 규칙(팀크기, 성비, 가중치 등)에 맞춰 무작위로 또는 균형 있게 나누는 도구입니다."
+				}
+				},
+				{
+				"@type": "Question",
+				"name": "성비 균등은 어떻게 동작하나요?",
+				"acceptedAnswer": {
+					"@type": "Answer",
+					"text": "성비 균등 체크 시 가능한 한 남/여 비율이 균형을 이루도록 팀을 배정합니다(성별 직접 설정 가능)."
+				}
+				},
+				{
+				"@type": "Question",
+				"name": "가중치 균등은 무엇인가요?",
+				"acceptedAnswer": {
+					"@type": "Answer",
+					"text": "가중치 균등을 사용하면 각 참가자에게 부여한 점수를 고려해 팀의 총 가중치가 균형이 되도록 배정합니다."
+				}
+				}
+			]
+			}
+			</script>
+		</section>
 
-    <script src="script.js"></script>
+		<section class="results-section" id="resultsSection">
+			<h2>생성된 팀</h2>
+			<div id="teamsDisplay" class="teams-display"></div>
+		</section>
+	</div>
+
+	<script src="script.js"></script>
 </body>
 </html>
