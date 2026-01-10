@@ -1,11 +1,13 @@
 const state = {
 	people: [],
 	requiredGroups: [],
+	forbiddenPairs: [], // array of [idA, idB]
+	forbiddenMap: {},   // built from forbiddenPairs for fast lookup
 	genderBalanceEnabled: false,
 	weightBalanceEnabled: false,
 	membersPerTeam: 4,
 	nextId: 1,
-	teamDisplayDelay: 600,
+	teamDisplayDelay: 0,
 	ungroupedColor: '#94a3b8',
 	groupColors: [
 		'#f59e0b', '#10b981', '#ec4899', '#667eea',
@@ -42,6 +44,8 @@ function init() {
 	elements.shuffleBtn.addEventListener('click', shuffleTeams);
 	
 	renderPeople();
+	// prepare forbidden pairs map
+	buildForbiddenMap();
 }
 
 function resetAll() {
@@ -52,6 +56,9 @@ function resetAll() {
 	state.requiredGroups = [];
 	state.nextId = 1;
 	elements.resultsSection.style.display = 'none';
+	// show FAQ again when resetting
+	const faqSection = document.querySelector('.faq-section');
+	if (faqSection) faqSection.style.display = '';
 	renderPeople();
 }
 
@@ -76,46 +83,97 @@ function addPerson() {
 		alert('이름을 입력해주세요.');
 		return;
 	}
-	
-	const groups = input.split('/').map(g => g.trim()).filter(g => g !== '');
-	
-	if (groups.length === 0) {
+
+	// Split by '/' into tokens; tokens with '!' are treated as constraints, others as names/groups
+	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
+
+	if (tokens.length === 0) {
 		alert('이름을 입력해주세요.');
 		return;
 	}
-	
-	groups.forEach(group => {
-		const names = group.split(',').map(n => n.trim()).filter(n => n !== '');
+
+	let addedAny = false;
+
+	tokens.forEach(token => {
+		if (token.includes('!')) {
+			// Support constraints like "A!B,C,D" and multiple constraints in one token (e.g. "A!B,C,X!Y,Z").
+			const parts = token.split(',').map(p => p.trim()).filter(p => p !== '');
+			let i = 0;
+			while (i < parts.length) {
+				const part = parts[i];
+				if (part.includes('!')) {
+					const [leftRaw, rightRaw] = part.split('!').map(s => s.trim());
+					const leftNames = leftRaw.split(',').map(n => n.trim()).filter(n => n !== '');
+					let rightNames = rightRaw ? rightRaw.split(',').map(n => n.trim()).filter(n => n !== '') : [];
+					// consume following parts that do NOT contain '!' as additional right-side names
+					let j = i + 1;
+					while (j < parts.length && !parts[j].includes('!')) {
+						rightNames.push(parts[j]);
+						j++;
+					}
+					leftNames.forEach(ln => {
+						rightNames.forEach(rn => {
+							if (!ln || !rn) return;
+							const res = addForbiddenPairByNames(ln, rn);
+							if (!res.ok) {
+								console.log('금지 제약 추가 실패:', res.message);
+							} else {
+								console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
+							}
+						});
+					});
+					i = j;
+				} else {
+					i++;
+				}
+			}
+		} else {
+			// Normal group / name token
+			const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
+			if (names.length === 0) return;
+			const newIds = [];
 		
-		if (names.length === 0) return;
-		
-		const newIds = [];
-		
-		names.forEach(name => {
-			const person = {
-				id: state.nextId++,
-				name: name,
-				gender: 'male',
-				weight: 100
-			};
-			state.people.push(person);
-			newIds.push(person.id);
-		});
-		
-		if (names.length > 1) {
-			state.requiredGroups.push(newIds);
+			names.forEach(name => {
+				const normalized = normalizeName(name);
+				const exists = state.people.some(p => normalizeName(p.name) === normalized);
+				if (exists) {
+					// Prevent duplicate names
+					alert(`${name}은(는) 이미 등록된 이름입니다.`);
+					return;
+				}
+				const person = {
+					id: state.nextId++,
+					name: name,
+					gender: 'male',
+					weight: 100
+				};
+				state.people.push(person);
+				newIds.push(person.id);
+				addedAny = true;
+			});
+			if (newIds.length > 1) {
+				state.requiredGroups.push(newIds);
+			}
 		}
 	});
-	
+
 	elements.nameInput.value = '';
 	elements.nameInput.focus();
-	renderPeople();
+	if (addedAny) renderPeople();
 }
 
 function removePerson(id) {
 	state.people = state.people.filter(p => p.id !== id);
 	state.requiredGroups = state.requiredGroups.map(group => group.filter(pid => pid !== id));
 	state.requiredGroups = state.requiredGroups.filter(group => group.length > 1);
+	// Remove any forbidden pairs involving this person
+	const before = state.forbiddenPairs.length;
+	state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => a !== id && b !== id);
+	const after = state.forbiddenPairs.length;
+	if (before !== after) {
+		console.log(`제약 제거: 삭제된 사람(id:${id})과 관련된 제약 ${before - after}개가 제거되었습니다.`);
+	}
+	buildForbiddenMap();
 	renderPeople();
 }
 
@@ -131,6 +189,75 @@ function updatePersonWeight(id, weight) {
 	if (person) {
 		person.weight = parseInt(weight) || 0;
 	}
+}
+
+// --- Helper functions for constraints and name normalization ---
+function normalizeName(name) {
+	return (name || '').trim().toLowerCase();
+}
+
+function findPersonByName(name) {
+	return state.people.find(p => normalizeName(p.name) === normalizeName(name));
+}
+
+function addForbiddenPairByNames(nameA, nameB) {
+	const pa = findPersonByName(nameA);
+	const pb = findPersonByName(nameB);
+	if (!pa || !pb) {
+		const msg = `등록된 사용자 중에 ${!pa ? nameA : nameB}을(를) 찾을 수 없습니다.`;
+		console.log('금지 제약 추가 실패:', msg);
+		return { ok: false, message: msg };
+	}
+	if (pa.id === pb.id) {
+		const msg = '동일인에 대한 제약은 불가능합니다.';
+		console.log('금지 제약 추가 실패:', msg);
+		return { ok: false, message: msg };
+	}
+	const gA = getPersonGroupIndex(pa.id);
+	const gB = getPersonGroupIndex(pb.id);
+	if (gA !== -1 && gA === gB) {
+		const msg = `${pa.name}와 ${pb.name}는 같은 그룹에 속해 있어 제약을 추가할 수 없습니다.`;
+		console.log('금지 제약 추가 실패:', msg);
+		return { ok: false, message: msg };
+	}
+	const exists = state.forbiddenPairs.some(([a, b]) => (a === pa.id && b === pb.id) || (a === pb.id && b === pa.id));
+	if (!exists) {
+		state.forbiddenPairs.push([pa.id, pb.id]);
+		buildForbiddenMap();
+		console.log(`금지 제약 추가됨: ${pa.name} (id:${pa.id}) ! ${pb.name} (id:${pb.id})`);
+	} else {
+		console.log(`금지 제약이 이미 존재함: ${pa.name} ! ${pb.name}`);
+	}
+	return { ok: true };
+}
+
+function buildForbiddenMap() {
+	state.forbiddenMap = {};
+	state.forbiddenPairs.forEach(([a, b]) => {
+		if (!state.forbiddenMap[a]) state.forbiddenMap[a] = new Set();
+		if (!state.forbiddenMap[b]) state.forbiddenMap[b] = new Set();
+		state.forbiddenMap[a].add(b);
+		state.forbiddenMap[b].add(a);
+	});
+}
+
+function isForbidden(aId, bId) {
+	return state.forbiddenMap[aId] && state.forbiddenMap[aId].has(bId);
+}
+
+function teamHasForbiddenConflict(team, person) {
+	return team.some(m => isForbidden(m.id, person.id));
+}
+
+function conflictExists(teams) {
+	for (const team of teams) {
+		for (let i = 0; i < team.length; i++) {
+			for (let j = i + 1; j < team.length; j++) {
+				if (isForbidden(team[i].id, team[j].id)) return true;
+			}
+		}
+	}
+	return false;
 }
 
 function getPersonGroupIndex(personId) {
@@ -264,86 +391,164 @@ function shuffleTeams() {
 	}
 	
 	const teams = generateTeams(validPeople);
+	if (!teams) return; // generateTeams shows error when impossible
 	displayTeams(teams);
 }
 
 function generateTeams(people) {
-	const teamCount = Math.ceil(people.length / state.membersPerTeam);
-	const teams = Array.from({ length: teamCount }, () => []);
-	const assigned = new Set();
-	
-	const validGroups = state.requiredGroups.filter(group => 
-		group.every(id => people.some(p => p.id === id))
-	);
-	
-	validGroups.forEach(group => {
-		group.forEach(id => assigned.add(id));
-	});
-	
-	const shuffledGroups = [...validGroups].sort(() => Math.random() - 0.5);
-	shuffledGroups.forEach((group, index) => {
-		const teamIndex = index % teamCount;
-		const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
-		teams[teamIndex].push(...groupMembers);
-	});
-	
-	const unassignedPeople = people.filter(p => !assigned.has(p.id));
-	
-	if (state.genderBalanceEnabled) {
-		const shuffled = unassignedPeople.sort(() => Math.random() - 0.5);
-		
-		shuffled.forEach(person => {
-			const teamStats = teams.map((team, idx) => {
-				const genderCount = team.filter(p => p.gender === person.gender).length;
-				const totalWeight = team.reduce((sum, p) => sum + (p.weight || 0), 0);
-				return { idx, genderCount, totalSize: team.length, totalWeight };
-			});
-			
-			const minGenderCount = Math.min(...teamStats.map(t => t.genderCount));
-			const teamsWithMinGender = teamStats.filter(t => t.genderCount === minGenderCount);
-			
-			const minSize = Math.min(...teamsWithMinGender.map(t => t.totalSize));
-			const bestTeams = teamsWithMinGender.filter(t => t.totalSize === minSize);
-			
-			let chosenTeam;
-			if (state.weightBalanceEnabled) {
-				const minWeight = Math.min(...bestTeams.map(t => t.totalWeight));
-				const lightestTeams = bestTeams.filter(t => t.totalWeight === minWeight);
-				chosenTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)];
-			} else {
-				chosenTeam = bestTeams[Math.floor(Math.random() * bestTeams.length)];
+	buildForbiddenMap();
+
+	// Quick validation: a required group cannot contain a forbidden pair
+	for (const group of state.requiredGroups) {
+		for (let i = 0; i < group.length; i++) {
+			for (let j = i + 1; j < group.length; j++) {
+				if (isForbidden(group[i], group[j])) {
+					showError('같은 그룹에 금지 제약이 있으므로 팀 배치가 불가능합니다. 제약을 확인하세요.');
+					return null;
+				}
 			}
-			
-			teams[chosenTeam.idx].push(person);
-		});
-	} else if (state.weightBalanceEnabled) {
-		const sorted = unassignedPeople.sort((a, b) => b.weight - a.weight);
-		
-		sorted.forEach(person => {
-			const teamSizes = teams.map(t => t.length);
-			const minSize = Math.min(...teamSizes);
-			const smallestTeams = teams.map((team, idx) => ({ team, idx, size: team.length }))
-				.filter(t => t.size === minSize);
-			
-			const teamWeights = smallestTeams.map(t => 
-				t.team.reduce((sum, p) => sum + (p.weight || 0), 0)
-			);
-			const minWeightTeam = smallestTeams[teamWeights.indexOf(Math.min(...teamWeights))];
-			teams[minWeightTeam.idx].push(person);
-		});
-	} else {
-		const shuffled = unassignedPeople.sort(() => Math.random() - 0.5);
-		shuffled.forEach(person => {
-			const teamSizes = teams.map(t => t.length);
-			const minSizeIndex = teamSizes.indexOf(Math.min(...teamSizes));
-			teams[minSizeIndex].push(person);
-		});
+		}
 	}
-	
-	return teams;
+
+	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
+	const maxAttempts = 200;
+
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const teams = Array.from({ length: teamCount }, () => []);
+		const assigned = new Set();
+
+		const validGroups = state.requiredGroups.filter(group => 
+			group.every(id => people.some(p => p.id === id))
+		);
+
+		const shuffledGroups = [...validGroups].sort(() => Math.random() - 0.5);
+		shuffledGroups.forEach((group, index) => {
+			const teamIndex = index % teamCount;
+			const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
+			teams[teamIndex].push(...groupMembers);
+			groupMembers.forEach(m => assigned.add(m.id));
+		});
+
+		const unassignedPeople = [...people.filter(p => !assigned.has(p.id))].sort(() => Math.random() - 0.5);
+
+		// assign unassigned people trying to avoid forbidden conflicts
+		for (const person of unassignedPeople) {
+			if (state.genderBalanceEnabled) {
+				const teamStats = teams.map((team, idx) => ({
+					idx,
+					genderCount: team.filter(p => p.gender === person.gender).length,
+					totalSize: team.length,
+					totalWeight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
+				}));
+
+				const minGenderCount = Math.min(...teamStats.map(t => t.genderCount));
+				let candidates = teamStats.filter(t => t.genderCount === minGenderCount);
+
+				const minSize = Math.min(...candidates.map(t => t.totalSize));
+				candidates = candidates.filter(t => t.totalSize === minSize);
+
+				// Prefer candidates with no forbidden conflict
+				let eligible = candidates.filter(t => !teamHasForbiddenConflict(teams[t.idx], person));
+
+				if (eligible.length === 0) {
+					// broaden search to any team with zero conflict
+					const zeroConflict = teamStats.filter(t => !teamHasForbiddenConflict(teams[t.idx], person));
+					if (zeroConflict.length > 0) {
+						const minZeroSize = Math.min(...zeroConflict.map(t => t.totalSize));
+						eligible = zeroConflict.filter(t => t.totalSize === minZeroSize);
+					}
+				}
+
+				let chosen;
+				if (eligible.length > 0) {
+					if (state.weightBalanceEnabled) {
+						const minWeight = Math.min(...eligible.map(t => t.totalWeight));
+						const lightest = eligible.filter(t => t.totalWeight === minWeight);
+						chosen = lightest[Math.floor(Math.random() * lightest.length)];
+					} else {
+						chosen = eligible[Math.floor(Math.random() * eligible.length)];
+					}
+				} else {
+					// No zero-conflict team found — pick team with minimal conflict count and smallest size
+					let bestScore = Infinity;
+					let bestTeams = [];
+					for (const t of teamStats) {
+						const conflictCount = teams[t.idx].reduce((c, m) => c + (isForbidden(m.id, person.id) ? 1 : 0), 0);
+						const score = conflictCount * 1000 + t.totalSize; // prioritize fewer conflicts, then smaller size
+						if (score < bestScore) { bestScore = score; bestTeams = [t]; }
+						else if (score === bestScore) bestTeams.push(t);
+					}
+					chosen = bestTeams[Math.floor(Math.random() * bestTeams.length)];
+				}
+
+				teams[chosen.idx].push(person);
+			} else if (state.weightBalanceEnabled) {
+				const sortedTeams = teams.map((team, idx) => ({ team, idx, size: team.length, totalWeight: team.reduce((s, p) => s + (p.weight || 0), 0) }));
+				const minSize = Math.min(...sortedTeams.map(t => t.size));
+				let smallest = sortedTeams.filter(t => t.size === minSize);
+
+				let eligible = smallest.filter(t => !teamHasForbiddenConflict(t.team, person));
+				if (eligible.length === 0) {
+					// expand to any team with zero conflict
+					const zeroConflict = sortedTeams.filter(t => !teamHasForbiddenConflict(t.team, person));
+					if (zeroConflict.length > 0) {
+						const minZeroSize = Math.min(...zeroConflict.map(t => t.size));
+						eligible = zeroConflict.filter(t => t.size === minZeroSize);
+					}
+				}
+
+				if (eligible.length > 0) {
+					const minWeight = Math.min(...eligible.map(t => t.totalWeight));
+					const chosenTeam = eligible.filter(t => t.totalWeight === minWeight)[0];
+					teams[chosenTeam.idx].push(person);
+				} else {
+					// fallback minimal conflict
+					let bestScore = Infinity; let bestTeams = [];
+					for (const t of sortedTeams) {
+						const conflictCount = t.team.reduce((c, m) => c + (isForbidden(m.id, person.id) ? 1 : 0), 0);
+						const score = conflictCount * 1000 + t.size;
+						if (score < bestScore) { bestScore = score; bestTeams = [t]; }
+						else if (score === bestScore) bestTeams.push(t);
+					}
+					const chosenTeam = bestTeams[Math.floor(Math.random() * bestTeams.length)];
+					teams[chosenTeam.idx].push(person);
+				}
+			} else {
+				const teamSizes = teams.map(t => t.length);
+				const minSize = Math.min(...teamSizes);
+				let smallestTeams = teams.map((team, idx) => ({ team, idx, size: team.length })).filter(t => t.size === minSize);
+				let eligible = smallestTeams.filter(t => !teamHasForbiddenConflict(t.team, person));
+				let chosenTeam;
+				if (eligible.length > 0) chosenTeam = eligible[Math.floor(Math.random() * eligible.length)];
+				else {
+					// minimal conflict fallback
+					let bestScore = Infinity; let bestTeams = [];
+					for (const t of smallestTeams) {
+						const conflictCount = t.team.reduce((c, m) => c + (isForbidden(m.id, person.id) ? 1 : 0), 0);
+						const score = conflictCount * 1000 + t.size;
+						if (score < bestScore) { bestScore = score; bestTeams = [t]; }
+						else if (score === bestScore) bestTeams.push(t);
+					}
+					chosenTeam = bestTeams[Math.floor(Math.random() * bestTeams.length)];
+				}
+				teams[chosenTeam.idx].push(person);
+			}
+		}
+
+		// If assignment succeeded without conflicts, return teams
+		if (!conflictExists(teams)) {
+			return teams;
+		}
+	}
+
+	showError('제약 조건으로 팀 배치가 불가능합니다. 제약을 검토해주세요.');
+	return null;
 }
 
 async function displayTeams(teams) {
+	// hide FAQ when teams are shown
+	const faqSection = document.querySelector('.faq-section');
+	if (faqSection) faqSection.style.display = 'none';
 	elements.teamsDisplay.innerHTML = '';
 	
 	// 1단계: 모든 팀 카드를 빈 상태로 생성

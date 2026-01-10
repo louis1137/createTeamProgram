@@ -165,6 +165,32 @@ h2 {
 	font-size: 0.9rem;
 }
 
+/* FAQ styling: make questions and answers visually distinct */
+.faq {
+	margin-top: 20px;
+}
+
+.faq details {
+	border: 1px solid #e6eefb;
+	background: #ffffff;
+	padding: 10px 12px;
+	border-radius: 8px;
+	margin-bottom: 10px;
+}
+
+.faq summary {
+	font-weight: 700;
+	cursor: pointer;
+	color: #111827;
+	padding: 4px 0;
+}
+
+.faq p {
+	margin-top: 8px;
+	color: #374151;
+	padding-left: 6px;
+}
+
 .group-container {
 	display: flex;
 	gap: 6px;
