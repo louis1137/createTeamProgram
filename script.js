@@ -66,7 +66,10 @@ function resetAll() {
 			if (addPendingConstraint(pa.name, pb.name).ok) converted++;
 		}
 	});
-	if (converted > 0) console.log(`초기화: 기존 제약 ${converted}개가 보류 제약으로 변환되어 유지됩니다.`);
+	if (converted > 0) {
+		console.log(`초기화: 기존 제약 ${converted}개가 보류 제약으로 변환되어 유지됩니다.`);
+			safeOpenForbiddenWindow();
+	}
 	// Clear people and groups, keep pendingConstraints intact so constraints persist
 	state.people = [];
 	state.requiredGroups = [];
@@ -132,7 +135,9 @@ function addPerson() {
 					leftNames.forEach(ln => {
 						rightNames.forEach(rn => {
 							if (!ln || !rn) return;
-							removeForbiddenPairByNames(ln, rn);
+							const rres = removeForbiddenPairByNames(ln, rn);
+							if (!rres.ok) console.log('보류/적용 제약 제거 실패:', rres.message);
+							else safeOpenForbiddenWindow();
 						});
 					});
 					i = j;
@@ -154,7 +159,11 @@ function addPerson() {
 							if (pa && pb) {
 								const res = addForbiddenPairByNames(ln, rn);
 								if (!res.ok) console.log('금지 제약 추가 실패:', res.message);
-								else console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
+						else {
+							if (res.added) console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
+							else console.log(`금지 제약이 이미 존재함: ${ln} ! ${rn}`);
+								safeOpenForbiddenWindow();
+						}
 							} else {
 								const pres = addPendingConstraint(ln, rn);
 								if (!pres.ok) console.log('보류 제약 추가 실패:', pres.message);
@@ -213,6 +222,7 @@ function removePerson(id) {
 	const after = state.forbiddenPairs.length;
 	if (before !== after) {
 		console.log(`제약 제거: 삭제된 사람(id:${id})과 관련된 제약 ${before - after}개가 제거되었습니다.`);
+				safeOpenForbiddenWindow();
 	}
 	buildForbiddenMap();
 	renderPeople();
@@ -266,11 +276,14 @@ function addForbiddenPairByNames(nameA, nameB) {
 		state.forbiddenPairs.push([pa.id, pb.id]);
 		buildForbiddenMap();
 		console.log(`금지 제약 추가됨: ${pa.name} (id:${pa.id}) ! ${pb.name} (id:${pb.id})`);
+		safeOpenForbiddenWindow();
 	} else {
 		console.log(`금지 제약이 이미 존재함: ${pa.name} ! ${pb.name}`);
+		// Even if the constraint already exists, open/focus the popup so users can view/manage it
+		safeOpenForbiddenWindow();
 	}
-	return { ok: true };
-}
+	return { ok: true, added: !exists };
+} 
 
 // Add a pending constraint by name (allows adding before people exist)
 function addPendingConstraint(leftName, rightName) {
@@ -279,10 +292,12 @@ function addPendingConstraint(leftName, rightName) {
 	if (l === r) return { ok: false, message: '동일인 제약은 불가능합니다.' };
 	// Avoid duplicates in pending
 	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
-	if (existsPending) return { ok: true };
+	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
 	console.log(`보류 제약 추가됨(사람 미등록): ${leftName} ! ${rightName}`);
-	return { ok: true };
+	// Update popup view if open (or open it)
+		safeOpenForbiddenWindow();
+	return { ok: true }; 
 }
 
 // Try to resolve any pending constraints when new people are added
@@ -300,7 +315,10 @@ function tryResolvePendingConstraints() {
 		}
 		return true; // keep pending
 	});
-	if (changed) buildForbiddenMap();
+	if (changed) {
+		buildForbiddenMap();
+		safeOpenForbiddenWindow();
+	} 
 }
 
 // Detect local viewing (file:// or localhost) so we can adjust behavior for developer convenience
@@ -340,7 +358,8 @@ function removeForbiddenPairByNames(nameA, nameB) {
 		if (state.forbiddenPairs.length !== before) {
 			buildForbiddenMap();
 			console.log(`금지 제약 제거됨: ${pa.name} ! ${pb.name}`);
-			return { ok: true };
+			safeOpenForbiddenWindow();
+			return { ok: true }; 
 		}
 	}
 	// If no applied pair found (or persons not present), remove matching pending textual constraints (either order)
@@ -348,6 +367,7 @@ function removeForbiddenPairByNames(nameA, nameB) {
 	state.pendingConstraints = state.pendingConstraints.filter(pc => !( (pc.left === na && pc.right === nb) || (pc.left === nb && pc.right === na) ));
 	if (state.pendingConstraints.length !== beforePending) {
 		console.log(`보류 제약 제거됨: ${nameA} ! ${nameB}`);
+		safeOpenForbiddenWindow();
 		return { ok: true };
 	}
 	console.log('제약 제거 실패: 해당 제약을 찾을 수 없습니다.');
@@ -362,6 +382,198 @@ function buildForbiddenMap() {
 		state.forbiddenMap[a].add(b);
 		state.forbiddenMap[b].add(a);
 	});
+}
+
+// --- Forbidden connections popup window helpers ---
+let forbiddenPopup = null;
+
+function openForbiddenWindow() {
+	const features = 'width=600,height=700,toolbar=0,location=0,status=0,menubar=0,scrollbars=1,resizable=1';
+	try {
+		if (!forbiddenPopup || forbiddenPopup.closed) {
+			forbiddenPopup = window.open('', 'forbiddenPopup', features);
+			if (!forbiddenPopup) {
+				console.log('팝업 차단: 기피 연결 창을 열 수 없습니다. 브라우저의 팝업 차단을 확인하세요.');
+				return;
+			}
+			const doc = forbiddenPopup.document;
+			doc.open();
+			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>기피 연결자</title><style>
+				:root{--accent:#667eea;--bg:#ffffff;--muted:#666}
+				body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;padding:18px;background:var(--bg);color:#111}
+				header{background:linear-gradient(135deg,var(--accent) 0%, #764ba2 100%);color:#fff;padding:14px;border-radius:8px;margin-bottom:12px}
+				h1{margin:0;font-size:18px}
+				.add-form{display:flex;gap:8px;margin:12px 0}
+				.add-form input{flex:1;padding:8px;border:1px solid #ddd;border-radius:8px}
+				.add-form button{padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+				section{margin-bottom:12px}
+				h2{font-size:14px;margin:8px 0}
+			tul{list-style:none;padding-left:0}
+				li{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;border:1px solid #eef2ff;background:#fbfcff;margin-bottom:8px}
+				li .label{font-weight:600}
+				li .meta{color:var(--muted);font-size:0.9rem}
+				.remove-btn{background:#ef4444;border:none;color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer}
+				.empty{color:#999;padding:8px}
+				.footer{margin-top:10px;color:#666;font-size:0.9rem}
+			/* Modal overlay */
+			.initial-modal{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+			.initial-modal .modal-content{background:#fff;padding:24px;border-radius:12px;text-align:center;max-width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.2);transform-origin:top;transform:scaleY(1);transition:transform 320ms ease, opacity 220ms ease}
+			.initial-modal:not(.visible) .modal-content{transform:scaleY(0);opacity:0}
+			.initial-modal.visible .modal-content{transform:scaleY(1);opacity:1}
+			.modal-show-btn{background:var(--accent);color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1.1rem;cursor:pointer}
+			.initial-modal .warn{margin-top:8px;color:#ef4444;font-size:12px;font-weight:400;line-height:1.2}			</style></head><body>
+			<header><h1>기피 연결자</h1></header>
+			<!-- Initial modal overlay; covers the popup until '보기' is clicked -->
+			<div id="initialModal" class="initial-modal visible">
+				<div class="modal-content">
+					<button id="showBtn" class="modal-show-btn">보기</button>
+					<div id="showWarn" class="warn"> 보기 버튼을 누르면 기피셋팅의 목록이 노출됩니다</div>
+				</div>
+			</div>
+			<section class="add-form"><input id="addConstraintInput" placeholder="예: A!B 또는 해지: A!!B (쉼표로 여러 항목 가능)"><button id="addConstraintBtn">+</button></section>
+			<section id="appliedSection" style="display:none"><h2>적용된 제약</h2><div id="appliedList"></div></section>
+			<section id="pendingSection" style="display:none"><h2>대기중인 제약</h2><div id="pendingList"></div></section>
+			<script>
+				(function(){
+					const addBtn = document.getElementById('addConstraintBtn');
+					const input = document.getElementById('addConstraintInput');
+					const showBtn = document.getElementById('showBtn');
+					const modal = document.getElementById('initialModal');
+					const showWarn = document.getElementById('showWarn');
+					function refresh(){ try { if (window.opener && window.opener.renderForbiddenWindowContent) window.opener.renderForbiddenWindowContent(); } catch(e){console.log(e);} }
+					addBtn.addEventListener('click', ()=>{
+						const v = input.value.trim(); if (!v) return; input.value='';
+						try {
+							if (!window.opener) throw new Error('부모창을 찾을 수 없습니다');
+							const parts = v.split(',').map(s=>s.trim()).filter(Boolean);
+							parts.forEach(part=>{
+								if (part.includes('!!')){
+									const [L,R] = part.split('!!').map(s=>s.trim());
+									const lefts = L.split(',').map(x=>x.trim()).filter(Boolean);
+									const rights = R.split(',').map(x=>x.trim()).filter(Boolean);
+									lefts.forEach(ln=>rights.forEach(rn=>{ try{ window.opener.removeForbiddenPairByNames(ln,rn); }catch(e){console.log(e)} }));
+								} else if (part.includes('!')){
+									const [L,R] = part.split('!').map(s=>s.trim());
+									const lefts = L.split(',').map(x=>x.trim()).filter(Boolean);
+									const rights = R.split(',').map(x=>x.trim()).filter(Boolean);
+									lefts.forEach(ln=>rights.forEach(rn=>{
+										try{
+											const res = window.opener.addForbiddenPairByNames(ln, rn);
+											if (!res.ok){ window.opener.addPendingConstraint(ln,rn); }
+										}catch(e){ console.log(e); }
+									}));
+								}
+							});
+							// refresh popup lists only
+							refresh();
+						} catch(e){ console.log('추가 실패', e); }
+					});
+					input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') addBtn.click(); });
+					// Show lists and hide modal when '보기' clicked
+					function hideModal(){
+						// cancel any pending scheduled re-show
+						if (reShowTimeout){ clearTimeout(reShowTimeout); reShowTimeout = null; }
+						modal.classList.remove('visible');
+						setTimeout(()=>{ if (!modal.classList.contains('visible')) modal.style.display = 'none'; }, 340);
+						document.getElementById('appliedSection').style.display = '';
+						document.getElementById('pendingSection').style.display = '';
+						showWarn.style.display = 'none';
+						refresh();
+					}
+					showBtn.addEventListener('click', hideModal);
+					// Schedule re-show 3s after mouse leaves or popup loses focus
+					let reShowTimeout = null;
+					function scheduleModalShow(){
+						if (reShowTimeout) clearTimeout(reShowTimeout);
+						reShowTimeout = setTimeout(()=>{
+							modal.style.display = '';
+							modal.classList.add('visible');
+							document.getElementById('appliedSection').style.display = 'none';
+							document.getElementById('pendingSection').style.display = 'none';
+							showWarn.style.display = '';
+						}, 1000);
+					}
+					function cancelModalShow(){ if (reShowTimeout){ clearTimeout(reShowTimeout); reShowTimeout = null; } }
+					window.addEventListener('mouseout', (e)=>{
+						if (!e.relatedTarget && !e.toElement) scheduleModalShow();
+					});
+					window.addEventListener('blur', scheduleModalShow);
+					// Cancel scheduled re-show when mouse moves inside popup
+					window.addEventListener('mousemove', ()=>{ cancelModalShow(); });
+				})();
+			</script>
+			</body></html>`);
+			doc.close();
+			}
+			renderForbiddenWindowContent();
+			if (forbiddenPopup && !forbiddenPopup.closed) forbiddenPopup.focus();
+	} catch (e) {
+		console.log('팝업 열기 중 오류:', e);
+	}
+}
+
+function renderForbiddenWindowContent() {
+	if (!forbiddenPopup || forbiddenPopup.closed) return;
+	const doc = forbiddenPopup.document;
+	const appliedList = doc.getElementById('appliedList');
+	const pendingList = doc.getElementById('pendingList');
+	if (!appliedList || !pendingList) return;
+	// Clear
+	appliedList.innerHTML = '';
+	pendingList.innerHTML = '';
+	// Applied
+	if (state.forbiddenPairs.length) {
+		const ul = doc.createElement('ul');
+		state.forbiddenPairs.forEach(([a,b]) => {
+			const pa = state.people.find(p => p.id === a);
+			const pb = state.people.find(p => p.id === b);
+			const left = pa ? pa.name : `id:${a}`;
+			const right = pb ? pb.name : `id:${b}`;
+			const li = doc.createElement('li');
+			const label = doc.createElement('span'); label.className='label'; label.textContent = `${left} ! ${right}`;
+			li.appendChild(label);
+			const btn = doc.createElement('button'); btn.className='remove-btn'; btn.textContent='×';
+			btn.addEventListener('click', ()=>{
+				try { removeForbiddenPairByNames(left, right); renderForbiddenWindowContent(); } catch(e){ console.log(e); }
+			});
+			li.appendChild(btn);
+			ul.appendChild(li);
+		});
+		appliedList.appendChild(ul);
+	} else {
+		const p = doc.createElement('div'); p.className='empty'; p.textContent='없음'; appliedList.appendChild(p);
+	}
+	// Pending
+	if (state.pendingConstraints.length) {
+		const ul2 = doc.createElement('ul');
+		state.pendingConstraints.forEach(pc => {
+			const li = doc.createElement('li');
+			const label = doc.createElement('span'); label.className='label'; label.textContent = `${pc.left} ! ${pc.right}`;
+			li.appendChild(label);
+			const btn = doc.createElement('button'); btn.className='remove-btn'; btn.textContent='×';
+			btn.addEventListener('click', ()=>{
+				try { removeForbiddenPairByNames(pc.left, pc.right); renderForbiddenWindowContent(); } catch(e){ console.log(e); }
+			});
+			li.appendChild(btn);
+			ul2.appendChild(li);
+		});
+		pendingList.appendChild(ul2);
+	} else {
+		const p = doc.createElement('div'); p.className='empty'; p.textContent='없음'; pendingList.appendChild(p);
+	}
+}
+
+// Safe wrapper to avoid ReferenceError if popup helper isn't available in current scope
+function safeOpenForbiddenWindow() {
+	if (typeof openForbiddenWindow === 'function') {
+		try { openForbiddenWindow(); } catch (e) { console.log('팝업 열기 중 오류:', e); }
+	} else {
+		console.warn('openForbiddenWindow 함수가 정의되지 않았습니다.');
+	}
+}
+
+function escapeHtml(s) {
+	return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function isForbidden(aId, bId) {
@@ -400,7 +612,7 @@ function createPersonTag(person) {
 	
 	if (state.genderBalanceEnabled) {
 		personTag.style.backgroundColor = person.gender === 'male' ? '#e0f2fe' : '#fce7f3';
-	}
+	} 
 	
 	const nameSpan = document.createElement('span');
 	nameSpan.className = 'name';

@@ -178,6 +178,26 @@ h2 {
 	margin-bottom: 10px;
 }
 
+/* Popup note used in FAQ when '!' opens a popup */
+.faq mark {
+	background: #fff6c6;
+	padding: 4px 8px;
+	border-radius: 6px;
+	display: inline-block;
+	margin: 6px 0;
+	color: #111;
+}
+
+.faq code {
+	background: #fff6c6;
+	padding: 4px 8px;
+	border-radius: 6px;
+	display: inline-block;
+	margin: 6px 0;
+	color: #111;
+	font-weight: 600;
+}
+
 .faq summary {
 	font-weight: 700;
 	cursor: pointer;
@@ -214,7 +234,7 @@ h2 {
 	font-weight: 500;
 	transition: all 0.2s;
 	position: relative;
-}
+} 
 
 .person-tag:hover {
 	border-color: #667eea;
@@ -290,6 +310,7 @@ h2 {
 	color: #333;
 	font-size: 0.85rem;
 	text-align: center;
+	appearance: textfield;
 	-moz-appearance: textfield;
 }
 
