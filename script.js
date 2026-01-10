@@ -54,7 +54,7 @@ function init() {
 }
 
 function resetAll() {
-	if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 기피 설정(금지 제약)은 초기화되지 않습니다.')) {
+	if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 제약 설정(금지 제약)은 초기화되지 않습니다.')) {
 		return;
 	}
 	// Convert any applied (id-based) forbidden pairs into pending name-based constraints so they persist
@@ -393,12 +393,12 @@ function openForbiddenWindow() {
 		if (!forbiddenPopup || forbiddenPopup.closed) {
 			forbiddenPopup = window.open('', 'forbiddenPopup', features);
 			if (!forbiddenPopup) {
-				console.log('팝업 차단: 기피 연결 창을 열 수 없습니다. 브라우저의 팝업 차단을 확인하세요.');
+				console.log('팝업 차단: 제약 연결 창을 열 수 없습니다. 브라우저의 팝업 차단을 확인하세요.');
 				return;
 			}
 			const doc = forbiddenPopup.document;
 			doc.open();
-			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>기피 연결자</title><style>
+			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>제약 관리</title><style>	
 				:root{--accent:#667eea;--bg:#ffffff;--muted:#666}
 				body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;padding:18px;background:var(--bg);color:#111}
 				header{background:linear-gradient(135deg,var(--accent) 0%, #764ba2 100%);color:#fff;padding:14px;border-radius:8px;margin-bottom:12px}
@@ -422,12 +422,12 @@ function openForbiddenWindow() {
 			.initial-modal.visible .modal-content{transform:scaleY(1);opacity:1}
 			.modal-show-btn{background:var(--accent);color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1.1rem;cursor:pointer}
 			.initial-modal .warn{margin-top:8px;color:#ef4444;font-size:12px;font-weight:400;line-height:1.2}			</style></head><body>
-			<header><h1>기피 연결자</h1></header>
+			<header><h1>제약 연결</h1></header>
 			<!-- Initial modal overlay; covers the popup until '보기' is clicked -->
 			<div id="initialModal" class="initial-modal visible">
 				<div class="modal-content">
 					<button id="showBtn" class="modal-show-btn">보기</button>
-					<div id="showWarn" class="warn"> 보기 버튼을 누르면 기피셋팅의 목록이 노출됩니다</div>
+					<div id="showWarn" class="warn"> 보기 버튼을 누르면 제약셋팅의 목록이 노출됩니다</div>
 				</div>
 			</div>
 			<section class="add-form"><input id="addConstraintInput" placeholder="예: A!B 또는 해지: A!!B (쉼표로 여러 항목 가능)"><button id="addConstraintBtn">+</button></section>
