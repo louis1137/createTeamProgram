@@ -1,5 +1,6 @@
-const teamDisplayDelay = !isLocalView() ? 400 : 400;
-const blindDelay = !isLocalView() ? null : 3000;
+const teamDisplayDelay = isLocalView() ? 400 : 400;
+const blindDelay = isLocalView() ? 5000 : 5000;
+try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
 const state = {
 	people: [],
@@ -505,11 +506,18 @@ function openForbiddenWindow() {
 					const modal = document.getElementById('initialModal');
 					const showWarn = document.getElementById('showWarn');
 					let reShowTimeout = null;
-					// 로컬(파일/localhost) 환경에서는 보기 모달을 자동으로 숨김 처리
-					const isLocal = (function(){
-						try { return !!parentWindow && typeof parentWindow.isLocalView === 'function' && parentWindow.isLocalView(); }
-						catch(e){ return false; }
-					})();
+					let modalDisabled = false;
+					let blindTime = 1000;
+					try {
+						if (parentWindow && typeof parentWindow.blindDelay !== 'undefined') {
+							if (parentWindow.blindDelay === null) {
+								modalDisabled = true;
+							} else if (Number.isFinite(parentWindow.blindDelay)) {
+								blindTime = parentWindow.blindDelay;
+							}
+						}
+					} catch (_) { /* fallback to defaults */ }
+					// 로컬 구분 없이 부모의 blindDelay만 사용
 					function refresh(){ try { if (parentWindow && parentWindow.renderForbiddenWindowContent) parentWindow.renderForbiddenWindowContent(); } catch(e){ console.log(e); } }
 					addBtn.addEventListener('click', ()=>{
 						const v = input.value.trim(); if (!v) return; input.value='';
@@ -548,16 +556,18 @@ function openForbiddenWindow() {
 						refresh();
 					}
 					showBtn.addEventListener('click', hideModal);
-					// 로컬 환경에서는 초기 모달을 즉시 숨김 처리
-					if (isLocal) { hideModal(); }
+					// blindDelay가 null이면 모달/보기 버튼 비활성화
+					if (modalDisabled) {
+						showBtn.style.display = 'none';
+						showWarn.style.display = 'none';
+						modal.classList.remove('visible');
+						modal.style.display = 'none';
+						document.getElementById('appliedSection').style.display = '';
+						document.getElementById('pendingSection').style.display = '';
+					}
 					function scheduleModalShow(){
+						if (modalDisabled) return;
 						if (reShowTimeout) clearTimeout(reShowTimeout);
-						let blindTime = 1000;
-						try {
-							if (parentWindow && typeof parentWindow.blindDelay !== 'undefined' && parentWindow.blindDelay !== null) {
-								blindTime = parentWindow.blindDelay;
-							}
-						} catch (e) { /* use default blindTime */ }
 						reShowTimeout = setTimeout(()=>{
 							modal.style.display = '';
 							modal.classList.add('visible');
@@ -567,8 +577,8 @@ function openForbiddenWindow() {
 						}, blindTime);
 					}
 					function cancelModalShow(){ if (reShowTimeout){ clearTimeout(reShowTimeout); reShowTimeout = null; } }
-					// 로컬 환경에서는 모달 재노출 이벤트 비활성화
-					if (!isLocal) {
+					// 모달 비활성화 시 재노출 이벤트 비활성화
+					if (!modalDisabled) {
 						window.addEventListener('mouseout', (e)=>{ if (!e.relatedTarget && !e.toElement) scheduleModalShow(); });
 						window.addEventListener('blur', scheduleModalShow);
 						window.addEventListener('mousemove', ()=>{ cancelModalShow(); });
