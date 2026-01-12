@@ -1013,21 +1013,28 @@ async function displayTeams(teams) {
 	
 	// 2단계: 모든 팀에 돌아가면서 인원을 추가 (라운드 로빈)
 	const maxMembers = Math.max(...teams.map(t => t.length));
-	
+
 	// 팀원 추가 애니메이션 동안 카드 높이 흔들림 방지를 위해
 	// 각 팀 카드의 리스트 영역(ul)에 maxMembers 기준의 min-height를 설정
 	try {
 		const uls = Array.from(elements.teamsDisplay.querySelectorAll('.team-card ul'));
 		if (uls.length) {
-			// 샘플 li를 하나 붙여 실제 렌더 높이를 측정
+			// 샘플 li를 하나 붙여 실제 렌더 높이를 측정 (마진 포함)
 			const sampleLi = document.createElement('li');
 			sampleLi.style.visibility = 'hidden';
-			sampleLi.style.position = 'absolute';
+			sampleLi.style.pointerEvents = 'none';
 			sampleLi.innerHTML = '<span class="result-group-dot"></span><span>샘플</span>';
 			uls[0].appendChild(sampleLi);
+			// offsetHeight(패딩/보더 포함) + 상하 마진을 더해 한 항목의 총 세로 점유치 계산
 			const liHeight = sampleLi.offsetHeight || 40; // 폴백 높이
+			const cs = window.getComputedStyle(sampleLi);
+			const mt = parseFloat(cs.marginTop) || 0;
+			const mb = parseFloat(cs.marginBottom) || 0;
+			const between = Math.max(mt, mb); // 인접 블록 간 마진 겹침 고려
 			uls[0].removeChild(sampleLi);
-			const minListHeight = liHeight * maxMembers;
+			const minListHeight = maxMembers > 0
+				? (liHeight * maxMembers + mt + mb + (maxMembers - 1) * between)
+				: 0;
 			uls.forEach(ul => { ul.style.minHeight = minListHeight + 'px'; });
 		}
 	} catch (_) { /* 측정 실패 시 무시하고 진행 */ }
