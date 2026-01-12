@@ -117,64 +117,49 @@ function addPerson() {
 
 	tokens.forEach(token => {
 		if (token.includes('!')) {
-			// Support constraints like "A!B,C,D" and multiple constraints in one token (e.g. "A!B,C,X!Y,Z").
-			const parts = token.split(',').map(p => p.trim()).filter(p => p !== '');
-			let i = 0;
-			while (i < parts.length) {
-				const part = parts[i];
-				// Removal has precedence: '!!' (e.g. A!!B removes an existing or pending constraint)
-				if (part.includes('!!')) {
-					const [leftRaw, rightRaw] = part.split('!!').map(s => s.trim());
-					const leftNames = leftRaw.split(',').map(n => n.trim()).filter(n => n !== '');
-					let rightNames = rightRaw ? rightRaw.split(',').map(n => n.trim()).filter(n => n !== '') : [];
-					let j = i + 1;
-					while (j < parts.length && !parts[j].includes('!')) {
-						rightNames.push(parts[j]);
-						j++;
+			// Handle multiple constraints in one input: "A!B!C!D" or "A!B,C!E"
+			// First, split by comma to handle "A!B,C!E" -> ["A!B", "C!E"]
+			const constraintParts = token.split(',').map(p => p.trim()).filter(p => p !== '');
+			
+			constraintParts.forEach(constraint => {
+				// Handle removal: A!!B
+				if (constraint.includes('!!')) {
+					const [left, right] = constraint.split('!!').map(s => s.trim());
+					if (left && right) {
+						const rres = removeForbiddenPairByNames(left, right);
+						if (!rres.ok) console.log('보류/적용 제약 제거 실패:', rres.message);
+						else safeOpenForbiddenWindow();
 					}
-					leftNames.forEach(ln => {
-						rightNames.forEach(rn => {
-							if (!ln || !rn) return;
-							const rres = removeForbiddenPairByNames(ln, rn);
-							if (!rres.ok) console.log('보류/적용 제약 제거 실패:', rres.message);
-							else safeOpenForbiddenWindow();
-						});
-					});
-					i = j;
-				} else if (part.includes('!')) {
-					const [leftRaw, rightRaw] = part.split('!').map(s => s.trim());
-					const leftNames = leftRaw.split(',').map(n => n.trim()).filter(n => n !== '');
-					let rightNames = rightRaw ? rightRaw.split(',').map(n => n.trim()).filter(n => n !== '') : [];
-					// consume following parts that do NOT contain '!' as additional right-side names
-					let j = i + 1;
-					while (j < parts.length && !parts[j].includes('!')) {
-						rightNames.push(parts[j]);
-						j++;
-					}
-					leftNames.forEach(ln => {
-						rightNames.forEach(rn => {
-							if (!ln || !rn) return;
+				}
+				// Handle pairwise constraints: A!B!C!D -> all pairs
+				else if (constraint.includes('!')) {
+					const names = constraint.split('!').map(s => s.trim()).filter(s => s !== '');
+					
+					// Create pairwise constraints for all combinations
+					for (let i = 0; i < names.length; i++) {
+						for (let j = i + 1; j < names.length; j++) {
+							const ln = names[i];
+							const rn = names[j];
+							if (!ln || !rn) continue;
+							
 							const pa = findPersonByName(ln);
 							const pb = findPersonByName(rn);
 							if (pa && pb) {
 								const res = addForbiddenPairByNames(ln, rn);
 								if (!res.ok) console.log('금지 제약 추가 실패:', res.message);
-						else {
-							if (res.added) console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
-							else console.log(`금지 제약이 이미 존재함: ${ln} ! ${rn}`);
-								safeOpenForbiddenWindow();
-						}
+								else {
+									if (res.added) console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
+									else console.log(`금지 제약이 이미 존재함: ${ln} ! ${rn}`);
+									safeOpenForbiddenWindow();
+								}
 							} else {
 								const pres = addPendingConstraint(ln, rn);
 								if (!pres.ok) console.log('보류 제약 추가 실패:', pres.message);
 							}
-						});
-					});
-					i = j;
-				} else {
-					i++;
+						}
+					}
 				}
-			}
+			});
 		} else {
 			// Normal group / name token
 			const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
@@ -390,6 +375,15 @@ let forbiddenPopup = null;
 function openForbiddenWindow() {
 	const features = 'width=600,height=700,toolbar=0,location=0,status=0,menubar=0,scrollbars=1,resizable=1';
 	try {
+		// If popup exists but became cross-origin, close and recreate
+		if (forbiddenPopup && !forbiddenPopup.closed) {
+			try {
+				void forbiddenPopup.document;
+			} catch (e) {
+				forbiddenPopup.close();
+				forbiddenPopup = null;
+			}
+		}
 		if (!forbiddenPopup || forbiddenPopup.closed) {
 			forbiddenPopup = window.open('', 'forbiddenPopup', features);
 			if (!forbiddenPopup) {
@@ -398,9 +392,9 @@ function openForbiddenWindow() {
 			}
 			const doc = forbiddenPopup.document;
 			doc.open();
-			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>제약 관리</title><style>	
+			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>제약 관리</title><style>
 				:root{--accent:#667eea;--bg:#ffffff;--muted:#666}
-				body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;padding:18px;background:var(--bg);color:#111}
+				body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:18px;background:var(--bg);color:#111}
 				header{background:linear-gradient(135deg,var(--accent) 0%, #764ba2 100%);color:#fff;padding:14px;border-radius:8px;margin-bottom:12px}
 				h1{margin:0;font-size:18px}
 				.add-form{display:flex;gap:8px;margin:12px 0}
@@ -408,22 +402,19 @@ function openForbiddenWindow() {
 				.add-form button{padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer}
 				section{margin-bottom:12px}
 				h2{font-size:14px;margin:8px 0}
-			tul{list-style:none;padding-left:0}
+				ul{list-style:none;padding-left:0}
 				li{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;border:1px solid #eef2ff;background:#fbfcff;margin-bottom:8px}
 				li .label{font-weight:600}
-				li .meta{color:var(--muted);font-size:0.9rem}
 				.remove-btn{background:#ef4444;border:none;color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer}
 				.empty{color:#999;padding:8px}
-				.footer{margin-top:10px;color:#666;font-size:0.9rem}
-			/* Modal overlay */
-			.initial-modal{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-			.initial-modal .modal-content{background:#fff;padding:24px;border-radius:12px;text-align:center;max-width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.2);transform-origin:top;transform:scaleY(1);transition:transform 320ms ease, opacity 220ms ease}
-			.initial-modal:not(.visible) .modal-content{transform:scaleY(0);opacity:0}
-			.initial-modal.visible .modal-content{transform:scaleY(1);opacity:1}
-			.modal-show-btn{background:var(--accent);color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1.1rem;cursor:pointer}
-			.initial-modal .warn{margin-top:8px;color:#ef4444;font-size:12px;font-weight:400;line-height:1.2}			</style></head><body>
+				.initial-modal{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+				.initial-modal .modal-content{background:#fff;padding:24px;border-radius:12px;text-align:center;max-width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.2);transform-origin:top;transform:scaleY(1);transition:transform 320ms ease, opacity 220ms ease}
+				.initial-modal:not(.visible) .modal-content{transform:scaleY(0);opacity:0}
+				.initial-modal.visible .modal-content{transform:scaleY(1);opacity:1}
+				.modal-show-btn{background:var(--accent);color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1.1rem;cursor:pointer}
+				.initial-modal .warn{margin-top:8px;color:#ef4444;font-size:12px;font-weight:400;line-height:1.2}
+			</style></head><body>
 			<header><h1>제약 연결</h1></header>
-			<!-- Initial modal overlay; covers the popup until '보기' is clicked -->
 			<div id="initialModal" class="initial-modal visible">
 				<div class="modal-content">
 					<button id="showBtn" class="modal-show-btn">보기</button>
@@ -435,43 +426,51 @@ function openForbiddenWindow() {
 			<section id="pendingSection" style="display:none"><h2>대기중인 제약</h2><div id="pendingList"></div></section>
 			<script>
 				(function(){
+					const parentWindow = window.opener;
+					if (!parentWindow) {
+						alert('부모 창 참조를 찾을 수 없습니다. 팝업을 닫고 다시 열어주세요.');
+						return;
+					}
 					const addBtn = document.getElementById('addConstraintBtn');
 					const input = document.getElementById('addConstraintInput');
 					const showBtn = document.getElementById('showBtn');
 					const modal = document.getElementById('initialModal');
 					const showWarn = document.getElementById('showWarn');
-					function refresh(){ try { if (window.opener && window.opener.renderForbiddenWindowContent) window.opener.renderForbiddenWindowContent(); } catch(e){console.log(e);} }
+					let reShowTimeout = null;
+					// 로컬(파일/localhost) 환경에서는 보기 모달을 자동으로 숨김 처리
+					const isLocal = (function(){
+						try { return !!parentWindow && typeof parentWindow.isLocalView === 'function' && parentWindow.isLocalView(); }
+						catch(e){ return false; }
+					})();
+					function refresh(){ try { if (parentWindow && parentWindow.renderForbiddenWindowContent) parentWindow.renderForbiddenWindowContent(); } catch(e){ console.log(e); } }
 					addBtn.addEventListener('click', ()=>{
 						const v = input.value.trim(); if (!v) return; input.value='';
 						try {
-							if (!window.opener) throw new Error('부모창을 찾을 수 없습니다');
 							const parts = v.split(',').map(s=>s.trim()).filter(Boolean);
 							parts.forEach(part=>{
-								if (part.includes('!!')){
+								if (part.includes('!!')) {
 									const [L,R] = part.split('!!').map(s=>s.trim());
-									const lefts = L.split(',').map(x=>x.trim()).filter(Boolean);
-									const rights = R.split(',').map(x=>x.trim()).filter(Boolean);
-									lefts.forEach(ln=>rights.forEach(rn=>{ try{ window.opener.removeForbiddenPairByNames(ln,rn); }catch(e){console.log(e)} }));
-								} else if (part.includes('!')){
-									const [L,R] = part.split('!').map(s=>s.trim());
-									const lefts = L.split(',').map(x=>x.trim()).filter(Boolean);
-									const rights = R.split(',').map(x=>x.trim()).filter(Boolean);
-									lefts.forEach(ln=>rights.forEach(rn=>{
-										try{
-											const res = window.opener.addForbiddenPairByNames(ln, rn);
-											if (!res.ok){ window.opener.addPendingConstraint(ln,rn); }
-										}catch(e){ console.log(e); }
-									}));
+									if (L && R) { try { parentWindow.removeForbiddenPairByNames(L,R); } catch(e){ console.log(e);} }
+								} else if (part.includes('!')) {
+									const names = part.split('!').map(s=>s.trim()).filter(Boolean);
+									for (let i=0;i<names.length;i++) {
+										for (let j=i+1;j<names.length;j++) {
+											const ln = names[i];
+											const rn = names[j];
+											if (!ln || !rn) continue;
+											try {
+												const res = parentWindow.addForbiddenPairByNames(ln,rn);
+												if (!res.ok) parentWindow.addPendingConstraint(ln,rn);
+											} catch(e){ console.log(e); }
+										}
+									}
 								}
 							});
-							// refresh popup lists only
 							refresh();
 						} catch(e){ console.log('추가 실패', e); }
 					});
 					input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') addBtn.click(); });
-					// Show lists and hide modal when '보기' clicked
 					function hideModal(){
-						// cancel any pending scheduled re-show
 						if (reShowTimeout){ clearTimeout(reShowTimeout); reShowTimeout = null; }
 						modal.classList.remove('visible');
 						setTimeout(()=>{ if (!modal.classList.contains('visible')) modal.style.display = 'none'; }, 340);
@@ -481,8 +480,8 @@ function openForbiddenWindow() {
 						refresh();
 					}
 					showBtn.addEventListener('click', hideModal);
-					// Schedule re-show 3s after mouse leaves or popup loses focus
-					let reShowTimeout = null;
+					// 로컬 환경에서는 초기 모달을 즉시 숨김 처리
+					if (isLocal) { hideModal(); }
 					function scheduleModalShow(){
 						if (reShowTimeout) clearTimeout(reShowTimeout);
 						reShowTimeout = setTimeout(()=>{
@@ -494,19 +493,19 @@ function openForbiddenWindow() {
 						}, 1000);
 					}
 					function cancelModalShow(){ if (reShowTimeout){ clearTimeout(reShowTimeout); reShowTimeout = null; } }
-					window.addEventListener('mouseout', (e)=>{
-						if (!e.relatedTarget && !e.toElement) scheduleModalShow();
-					});
-					window.addEventListener('blur', scheduleModalShow);
-					// Cancel scheduled re-show when mouse moves inside popup
-					window.addEventListener('mousemove', ()=>{ cancelModalShow(); });
+					// 로컬 환경에서는 모달 재노출 이벤트 비활성화
+					if (!isLocal) {
+						window.addEventListener('mouseout', (e)=>{ if (!e.relatedTarget && !e.toElement) scheduleModalShow(); });
+						window.addEventListener('blur', scheduleModalShow);
+						window.addEventListener('mousemove', ()=>{ cancelModalShow(); });
+					}
 				})();
 			</script>
 			</body></html>`);
 			doc.close();
-			}
-			renderForbiddenWindowContent();
-			if (forbiddenPopup && !forbiddenPopup.closed) forbiddenPopup.focus();
+		}
+		renderForbiddenWindowContent();
+		if (forbiddenPopup && !forbiddenPopup.closed) forbiddenPopup.focus();
 	} catch (e) {
 		console.log('팝업 열기 중 오류:', e);
 	}
@@ -733,12 +732,12 @@ function shuffleTeams() {
 function generateTeams(people) {
 	buildForbiddenMap();
 
-	// Quick validation: a required group cannot contain a forbidden pair
+	// Validation: a required group cannot contain a forbidden pair
 	for (const group of state.requiredGroups) {
 		for (let i = 0; i < group.length; i++) {
 			for (let j = i + 1; j < group.length; j++) {
 				if (isForbidden(group[i], group[j])) {
-					showError('같은 그룹에 금지 제약이 있으므로 팀 배치가 불가능합니다. 제약을 확인하세요.');
+					showError('같은 그룹에 금지 제약이 있습니다.');
 					return null;
 				}
 			}
@@ -746,7 +745,14 @@ function generateTeams(people) {
 	}
 
 	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
-	const maxAttempts = 200;
+	const maxAttempts = 500;
+
+	// Calculate minimum gender count across all people
+	const maleCount = people.filter(p => p.gender === 'male').length;
+	const femaleCount = people.filter(p => p.gender === 'female').length;
+	const isFemaleLess = femaleCount < maleCount;
+	const minGenderCount = Math.min(maleCount, femaleCount);
+	const minGenderPerTeam = Math.floor(minGenderCount / teamCount);
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
 		const teams = Array.from({ length: teamCount }, () => []);
@@ -756,124 +762,170 @@ function generateTeams(people) {
 			group.every(id => people.some(p => p.id === id))
 		);
 
+		// Shuffle groups and assign randomly
 		const shuffledGroups = [...validGroups].sort(() => Math.random() - 0.5);
-		shuffledGroups.forEach((group, index) => {
-			const teamIndex = index % teamCount;
+		let groupFailed = false;
+
+		for (const group of shuffledGroups) {
 			const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
-			teams[teamIndex].push(...groupMembers);
+			
+			// Count minimum gender in this group
+			const groupMinGender = isFemaleLess ? 
+				groupMembers.filter(p => p.gender === 'female').length :
+				groupMembers.filter(p => p.gender === 'male').length;
+			
+			// Find valid teams
+			let validTeams = [];
+			for (let i = 0; i < teams.length; i++) {
+				// Check 1: Size constraint
+				if (teams[i].length + groupMembers.length > state.membersPerTeam) continue;
+				
+				// Check 2: No conflicts
+				let hasConflict = false;
+				for (const gm of groupMembers) {
+					if (teams[i].some(tm => isForbidden(gm.id, tm.id))) {
+						hasConflict = true;
+						break;
+					}
+				}
+				if (hasConflict) continue;
+				
+				// Check 3: Gender balance - only if enabled
+				if (state.genderBalanceEnabled) {
+					const currentMinGender = isFemaleLess ? 
+						teams[i].filter(p => p.gender === 'female').length :
+						teams[i].filter(p => p.gender === 'male').length;
+					const futureMinGender = currentMinGender + groupMinGender;
+					
+					// Find the team with the LEAST minimum gender
+					const allTeamMinGenders = teams.map(t => 
+						isFemaleLess ? 
+							t.filter(p => p.gender === 'female').length :
+							t.filter(p => p.gender === 'male').length
+					);
+					const globalMinGender = Math.min(...allTeamMinGenders);
+					
+					// Only allow if this team currently has the minimum OR would not exceed balance
+					if (currentMinGender > globalMinGender) continue;
+				}
+				
+				validTeams.push(i);
+			}
+			
+			if (validTeams.length === 0) {
+				groupFailed = true;
+				break;
+			}
+			
+			// Randomly pick from valid teams
+			const selectedTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
+			teams[selectedTeam].push(...groupMembers);
 			groupMembers.forEach(m => assigned.add(m.id));
-		});
+		}
 
-		const unassignedPeople = [...people.filter(p => !assigned.has(p.id))].sort(() => Math.random() - 0.5);
+		if (groupFailed) continue;
 
-		// assign unassigned people trying to avoid forbidden conflicts
+		// Assign individual people
+		const unassignedPeople = people.filter(p => !assigned.has(p.id));
+		let personFailed = false;
+
 		for (const person of unassignedPeople) {
-			if (state.genderBalanceEnabled) {
-				const teamStats = teams.map((team, idx) => ({
-					idx,
-					genderCount: team.filter(p => p.gender === person.gender).length,
-					totalSize: team.length,
-					totalWeight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
+			const personMinGender = (isFemaleLess && person.gender === 'female') || 
+			                        (!isFemaleLess && person.gender === 'male') ? 1 : 0;
+			
+			// Find valid teams
+			let validTeams = [];
+			for (let i = 0; i < teams.length; i++) {
+				// Check 1: Size constraint
+				if (teams[i].length >= state.membersPerTeam) continue;
+				
+				// Check 2: No conflicts
+				if (teams[i].some(tm => isForbidden(tm.id, person.id))) continue;
+				
+				// Check 3: Gender balance - only if enabled
+				if (state.genderBalanceEnabled && personMinGender === 1) {
+					const currentMinGender = isFemaleLess ? 
+						teams[i].filter(p => p.gender === 'female').length :
+						teams[i].filter(p => p.gender === 'male').length;
+					
+					// Find the team with the LEAST minimum gender
+					const allTeamMinGenders = teams.map(t => 
+						isFemaleLess ? 
+							t.filter(p => p.gender === 'female').length :
+							t.filter(p => p.gender === 'male').length
+					);
+					const globalMinGender = Math.min(...allTeamMinGenders);
+					
+					// Only allow if this team currently has the minimum
+					if (currentMinGender > globalMinGender) continue;
+				}
+				
+				validTeams.push(i);
+			}
+			
+			if (validTeams.length === 0) {
+				personFailed = true;
+				break;
+			}
+			
+			// Priority 1: Teams with only 1 unit (need 2nd unit)
+			const teamUnits = validTeams.map(idx => {
+				const groupSet = new Set();
+				let ungroupedCount = 0;
+				for (const member of teams[idx]) {
+					const gi = getPersonGroupIndex(member.id);
+					if (gi === -1) ungroupedCount++;
+					else groupSet.add(gi);
+				}
+				return { idx, units: groupSet.size + ungroupedCount, size: teams[idx].length };
+			});
+			
+			const needUnit = teamUnits.filter(t => t.units < 2);
+			let candidateTeams = needUnit.length > 0 ? needUnit : teamUnits;
+			
+			// Priority 2: Among candidates, always prefer smallest teams
+			const minSize = Math.min(...candidateTeams.map(t => t.size));
+			candidateTeams = candidateTeams.filter(t => t.size === minSize);
+			
+			// Priority 3: Weight balance (if enabled)
+			let selectedTeam;
+			if (state.weightBalanceEnabled && candidateTeams.length > 1) {
+				const teamWeights = candidateTeams.map(t => ({
+					...t,
+					weight: teams[t.idx].reduce((sum, p) => sum + (p.weight || 0), 0)
 				}));
-
-				const minGenderCount = Math.min(...teamStats.map(t => t.genderCount));
-				let candidates = teamStats.filter(t => t.genderCount === minGenderCount);
-
-				const minSize = Math.min(...candidates.map(t => t.totalSize));
-				candidates = candidates.filter(t => t.totalSize === minSize);
-
-				// Prefer candidates with no forbidden conflict
-				let eligible = candidates.filter(t => !teamHasForbiddenConflict(teams[t.idx], person));
-
-				if (eligible.length === 0) {
-					// broaden search to any team with zero conflict
-					const zeroConflict = teamStats.filter(t => !teamHasForbiddenConflict(teams[t.idx], person));
-					if (zeroConflict.length > 0) {
-						const minZeroSize = Math.min(...zeroConflict.map(t => t.totalSize));
-						eligible = zeroConflict.filter(t => t.totalSize === minZeroSize);
-					}
-				}
-
-				let chosen;
-				if (eligible.length > 0) {
-					if (state.weightBalanceEnabled) {
-						const minWeight = Math.min(...eligible.map(t => t.totalWeight));
-						const lightest = eligible.filter(t => t.totalWeight === minWeight);
-						chosen = lightest[Math.floor(Math.random() * lightest.length)];
-					} else {
-						chosen = eligible[Math.floor(Math.random() * eligible.length)];
-					}
-				} else {
-					// No zero-conflict team found — pick team with minimal conflict count and smallest size
-					let bestScore = Infinity;
-					let bestTeams = [];
-					for (const t of teamStats) {
-						const conflictCount = teams[t.idx].reduce((c, m) => c + (isForbidden(m.id, person.id) ? 1 : 0), 0);
-						const score = conflictCount * 1000 + t.totalSize; // prioritize fewer conflicts, then smaller size
-						if (score < bestScore) { bestScore = score; bestTeams = [t]; }
-						else if (score === bestScore) bestTeams.push(t);
-					}
-					chosen = bestTeams[Math.floor(Math.random() * bestTeams.length)];
-				}
-
-				teams[chosen.idx].push(person);
-			} else if (state.weightBalanceEnabled) {
-				const sortedTeams = teams.map((team, idx) => ({ team, idx, size: team.length, totalWeight: team.reduce((s, p) => s + (p.weight || 0), 0) }));
-				const minSize = Math.min(...sortedTeams.map(t => t.size));
-				let smallest = sortedTeams.filter(t => t.size === minSize);
-
-				let eligible = smallest.filter(t => !teamHasForbiddenConflict(t.team, person));
-				if (eligible.length === 0) {
-					// expand to any team with zero conflict
-					const zeroConflict = sortedTeams.filter(t => !teamHasForbiddenConflict(t.team, person));
-					if (zeroConflict.length > 0) {
-						const minZeroSize = Math.min(...zeroConflict.map(t => t.size));
-						eligible = zeroConflict.filter(t => t.size === minZeroSize);
-					}
-				}
-
-				if (eligible.length > 0) {
-					const minWeight = Math.min(...eligible.map(t => t.totalWeight));
-					const chosenTeam = eligible.filter(t => t.totalWeight === minWeight)[0];
-					teams[chosenTeam.idx].push(person);
-				} else {
-					// fallback minimal conflict
-					let bestScore = Infinity; let bestTeams = [];
-					for (const t of sortedTeams) {
-						const conflictCount = t.team.reduce((c, m) => c + (isForbidden(m.id, person.id) ? 1 : 0), 0);
-						const score = conflictCount * 1000 + t.size;
-						if (score < bestScore) { bestScore = score; bestTeams = [t]; }
-						else if (score === bestScore) bestTeams.push(t);
-					}
-					const chosenTeam = bestTeams[Math.floor(Math.random() * bestTeams.length)];
-					teams[chosenTeam.idx].push(person);
-				}
+				const minWeight = Math.min(...teamWeights.map(t => t.weight));
+				const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
+				selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
 			} else {
-				const teamSizes = teams.map(t => t.length);
-				const minSize = Math.min(...teamSizes);
-				let smallestTeams = teams.map((team, idx) => ({ team, idx, size: team.length })).filter(t => t.size === minSize);
-				let eligible = smallestTeams.filter(t => !teamHasForbiddenConflict(t.team, person));
-				let chosenTeam;
-				if (eligible.length > 0) chosenTeam = eligible[Math.floor(Math.random() * eligible.length)];
-				else {
-					// minimal conflict fallback
-					let bestScore = Infinity; let bestTeams = [];
-					for (const t of smallestTeams) {
-						const conflictCount = t.team.reduce((c, m) => c + (isForbidden(m.id, person.id) ? 1 : 0), 0);
-						const score = conflictCount * 1000 + t.size;
-						if (score < bestScore) { bestScore = score; bestTeams = [t]; }
-						else if (score === bestScore) bestTeams.push(t);
-					}
-					chosenTeam = bestTeams[Math.floor(Math.random() * bestTeams.length)];
-				}
-				teams[chosenTeam.idx].push(person);
+				selectedTeam = candidateTeams[Math.floor(Math.random() * candidateTeams.length)].idx;
+			}
+			
+			teams[selectedTeam].push(person);
+		}
+
+		if (personFailed) continue;
+
+		// Validate: no conflicts and minimum 2 units per team
+		if (conflictExists(teams)) continue;
+		
+		// Check each team has at least 2 units
+		let allValid = true;
+		for (const team of teams) {
+			const groupSet = new Set();
+			let ungroupedCount = 0;
+			for (const member of team) {
+				const gi = getPersonGroupIndex(member.id);
+				if (gi === -1) ungroupedCount++;
+				else groupSet.add(gi);
+			}
+			if (groupSet.size + ungroupedCount < 2) {
+				allValid = false;
+				break;
 			}
 		}
-
-		// If assignment succeeded without conflicts, return teams
-		if (!conflictExists(teams)) {
-			return teams;
-		}
+		
+		if (allValid) return teams;
 	}
 
 	showError('제약 조건으로 팀 배치가 불가능합니다. 제약을 검토해주세요.');
