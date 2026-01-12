@@ -1,4 +1,5 @@
 const teamDisplayDelay = !isLocalView() ? 400 : 400;
+const blindDelay = !isLocalView() ? null : 3000;
 
 const state = {
 	people: [],
@@ -189,9 +190,10 @@ function addPerson() {
 								else {
 									if (res.added) console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
 									else console.log(`금지 제약이 이미 존재함: ${ln} ! ${rn}`);
-									safeOpenForbiddenWindow();
 									constraintsTouched = true;
 								}
+								// 성공/실패 모두 자식창 표시
+								safeOpenForbiddenWindow();
 							} else {
 								const pres = addPendingConstraint(ln, rn);
 								if (!pres.ok) console.log('보류 제약 추가 실패:', pres.message);
@@ -550,13 +552,19 @@ function openForbiddenWindow() {
 					if (isLocal) { hideModal(); }
 					function scheduleModalShow(){
 						if (reShowTimeout) clearTimeout(reShowTimeout);
+						let blindTime = 1000;
+						try {
+							if (parentWindow && typeof parentWindow.blindDelay !== 'undefined' && parentWindow.blindDelay !== null) {
+								blindTime = parentWindow.blindDelay;
+							}
+						} catch (e) { /* use default blindTime */ }
 						reShowTimeout = setTimeout(()=>{
 							modal.style.display = '';
 							modal.classList.add('visible');
 							document.getElementById('appliedSection').style.display = 'none';
 							document.getElementById('pendingSection').style.display = 'none';
 							showWarn.style.display = '';
-						}, 1000);
+						}, blindTime);
 					}
 					function cancelModalShow(){ if (reShowTimeout){ clearTimeout(reShowTimeout); reShowTimeout = null; } }
 					// 로컬 환경에서는 모달 재노출 이벤트 비활성화
