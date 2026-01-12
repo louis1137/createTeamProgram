@@ -156,7 +156,7 @@ h2 {
 	background: #f8f9fa;
 	border-radius: 8px;
 	border: 2px dashed #ddd;
-	align-items: flex-start;
+	align-items: center;
 }
 
 .people-list:empty::before {
@@ -235,6 +235,11 @@ h2 {
 	transition: all 0.2s;
 	position: relative;
 } 
+
+.person-tag.is-duplicate {
+	border-color: #ef4444;
+	box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18);
+}
 
 .person-tag:hover {
 	border-color: #667eea;
@@ -479,6 +484,15 @@ h2 {
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.team-card.team-card-pulse {
+	animation: team-card-pulse calc(var(--team-anim-duration, 300ms) * 1.7) ease-out;
+	will-change: border-color, box-shadow, background-color;
+}
+
+.team-card.team-card-pulse h3 {
+	animation: team-card-title-pulse calc(var(--team-anim-duration, 300ms) * 1.7) ease-out;
+}
+
 .team-card h3 {
 	color: #667eea;
 	margin-bottom: 12px;
@@ -510,7 +524,9 @@ h2 {
 
 /* Jelly-in animation when members are added */
 .team-card li.jelly-in {
-	animation: team-fade-up var(--team-anim-duration, 300ms) cubic-bezier(0.22, 1, 0.36, 1);
+	animation:
+		team-fade-up var(--team-anim-duration, 300ms) cubic-bezier(0.22, 1, 0.36, 1),
+		team-item-tint calc(var(--team-anim-duration, 300ms) * 1.2) ease-out;
 	transform-origin: center center;
 	will-change: transform, opacity;
 }
@@ -518,6 +534,50 @@ h2 {
 @keyframes team-fade-up {
 	0% { opacity: 0; transform: translateY(12px); }
 	100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes team-item-tint {
+	0% {
+		background: #eff7ff;
+		color: inherit;
+	}
+	70% {
+		background: #eff7ff;
+		color: inherit;
+	}
+	100% {
+		background: #f8f9fa;
+		color: inherit;
+	}
+}
+
+@keyframes team-card-pulse {
+	0% {
+		border-color: #1f8bff;
+		background: #ffffff;
+		box-shadow: 0 0 0 2px rgba(31, 139, 255, 0.24), 0 4px 12px rgba(0, 0, 0, 0.12);
+	}
+	60% {
+		border-color: #1f8bff;
+		background: #ffffff;
+		box-shadow: 0 0 0 3px rgba(31, 139, 255, 0.16), 0 6px 14px rgba(0, 0, 0, 0.12);
+	}
+	80% {
+		border-color: #2563eb;
+		background: #ffffff;
+	}
+	100% {
+		border-color: #667eea;
+		background: #ffffff;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+	}
+}
+
+@keyframes team-card-title-pulse {
+	0% { color: #1f8bff; }
+	60% { color: #1f8bff; }
+	80% { color: #2563eb; }
+	100% { color: #667eea; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -566,13 +626,14 @@ h2 {
 	z-index: 9999;
 	opacity: 0;
 	transform: translateY(14px);
-	pointer-events: none; /* let clicks pass through except explicit controls */
+	pointer-events: none; /* hidden 상태에서 클릭 통과 */
 	transition: opacity 200ms ease, transform 240ms ease;
 }
 
 .warning-popup.is-visible {
 	opacity: 1;
 	transform: translateY(0);
+	pointer-events: auto; /* 표시 중일 때 뒤쪽 클릭 차단 */
 }
 
 .warning-popup::before {

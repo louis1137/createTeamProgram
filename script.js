@@ -13,19 +13,18 @@ const state = {
 	teamDisplayDelay,
 	ungroupedColor: '#94a3b8',
 	groupColors: [
-		// Colorblind-friendly, high-contrast palette
-		'#E69F00', // orange
-		'#56B4E9', // sky blue
-		'#009E73', // teal green
-		'#F0E442', // yellow
-		'#0072B2', // blue
-		'#D55E00', // vermillion
-		'#CC79A7', // reddish purple
-		'#E41A1C', // red
-		'#4DAF4A', // green
-		'#984EA3', // purple
-		'#A65628', // brown
-		'#FF7F00'  // orange 2
+		// Bright, high-contrast palette (kept colorblind-friendly spread)
+		'#FF6B6B', // bright coral
+		'#4ECDC4', // aqua teal
+		'#DDDD00', // vivid yellow
+		'#1E90FF', // dodger blue
+		'#8AC926', // lime green
+		'#FF1FCD', // hot pink
+		'#E71D36', // crimson red
+		'#7C3AED', // vibrant violet
+		'#F3722C', // persimmon
+		'#B5179E', // magenta
+		'#FFCA00'  // golden yellow
 	]
 };
 
@@ -45,6 +44,7 @@ const elements = {
 
 // Warning popup auto-hide timer id
 let warningHideTimer = null;
+let warningHovering = false;
 
 function init() {
 	elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
@@ -72,6 +72,8 @@ function init() {
 			hideWarnings();
 		}
 	});
+	// Track pointer hover over warning popup to pause auto-hide
+	document.addEventListener('mousemove', handleWarningHover);
 
 	// 그룹 색상 팔레트는 세션당 한 번 랜덤 셔플
 	shuffleGroupColorsOnce();
@@ -134,7 +136,7 @@ function handleTeamSizeChange(e) {
 
 function addPerson() {
 	const input = elements.nameInput.value.trim();
-	
+	const duplicateHits = [];
 	if (input === '') {
 		alert('이름을 입력해주세요.');
 		return;
@@ -208,7 +210,7 @@ function addPerson() {
 			names.forEach(name => {
 				const normalized = normalizeName(name);
 				const exists = state.people.some(p => normalizeName(p.name) === normalized);
-				if (exists) { warnings.push(`[${name}]은(는) 이미 등록된 이름입니다.`); return; }
+				if (exists) { warnings.push(`[${name}]은(는) 이미 등록된 이름입니다.`); duplicateHits.push(name); return; }
 				const person = {
 					id: state.nextId++,
 					name: name,
@@ -227,7 +229,7 @@ function addPerson() {
 
 	elements.nameInput.value = '';
 	elements.nameInput.focus();
-	if (warnings.length) showWarnings(warnings);
+	if (warnings.length) showWarnings(warnings, duplicateHits);
 	if (addedAny) renderPeople();
 	// Hide previous warnings only if we didn't just show new ones
 	if (!warnings.length && (addedAny || constraintsTouched)) hideWarnings();
@@ -375,6 +377,15 @@ function setTeamAnimDurationFromDelay() {
 		const dur = Math.max(50, Math.round((state.teamDisplayDelay || 400) * 0.75));
 		document.documentElement.style.setProperty('--team-anim-duration', dur + 'ms');
 	} catch (_) { /* no-op */ }
+}
+
+function getTeamAnimDurationMs() {
+	try {
+		const css = getComputedStyle(document.documentElement).getPropertyValue('--team-anim-duration');
+		const parsed = parseFloat(css);
+		if (Number.isFinite(parsed)) return parsed;
+	} catch (_) { /* ignore */ }
+	return Math.max(50, Math.round((state.teamDisplayDelay || 400) * 0.75));
 }
 
 
@@ -1136,6 +1147,7 @@ async function displayTeams(teams) {
 			teamCardData.currentCount += 1;
 			if (state.weightBalanceEnabled) addedWeight += person.weight || 0;
 		}
+		if (chunk.length) pulseTeamCard(teamCardData.card);
 		if (state.weightBalanceEnabled) {
 			teamCardData.currentWeight += addedWeight;
 			title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
@@ -1155,15 +1167,49 @@ function showError(message) {
 	elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
+// Highlight any existing participant tags that match duplicate names
+function applyDuplicateHighlights(names) {
+	const targets = new Set((names || []).map(normalizeName));
+	const tags = document.querySelectorAll('.person-tag');
+	tags.forEach(tag => {
+		tag.classList.remove('is-duplicate');
+		if (!targets.size) return;
+		const nameEl = tag.querySelector('.name');
+		if (!nameEl) return;
+		const label = normalizeName(nameEl.textContent || '');
+		if (targets.has(label)) tag.classList.add('is-duplicate');
+	});
+}
+
+// Briefly pulse a team card border when members are added
+function pulseTeamCard(card) {
+	if (!card) return;
+	const base = getTeamAnimDurationMs();
+	const dur = base * 1.7; // match CSS pulse duration multiplier
+	if (card._pulseTimer) {
+		clearTimeout(card._pulseTimer);
+		card._pulseTimer = null;
+	}
+	card.classList.remove('team-card-pulse');
+	// force reflow to restart animation
+	void card.offsetWidth;
+	card.classList.add('team-card-pulse');
+	card._pulseTimer = setTimeout(() => {
+		card.classList.remove('team-card-pulse');
+		card._pulseTimer = null;
+	}, dur + 50);
+}
+
 function hideWarnings() {
 	const panel = document.getElementById('warningPopup');
 	if (!panel) return;
 	if (warningHideTimer) { clearTimeout(warningHideTimer); warningHideTimer = null; }
 	panel.classList.remove('is-visible');
 	panel.setAttribute('aria-hidden','true');
+	applyDuplicateHighlights([]);
 }
 
-function showWarnings(messages) {
+function showWarnings(messages, duplicateNames = []) {
 	const panel = document.getElementById('warningPopup');
 	if (!panel) return;
 	const list = panel.querySelector('.warning-popup__list');
@@ -1177,12 +1223,41 @@ function showWarnings(messages) {
 	if (!messages.length) return;
 	panel.classList.add('is-visible');
 	panel.setAttribute('aria-hidden','false');
-	// Restart auto-dismiss timer (3s)
-	if (warningHideTimer) { clearTimeout(warningHideTimer); }
+	applyDuplicateHighlights(duplicateNames);
+	// Restart auto-dismiss timer (3s) unless hovering
+	scheduleWarningHide();
+}
+
+// --- Warning popup hover-aware auto-hide helpers ---
+function pauseWarningHide() {
+	if (warningHideTimer) { clearTimeout(warningHideTimer); warningHideTimer = null; }
+}
+
+function scheduleWarningHide(delay = 3000) {
+	if (warningHovering) return; // do not schedule while hovering
+	pauseWarningHide();
 	warningHideTimer = setTimeout(() => {
 		warningHideTimer = null;
 		hideWarnings();
-	}, 3000);
+	}, delay);
+}
+
+function handleWarningHover(e) {
+	const panel = document.getElementById('warningPopup');
+	if (!panel || panel.getAttribute('aria-hidden') === 'true') return;
+	const rect = panel.getBoundingClientRect();
+	const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+	if (inside) {
+		if (!warningHovering) {
+			warningHovering = true;
+			pauseWarningHide();
+		}
+	} else {
+		if (warningHovering) {
+			warningHovering = false;
+			scheduleWarningHide();
+		}
+	}
 }
 
 init();
