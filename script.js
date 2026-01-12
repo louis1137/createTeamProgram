@@ -43,6 +43,20 @@ function init() {
 		}
 	});
 	elements.shuffleBtn.addEventListener('click', shuffleTeams);
+	// Wire warning popup close
+	const warnClose = document.querySelector('#warningPopup .warning-popup__close');
+	if (warnClose) {
+		warnClose.addEventListener('click', () => {
+			const panel = document.getElementById('warningPopup');
+			if (panel) { panel.classList.remove('is-visible'); panel.setAttribute('aria-hidden','true'); }
+		});
+	}
+	// Hide warning popup on Enter or Escape
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape' || e.key === 'Esc' || e.key === 'Enter') {
+			hideWarnings();
+		}
+	});
 	
 	renderPeople();
 	// prepare forbidden pairs map
@@ -114,6 +128,8 @@ function addPerson() {
 	}
 
 	let addedAny = false;
+	const warnings = [];
+	let constraintsTouched = false;
 
 	tokens.forEach(token => {
 		if (token.includes('!')) {
@@ -123,12 +139,12 @@ function addPerson() {
 			
 			constraintParts.forEach(constraint => {
 				// Handle removal: A!!B
-				if (constraint.includes('!!')) {
+					if (constraint.includes('!!')) {
 					const [left, right] = constraint.split('!!').map(s => s.trim());
 					if (left && right) {
 						const rres = removeForbiddenPairByNames(left, right);
 						if (!rres.ok) console.log('보류/적용 제약 제거 실패:', rres.message);
-						else safeOpenForbiddenWindow();
+							else { safeOpenForbiddenWindow(); constraintsTouched = true; }
 					}
 				}
 				// Handle pairwise constraints: A!B!C!D -> all pairs
@@ -151,10 +167,12 @@ function addPerson() {
 									if (res.added) console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
 									else console.log(`금지 제약이 이미 존재함: ${ln} ! ${rn}`);
 									safeOpenForbiddenWindow();
+									constraintsTouched = true;
 								}
 							} else {
 								const pres = addPendingConstraint(ln, rn);
 								if (!pres.ok) console.log('보류 제약 추가 실패:', pres.message);
+								else constraintsTouched = true;
 							}
 						}
 					}
@@ -165,15 +183,11 @@ function addPerson() {
 			const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
 			if (names.length === 0) return;
 			const newIds = [];
-		
+
 			names.forEach(name => {
 				const normalized = normalizeName(name);
 				const exists = state.people.some(p => normalizeName(p.name) === normalized);
-				if (exists) {
-					// Prevent duplicate names
-					alert(`${name}은(는) 이미 등록된 이름입니다.`);
-					return;
-				}
+				if (exists) { warnings.push(`${name}은(는) 이미 등록된 이름입니다.`); return; }
 				const person = {
 					id: state.nextId++,
 					name: name,
@@ -192,7 +206,10 @@ function addPerson() {
 
 	elements.nameInput.value = '';
 	elements.nameInput.focus();
+	if (warnings.length) showWarnings(warnings);
 	if (addedAny) renderPeople();
+	// Hide previous warnings only if we didn't just show new ones
+	if (!warnings.length && (addedAny || constraintsTouched)) hideWarnings();
 	// After possibly adding people, try to resolve pending textual constraints
 	tryResolvePendingConstraints();
 }
@@ -262,10 +279,12 @@ function addForbiddenPairByNames(nameA, nameB) {
 		buildForbiddenMap();
 		console.log(`금지 제약 추가됨: ${pa.name} (id:${pa.id}) ! ${pb.name} (id:${pb.id})`);
 		safeOpenForbiddenWindow();
+		hideWarnings();
 	} else {
 		console.log(`금지 제약이 이미 존재함: ${pa.name} ! ${pb.name}`);
 		// Even if the constraint already exists, open/focus the popup so users can view/manage it
 		safeOpenForbiddenWindow();
+		hideWarnings();
 	}
 	return { ok: true, added: !exists };
 } 
@@ -277,11 +296,12 @@ function addPendingConstraint(leftName, rightName) {
 	if (l === r) return { ok: false, message: '동일인 제약은 불가능합니다.' };
 	// Avoid duplicates in pending
 	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
-	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
+	if (existsPending) { safeOpenForbiddenWindow(); hideWarnings(); return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
 	console.log(`보류 제약 추가됨(사람 미등록): ${leftName} ! ${rightName}`);
 	// Update popup view if open (or open it)
 		safeOpenForbiddenWindow();
+		hideWarnings();
 	return { ok: true }; 
 }
 
@@ -344,6 +364,7 @@ function removeForbiddenPairByNames(nameA, nameB) {
 			buildForbiddenMap();
 			console.log(`금지 제약 제거됨: ${pa.name} ! ${pb.name}`);
 			safeOpenForbiddenWindow();
+			hideWarnings();
 			return { ok: true }; 
 		}
 	}
@@ -353,6 +374,7 @@ function removeForbiddenPairByNames(nameA, nameB) {
 	if (state.pendingConstraints.length !== beforePending) {
 		console.log(`보류 제약 제거됨: ${nameA} ! ${nameB}`);
 		safeOpenForbiddenWindow();
+		hideWarnings();
 		return { ok: true };
 	}
 	console.log('제약 제거 실패: 해당 제약을 찾을 수 없습니다.');
@@ -1018,6 +1040,29 @@ function showError(message) {
 	elements.teamsDisplay.innerHTML = `<div class="error-message">${message}</div>`;
 	elements.resultsSection.classList.add('visible');
 	elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideWarnings() {
+	const panel = document.getElementById('warningPopup');
+	if (!panel) return;
+	panel.classList.remove('is-visible');
+	panel.setAttribute('aria-hidden','true');
+}
+
+function showWarnings(messages) {
+	const panel = document.getElementById('warningPopup');
+	if (!panel) return;
+	const list = panel.querySelector('.warning-popup__list');
+	if (!list) return;
+	list.innerHTML = '';
+	messages.forEach(msg => {
+		const li = document.createElement('li');
+		li.textContent = msg;
+		list.appendChild(li);
+	});
+	if (!messages.length) return;
+	panel.classList.add('is-visible');
+	panel.setAttribute('aria-hidden','false');
 }
 
 init();
