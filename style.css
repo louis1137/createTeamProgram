@@ -508,6 +508,22 @@ h2 {
 	flex-shrink: 0;
 }
 
+/* Jelly-in animation when members are added */
+.team-card li.jelly-in {
+	animation: team-fade-up var(--team-anim-duration, 300ms) cubic-bezier(0.22, 1, 0.36, 1);
+	transform-origin: center center;
+	will-change: transform, opacity;
+}
+
+@keyframes team-fade-up {
+	0% { opacity: 0; transform: translateY(12px); }
+	100% { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.team-card li.jelly-in { animation: none; }
+}
+
 .error-message {
 	background: #fee2e2;
 	color: #991b1b;

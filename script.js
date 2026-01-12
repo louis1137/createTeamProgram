@@ -1,3 +1,5 @@
+const teamDisplayDelay = !isLocalView() ? 400 : 400;
+
 const state = {
 	people: [],
 	requiredGroups: [],
@@ -8,12 +10,22 @@ const state = {
 	weightBalanceEnabled: false,
 	membersPerTeam: 4,
 	nextId: 1,
-	teamDisplayDelay: 600,
+	teamDisplayDelay,
 	ungroupedColor: '#94a3b8',
 	groupColors: [
-		'#f59e0b', '#10b981', '#ec4899', '#667eea',
-		'#8b5cf6', '#06b6d4', '#f97316', '#14b8a6',
-		'#a855f7', '#84cc16', '#f43f5e', '#6366f1'
+		// Colorblind-friendly, high-contrast palette
+		'#E69F00', // orange
+		'#56B4E9', // sky blue
+		'#009E73', // teal green
+		'#F0E442', // yellow
+		'#0072B2', // blue
+		'#D55E00', // vermillion
+		'#CC79A7', // reddish purple
+		'#E41A1C', // red
+		'#4DAF4A', // green
+		'#984EA3', // purple
+		'#A65628', // brown
+		'#FF7F00'  // orange 2
 	]
 };
 
@@ -60,14 +72,18 @@ function init() {
 			hideWarnings();
 		}
 	});
-	
+
+	// 그룹 색상 팔레트는 세션당 한 번 랜덤 셔플
+	shuffleGroupColorsOnce();
+
+	// 팀 표시 애니메이션 시간: teamDisplayDelay의 50%로 설정
+	setTeamAnimDurationFromDelay();
+
 	renderPeople();
 	// prepare forbidden pairs map
 	buildForbiddenMap();
 	// try to resolve any pending textual constraints (if users were added earlier)
 	tryResolvePendingConstraints();
-	// If viewing locally (file:// or localhost), reduce team display delay to 0 for instant feedback
-	adjustLocalSettings();
 }
 
 function resetAll() {
@@ -342,11 +358,23 @@ function isLocalView() {
 	}
 }
 
-function adjustLocalSettings() {
-	if (isLocalView()) {
-		state.teamDisplayDelay = 0;
-		console.log('로컬 환경 감지: 팀 표시 지연을 0ms로 설정합니다. (빠른 로컬 미리보기)');
+// 그룹 색상 팔레트를 한 번만 랜덤 셔플
+function shuffleGroupColorsOnce() {
+	if (state._groupColorsShuffled) return;
+	state._groupColorsShuffled = true;
+	const arr = state.groupColors;
+	for (let i = arr.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[arr[i], arr[j]] = [arr[j], arr[i]];
 	}
+}
+
+// CSS 변수로 팀원 표시 애니메이션 시간 설정 (teamDisplayDelay의 50%)
+function setTeamAnimDurationFromDelay() {
+	try {
+		const dur = Math.max(50, Math.round((state.teamDisplayDelay || 400) * 0.75));
+		document.documentElement.style.setProperty('--team-anim-duration', dur + 'ms');
+	} catch (_) { /* no-op */ }
 }
 
 
@@ -753,6 +781,8 @@ function shuffleTeams() {
 
 	const teams = generateTeams(preShufflePeopleForGeneration(validPeople));
 	if (!teams) return; // generateTeams shows error when impossible
+	// teamDisplayDelay가 바뀔 수 있으므로 표시 전 최신값으로 반영
+	setTeamAnimDurationFromDelay();
 	displayTeams(teams);
 }
 // 팀 생성 전에 내부적으로 한 번 셔플: 그룹 내 인원은 제외(비그룹 인원만 무작위화)
@@ -1006,7 +1036,7 @@ async function displayTeams(teams) {
 		teamCard.appendChild(membersList);
 		
 		elements.teamsDisplay.appendChild(teamCard);
-		teamCards.push({ card: teamCard, title: teamTitle, list: membersList, team: team, currentWeight: 0 });
+		teamCards.push({ card: teamCard, title: teamTitle, list: membersList, team: team, currentWeight: 0, currentCount: 0 });
 	});
 	
 	elements.resultsSection.classList.add('visible');
@@ -1039,49 +1069,81 @@ async function displayTeams(teams) {
 		}
 	} catch (_) { /* 측정 실패 시 무시하고 진행 */ }
 	
-	for (let memberIndex = 0; memberIndex < maxMembers; memberIndex++) {
-		for (let teamIndex = 0; teamIndex < teamCards.length; teamIndex++) {
-			const teamCardData = teamCards[teamIndex];
-			const { list, team, title } = teamCardData;
-			
-			if (memberIndex < team.length) {
-				const person = team[memberIndex];
-				const li = document.createElement('li');
-				let displayText = person.name;
-				if (state.weightBalanceEnabled) {
-					displayText += ` (${person.weight})`;
-				}
-				li.textContent = displayText;
-				
-				if (state.genderBalanceEnabled) {
-					const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
-					li.style.borderLeft = `4px solid ${genderColor}`;
-				}
-				
-				const groupIndex = getPersonGroupIndex(person.id);
-				if (groupIndex !== -1) {
-					const color = getGroupColor(groupIndex);
-					const dotSpan = document.createElement('span');
-					dotSpan.className = 'result-group-dot';
-					dotSpan.style.backgroundColor = color;
-					li.appendChild(dotSpan);
-				}
-				list.appendChild(li);
-				
-				// 가중치 업데이트
-				if (state.weightBalanceEnabled) {
-					teamCardData.currentWeight += person.weight || 0;
-					const titleText = `팀 ${teamIndex + 1} (${memberIndex + 1}명) - 가중치: ${teamCardData.currentWeight}`;
-					title.textContent = titleText;
-				}
-				
-				// 마지막 인원이 아닌 경우에만 지연
-				const isLastMember = memberIndex === maxMembers - 1 && teamIndex === teamCards.length - 1;
-				if (!isLastMember) {
-					await new Promise(resolve => setTimeout(resolve, state.teamDisplayDelay));
-				}
+	// 팀 배열을 그룹 단위(연속된 동일 그룹 인원)와 단일 인원으로 분할하여 블록 단위로 애니메이션
+	const teamChunks = teamCards.map(({ team }) => {
+		const chunks = [];
+		let i = 0;
+		while (i < team.length) {
+			const person = team[i];
+			const gIdx = getPersonGroupIndex(person.id);
+			if (gIdx === -1) {
+				chunks.push([person]);
+				i += 1;
+				continue;
+			}
+			const chunk = [];
+			let j = i;
+			while (j < team.length && getPersonGroupIndex(team[j].id) === gIdx) {
+				chunk.push(team[j]);
+				j++;
+			}
+			chunks.push(chunk);
+			i = j;
+		}
+		return chunks;
+	});
+
+	// 최소 인원 팀 우선으로 청크를 하나씩 소비하는 그리디 스케줄링
+	const nextIdx = teamChunks.map(() => 0);
+	const totalChunks = teamChunks.reduce((sum, ch) => sum + ch.length, 0);
+	for (let processed = 0; processed < totalChunks; processed++) {
+		// 아직 남은 청크가 있는 팀 중 현재 인원이 가장 적은 팀 선택
+		let pick = -1;
+		let minCount = Infinity;
+		for (let i = 0; i < teamCards.length; i++) {
+			if (nextIdx[i] >= teamChunks[i].length) continue;
+			const cnt = teamCards[i].currentCount;
+			if (cnt < minCount) {
+				minCount = cnt;
+				pick = i;
 			}
 		}
+		if (pick === -1) break; // 방어적
+		const teamCardData = teamCards[pick];
+		const { list, title } = teamCardData;
+		const chunk = teamChunks[pick][nextIdx[pick]++];
+		let addedWeight = 0;
+		for (const person of chunk) {
+			const li = document.createElement('li');
+			let displayText = person.name;
+			if (state.weightBalanceEnabled) displayText += ` (${person.weight})`;
+			li.textContent = displayText;
+			li.classList.add('jelly-in');
+			if (state.genderBalanceEnabled) {
+				const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
+				li.style.borderLeft = `4px solid ${genderColor}`;
+			}
+			const groupIndex = getPersonGroupIndex(person.id);
+			if (groupIndex !== -1) {
+				const color = getGroupColor(groupIndex);
+				const dotSpan = document.createElement('span');
+				dotSpan.className = 'result-group-dot';
+				dotSpan.style.backgroundColor = color;
+				li.appendChild(dotSpan);
+			}
+			list.appendChild(li);
+			li.addEventListener('animationend', () => li.classList.remove('jelly-in'), { once: true });
+			teamCardData.currentCount += 1;
+			if (state.weightBalanceEnabled) addedWeight += person.weight || 0;
+		}
+		if (state.weightBalanceEnabled) {
+			teamCardData.currentWeight += addedWeight;
+			title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
+		} else {
+			title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명)`;
+		}
+		const isLastStep = processed === totalChunks - 1;
+		if (!isLastStep) await new Promise(r => setTimeout(r, state.teamDisplayDelay));
 	}
 	
 	elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
