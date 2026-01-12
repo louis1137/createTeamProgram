@@ -31,6 +31,9 @@ const elements = {
 	participantCount: document.querySelector('.participantCount')
 };
 
+// Warning popup auto-hide timer id
+let warningHideTimer = null;
+
 function init() {
 	elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
 	elements.weightBalanceCheckbox.addEventListener('change', handleWeightBalanceToggle);
@@ -71,6 +74,8 @@ function resetAll() {
 	if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 제약 설정(금지 제약)은 초기화되지 않습니다.')) {
 		return;
 	}
+	// Hide any visible warning popup when resetting lists/state
+	hideWarnings();
 	// Convert any applied (id-based) forbidden pairs into pending name-based constraints so they persist
 	let converted = 0;
 	state.forbiddenPairs.forEach(([a, b]) => {
@@ -187,7 +192,7 @@ function addPerson() {
 			names.forEach(name => {
 				const normalized = normalizeName(name);
 				const exists = state.people.some(p => normalizeName(p.name) === normalized);
-				if (exists) { warnings.push(`${name}은(는) 이미 등록된 이름입니다.`); return; }
+				if (exists) { warnings.push(`[${name}]은(는) 이미 등록된 이름입니다.`); return; }
 				const person = {
 					id: state.nextId++,
 					name: name,
@@ -729,26 +734,47 @@ function shuffleTeams() {
 		showError('참가자를 추가해주세요.');
 		return;
 	}
-	
+
 	const validPeople = state.people.filter(p => p.name.trim() !== '');
 	if (validPeople.length === 0) {
 		showError('최소 1명 이상의 이름을 입력해주세요.');
 		return;
 	}
-	
+
 	if (state.membersPerTeam < 2) {
 		showError('팀 인원수는 최소 2명 이상이어야 합니다.');
 		return;
 	}
-	
+
 	if (validPeople.length < state.membersPerTeam) {
 		showError('참가자 수가 팀 인원수보다 적습니다.');
 		return;
 	}
-	
-	const teams = generateTeams(validPeople);
+
+	const teams = generateTeams(preShufflePeopleForGeneration(validPeople));
 	if (!teams) return; // generateTeams shows error when impossible
 	displayTeams(teams);
+}
+// 팀 생성 전에 내부적으로 한 번 셔플: 그룹 내 인원은 제외(비그룹 인원만 무작위화)
+function preShufflePeopleForGeneration(people) {
+	try {
+		const groupedIdSet = new Set();
+		for (const g of state.requiredGroups) {
+			for (const id of g) groupedIdSet.add(id);
+		}
+		const groupedPeople = people.filter(p => groupedIdSet.has(p.id));
+		const ungroupedPeople = people.filter(p => !groupedIdSet.has(p.id));
+		// Fisher-Yates shuffle for ungrouped only
+		for (let i = ungroupedPeople.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[ungroupedPeople[i], ungroupedPeople[j]] = [ungroupedPeople[j], ungroupedPeople[i]];
+		}
+		// 그룹 인원은 원래 순서 유지, 비그룹 인원만 셔플된 순서로 뒤에 배치
+		return [...groupedPeople, ...ungroupedPeople];
+	} catch (_) {
+		// 문제가 있으면 원본 people 사용
+		return people;
+	}
 }
 
 function generateTeams(people) {
@@ -988,6 +1014,24 @@ async function displayTeams(teams) {
 	// 2단계: 모든 팀에 돌아가면서 인원을 추가 (라운드 로빈)
 	const maxMembers = Math.max(...teams.map(t => t.length));
 	
+	// 팀원 추가 애니메이션 동안 카드 높이 흔들림 방지를 위해
+	// 각 팀 카드의 리스트 영역(ul)에 maxMembers 기준의 min-height를 설정
+	try {
+		const uls = Array.from(elements.teamsDisplay.querySelectorAll('.team-card ul'));
+		if (uls.length) {
+			// 샘플 li를 하나 붙여 실제 렌더 높이를 측정
+			const sampleLi = document.createElement('li');
+			sampleLi.style.visibility = 'hidden';
+			sampleLi.style.position = 'absolute';
+			sampleLi.innerHTML = '<span class="result-group-dot"></span><span>샘플</span>';
+			uls[0].appendChild(sampleLi);
+			const liHeight = sampleLi.offsetHeight || 40; // 폴백 높이
+			uls[0].removeChild(sampleLi);
+			const minListHeight = liHeight * maxMembers;
+			uls.forEach(ul => { ul.style.minHeight = minListHeight + 'px'; });
+		}
+	} catch (_) { /* 측정 실패 시 무시하고 진행 */ }
+	
 	for (let memberIndex = 0; memberIndex < maxMembers; memberIndex++) {
 		for (let teamIndex = 0; teamIndex < teamCards.length; teamIndex++) {
 			const teamCardData = teamCards[teamIndex];
@@ -1045,6 +1089,7 @@ function showError(message) {
 function hideWarnings() {
 	const panel = document.getElementById('warningPopup');
 	if (!panel) return;
+	if (warningHideTimer) { clearTimeout(warningHideTimer); warningHideTimer = null; }
 	panel.classList.remove('is-visible');
 	panel.setAttribute('aria-hidden','true');
 }
@@ -1063,6 +1108,12 @@ function showWarnings(messages) {
 	if (!messages.length) return;
 	panel.classList.add('is-visible');
 	panel.setAttribute('aria-hidden','false');
+	// Restart auto-dismiss timer (3s)
+	if (warningHideTimer) { clearTimeout(warningHideTimer); }
+	warningHideTimer = setTimeout(() => {
+		warningHideTimer = null;
+		hideWarnings();
+	}, 3000);
 }
 
 init();
