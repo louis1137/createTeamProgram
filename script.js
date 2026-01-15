@@ -234,6 +234,45 @@ function loadFromLocalStorage() {
 				state.membersPerTeam = data.membersPerTeam;
 				elements.teamSizeInput.value = data.membersPerTeam;
 			}
+			
+			// 콘솔에 복원된 데이터 출력
+			console.group('📦 저장된 데이터 복원');
+			
+			if (state.people.length > 0) {
+				console.log('%c👥 참가자 목록', 'color: #667eea; font-weight: bold; font-size: 14px;');
+				const peopleTable = state.people.map(p => ({
+					'이름': p.name,
+					'성별': p.gender === 'male' ? '남 👨' : '여 👩',
+					'가중치': p.weight || '-'
+				}));
+				console.table(peopleTable);
+			} else {
+				console.log('%c👥 참가자: 없음', 'color: #999; font-style: italic;');
+			}
+			
+			if (state.forbiddenPairs.length > 0) {
+				console.log('%c🚫 적용된 제약', 'color: #ef4444; font-weight: bold; font-size: 14px;');
+				state.forbiddenPairs.forEach((pair, idx) => {
+					const person1 = state.people.find(p => p.id === pair[0]);
+					const person2 = state.people.find(p => p.id === pair[1]);
+					if (person1 && person2) {
+						console.log(`  ${idx + 1}. ${person1.name} ↔ ${person2.name}`);
+					}
+				});
+			} else {
+				console.log('%c🚫 적용된 제약: 없음', 'color: #999; font-style: italic;');
+			}
+			
+			if (state.pendingConstraints.length > 0) {
+				console.log('%c⏳ 대기 중인 제약', 'color: #f59e0b; font-weight: bold; font-size: 14px;');
+				state.pendingConstraints.forEach((constraint, idx) => {
+					console.log(`  ${idx + 1}. ${constraint.left} ↔ ${constraint.right}`);
+				});
+			} else {
+				console.log('%c⏳ 대기 중인 제약: 없음', 'color: #999; font-style: italic;');
+			}
+			
+			console.groupEnd();
 		}
 	} catch (e) {
 		console.error('localStorage 복원 실패:', e);
