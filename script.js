@@ -276,6 +276,12 @@ function captureResultsSection() {
 		return;
 	}
 	
+	// 기존 타이머 클리어 및 버튼 상태 초기화
+	if (captureSuccessTimer) {
+		clearTimeout(captureSuccessTimer);
+		captureSuccessTimer = null;
+	}
+	
 	// 플래시 효과 추가 (::after 가상요소)
 	section.classList.add('capture-flash');
 	
@@ -289,7 +295,8 @@ function captureResultsSection() {
 	
 	// 캐처 버튼 임시 비활성화
 	const btn = elements.captureBtn;
-	const originalText = btn.textContent;
+	btn.innerHTML = '화면 캡처 <span class="camera-emoji">📸</span>';
+	const originalHTML = btn.innerHTML;
 	btn.textContent = '캡처 중...';
 	btn.disabled = true;
 	
@@ -306,7 +313,7 @@ function captureResultsSection() {
 		canvas.toBlob(blob => {
 			if (!blob) {
 				alert('이미지 생성에 실패했습니다.');
-				btn.textContent = originalText;
+				btn.innerHTML = originalHTML;
 				btn.disabled = false;
 				return;
 			}
@@ -314,7 +321,7 @@ function captureResultsSection() {
 			// 클립보드 API 확인
 			if (!navigator.clipboard || !navigator.clipboard.write) {
 				alert('클립보드 기능을 사용할 수 없습니다. HTTPS 환경이 필요합니다.');
-				btn.textContent = originalText;
+				btn.innerHTML = originalHTML;
 				btn.disabled = false;
 				return;
 			}
@@ -324,23 +331,22 @@ function captureResultsSection() {
 			navigator.clipboard.write([item]).then(() => {
 				// 성공 메시지
 				btn.textContent = '복사 완료!';
-				if (captureSuccessTimer) clearTimeout(captureSuccessTimer);
 				captureSuccessTimer = setTimeout(() => {
-					btn.textContent = originalText;
+					btn.innerHTML = originalHTML;
 					captureSuccessTimer = null;
 				}, 2000);
 				btn.disabled = false;
 			}).catch(err => {
 				console.error('클립보드 복사 실패:', err);
 				alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');
-				btn.textContent = originalText;
+				btn.innerHTML = originalHTML;
 				btn.disabled = false;
 			});
 		}, 'image/png');
 	}).catch(err => {
 		console.error('캐처 실패:', err);
 		alert('화면 캐처에 실패했습니다.');
-		btn.textContent = originalText;
+		btn.innerHTML = originalHTML;
 		btn.disabled = false;
 	});
 	}, 100);
@@ -1531,9 +1537,16 @@ async function displayTeams(teams) {
 	
 	elements.resultsSection.classList.add('visible');
 	
-	// 캡처 버튼 컨테이너 표시
+	// 캡처 기능 사용 가능 여부 확인 후 버튼 컨테이너 표시
 	if (elements.captureButtonContainer) {
-		elements.captureButtonContainer.style.display = 'block';
+		const canUseCapture = typeof html2canvas !== 'undefined' && 
+							  navigator.clipboard && 
+							  navigator.clipboard.write;
+		if (canUseCapture) {
+			elements.captureButtonContainer.style.display = 'block';
+		} else {
+			elements.captureButtonContainer.style.display = 'none';
+		}
 	}
 	
 	// 2단계: 모든 팀에 돌아가면서 인원을 추가 (라운드 로빈)
