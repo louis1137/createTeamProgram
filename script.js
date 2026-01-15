@@ -3,6 +3,28 @@ const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
+// Animated Favicon
+(function() {
+	const moonPhases = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌝', '🌝', '🌝', '🌕', '🌖', '🌗', '🌘', '🌑', '🌚', '🌚', '🌚'];
+	let currentPhase = 0;
+	
+	function updateFavicon() {
+		const emoji = moonPhases[currentPhase];
+		const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='-0.1em' y='1em' font-size='90'>${emoji}</text></svg>`;
+		const favicon = document.querySelector("link[rel*='icon']") || document.createElement('link');
+		favicon.type = 'image/svg+xml';
+		favicon.rel = 'icon';
+		favicon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+		if (!document.querySelector("link[rel*='icon']")) {
+			document.head.appendChild(favicon);
+		}
+		currentPhase = (currentPhase + 1) % moonPhases.length;
+	}
+	
+	setInterval(updateFavicon, 350); // 350ms마다 변경
+	updateFavicon(); // 즉시 실행
+})();
+
 const state = {
 	people: [],
 	requiredGroups: [],
