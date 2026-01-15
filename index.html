@@ -13,6 +13,7 @@
 	<meta property="og:url" content="https://yourdomain.com/팀섞기">
 	<meta name="twitter:card" content="summary">
 	<link rel="stylesheet" href="style.css">
+	<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 	<script type="application/ld+json">
 	{
 		"@context": "https://schema.org",
@@ -157,6 +158,11 @@
 			<h2>생성된 팀</h2>
 			<div id="teamsDisplay" class="teams-display"></div>
 		</section>
+		
+		<div class="capture-button-container" style="display:none;">
+			<button id="captureBtn" class="btn btn-capture btn-primary">화면 캡처 <span class="camera-emoji">📸</span></button>
+			<p class="capture-hint">캡처 버튼을 눌러 손쉽게 이미지를 복사하세요. <code>Ctrl+V</code>로 붙여넣기 하세요!</p>
+		</div>
 	</div>
 
 	<!-- Warning popup (bottom-right tooltip style) -->
@@ -169,7 +175,7 @@
 	<div id="constraintNotificationLayer" class="constraint-notification-layer" style="display: none;">
 		<div class="constraint-notification-card">
 			<div class="constraint-notification-icon">⚠️</div>
-			<h3>제약 목록이 존재합니다</h3>
+			<h3>저장된 제약 목록이 존재합니다</h3>
 			<p>제약을 유지하거나 초기화할 수 있습니다</p>
 			<div class="constraint-notification-buttons">
 				<button id="constraintNotificationConfirm" class="btn btn-primary">제약유지(관리창 열기)</button>

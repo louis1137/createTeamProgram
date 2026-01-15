@@ -44,12 +44,15 @@ const elements = {
 	shuffleBtn: document.getElementById('shuffleBtn'),
 	resultsSection: document.getElementById('resultsSection'),
 	teamsDisplay: document.getElementById('teamsDisplay'),
-	participantCount: document.querySelector('.participantCount')
+	participantCount: document.querySelector('.participantCount'),
+	captureBtn: document.getElementById('captureBtn'),
+	captureButtonContainer: document.querySelector('.capture-button-container')
 };
 
 // Warning popup auto-hide timer id
 let warningHideTimer = null;
 let warningHovering = false;
+let captureSuccessTimer = null;
 
 function init() {
 	elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
@@ -65,6 +68,18 @@ function init() {
 		}
 	});
 	elements.shuffleBtn.addEventListener('click', shuffleTeams);
+	if (elements.captureBtn) {
+		elements.captureBtn.addEventListener('click', captureResultsSection);
+		// 호버 시 캡처 영역 하이라이트
+		elements.captureBtn.addEventListener('mouseenter', () => {
+			if (elements.resultsSection.classList.contains('visible')) {
+				elements.resultsSection.classList.add('capture-highlight');
+			}
+		});
+		elements.captureBtn.addEventListener('mouseleave', () => {
+			elements.resultsSection.classList.remove('capture-highlight');
+		});
+	}
 	// Wire warning popup close
 	const warnClose = document.querySelector('#warningPopup .warning-popup__close');
 	if (warnClose) {
@@ -240,6 +255,114 @@ function getPersonDefaults(name) {
 	return null;
 }
 
+// 결과 섹션 캐처 기능
+function captureResultsSection() {
+	const section = elements.resultsSection;
+	if (!section || !section.classList.contains('visible')) {
+		alert('팀 생성 결과가 없습니다.');
+		return;
+	}
+	
+	// html2canvas가 로드되었는지 확인
+	if (typeof html2canvas === 'undefined') {
+		alert('html2canvas 라이브러리를 찾을 수 없습니다.');
+		return;
+	}
+	
+	// 플래시 효과 추가 (::after 가상요소)
+	section.classList.add('capture-flash');
+	
+	// 찰칵 사운드 재생
+	playCameraShutterSound();
+	
+	// 애니메이션 종료 후 클래스 제거
+	setTimeout(() => {
+		section.classList.remove('capture-flash');
+	}, 600);
+	
+	// 캐처 버튼 임시 비활성화
+	const btn = elements.captureBtn;
+	const originalText = btn.textContent;
+	btn.textContent = '캡처 중...';
+	btn.disabled = true;
+	
+	// 플래시 효과 후 약간 대기
+	setTimeout(() => {
+		html2canvas(section, {
+		backgroundColor: '#f8f9fa',
+		scale: 2,
+		logging: false,
+		allowTaint: true,
+		useCORS: true
+	}).then(canvas => {
+		// 캔버스를 이미지로 변환하여 클립보드에 복사
+		canvas.toBlob(blob => {
+			if (!blob) {
+				alert('이미지 생성에 실패했습니다.');
+				btn.textContent = originalText;
+				btn.disabled = false;
+				return;
+			}
+			
+			// 클립보드 API 확인
+			if (!navigator.clipboard || !navigator.clipboard.write) {
+				alert('클립보드 기능을 사용할 수 없습니다. HTTPS 환경이 필요합니다.');
+				btn.textContent = originalText;
+				btn.disabled = false;
+				return;
+			}
+			
+			// 클립보드에 이미지 복사
+			const item = new ClipboardItem({ 'image/png': blob });
+			navigator.clipboard.write([item]).then(() => {
+				// 성공 메시지
+				btn.textContent = '복사 완료!';
+				if (captureSuccessTimer) clearTimeout(captureSuccessTimer);
+				captureSuccessTimer = setTimeout(() => {
+					btn.textContent = originalText;
+					captureSuccessTimer = null;
+				}, 2000);
+				btn.disabled = false;
+			}).catch(err => {
+				console.error('클립보드 복사 실패:', err);
+				alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');
+				btn.textContent = originalText;
+				btn.disabled = false;
+			});
+		}, 'image/png');
+	}).catch(err => {
+		console.error('캐처 실패:', err);
+		alert('화면 캐처에 실패했습니다.');
+		btn.textContent = originalText;
+		btn.disabled = false;
+	});
+	}, 100);
+}
+
+// 카메라 셔터 사운드 재생
+function playCameraShutterSound() {
+	try {
+		const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+		const oscillator = audioContext.createOscillator();
+		const gainNode = audioContext.createGain();
+		
+		oscillator.connect(gainNode);
+		gainNode.connect(audioContext.destination);
+		
+		// 찰칵 소리 효과
+		oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+		oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.1);
+		
+		gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+		gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+		
+		oscillator.start(audioContext.currentTime);
+		oscillator.stop(audioContext.currentTime + 0.1);
+	} catch (e) {
+		console.log('사운드 재생 실패:', e);
+	}
+}
+
 function resetAll() {
 	if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 제약 설정(금지 제약)은 초기화되지 않습니다.')) {
 		return;
@@ -266,6 +389,10 @@ function resetAll() {
 	state.forbiddenPairs = []; // clear id-based pairs (they become pending)
 	state.forbiddenMap = {};
 	elements.resultsSection.classList.remove('visible');
+	// 캡처 버튼 컨테이너 숨기기
+	if (elements.captureButtonContainer) {
+		elements.captureButtonContainer.style.display = 'none';
+	}
 	// show FAQ again when resetting
 	const faqSection = document.querySelector('.faq-section');
 	if (faqSection) faqSection.style.display = '';
@@ -1049,6 +1176,16 @@ function shuffleTeams() {
 	// 팀 생성시 제약 레이어가 열려있으면 내리기
 	hideConstraintNotification();
 	
+	// 캡처 버튼 상태 초기화
+	if (captureSuccessTimer) {
+		clearTimeout(captureSuccessTimer);
+		captureSuccessTimer = null;
+	}
+	if (elements.captureBtn) {
+		elements.captureBtn.innerHTML = '화면 캡처 <span class="camera-emoji">📸</span>';
+		elements.captureBtn.disabled = false;
+	}
+	
 	// teamDisplayDelay가 바뀔 수 있으므로 표시 전 최신값으로 반영
 	setTeamAnimDurationFromDelay();
 	displayTeams(teams);
@@ -1387,6 +1524,11 @@ async function displayTeams(teams) {
 	
 	elements.resultsSection.classList.add('visible');
 	
+	// 캡처 버튼 컨테이너 표시
+	if (elements.captureButtonContainer) {
+		elements.captureButtonContainer.style.display = 'block';
+	}
+	
 	// 2단계: 모든 팀에 돌아가면서 인원을 추가 (라운드 로빈)
 	const maxMembers = Math.max(...teams.map(t => t.length));
 
@@ -1553,14 +1695,11 @@ async function displayTeams(teams) {
 			if (!isLastStep) await new Promise(r => setTimeout(r, state.teamDisplayDelay));
 		}
 	}
-	
-	elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
 function showError(message) {
 	elements.teamsDisplay.innerHTML = `<div class="error-message">${message}</div>`;
 	elements.resultsSection.classList.add('visible');
-	elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
 // Highlight any existing participant tags that match duplicate names

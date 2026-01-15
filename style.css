@@ -17,7 +17,6 @@ body {
 	background: white;
 	border-radius: 16px;
 	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-	overflow: hidden;
 }
 
 header {
@@ -39,6 +38,10 @@ section {
 
 section:last-child {
 	border-bottom: none;
+}
+
+.faq-section {
+	border-bottom: none !important;
 }
 
 .section-header {
@@ -187,13 +190,15 @@ section:last-child {
 }
 
 .constraint-notification-buttons .btn-primary {
-	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 	color: white;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .constraint-notification-buttons .btn-primary:hover {
-	box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+	display: flex;
+	justify-content: center;
 	transform: translateY(-2px);
+	background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
 }
 
 .constraint-notification-buttons .btn-secondary {
@@ -223,6 +228,19 @@ h2 {
 	gap: 30px;
 	align-items: center;
 	background: #f8f9fa;
+}
+
+.action-section .btn-primary {
+	color: white;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.action-section .btn-primary:hover {
+	display: flex;
+	justify-content: center;
+	height: 56px;
+	transform: translateY(-2px);
+	background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
 }
 
 .option label {
@@ -535,18 +553,14 @@ h2 {
 }
 
 .btn-primary {
-	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-	color: white;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	width: 100%;
-	padding: 15px;
+	height: 56px;
 	font-size: 1.2rem;
 	font-weight: 600;
 }
-
-.btn-primary:hover {
-	background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-}
-
 .btn-reset {
 	background: #ef4444;
 	color: white;
@@ -562,6 +576,9 @@ h2 {
 .results-section {
 	background: #f8f9fa;
 	display: none;
+	position: relative;
+	overflow: visible;
+	transition: box-shadow 0.3s ease, outline 0.3s ease;
 }
 
 .results-section h2 {
@@ -570,6 +587,98 @@ h2 {
 
 .results-section.visible {
 	display: block;
+}
+
+.results-section.capture-highlight {
+	box-shadow: 0 0 0 5px rgba(236, 72, 153, 0.2), inset 0 0 0 3px #ec4899;
+}
+
+/* 캡처 플래시 효과 - ::after 사용 */
+.results-section.capture-flash::after {
+	content: '';
+	position: absolute;
+	top: -10px;
+	left: -10px;
+	right: -10px;
+	bottom: -10px;
+	background: white;
+	pointer-events: none;
+	z-index: 9999;
+	opacity: 0.6;
+	transform: scale(0.98);
+	transform-origin: center center;
+	animation: flashScaleEffect 0.3s ease-out forwards;
+}
+
+@keyframes flashScaleEffect {
+	0% {
+		opacity: 0.7;
+		transform: scale(0.95);
+	}
+	40% {
+		opacity: 0.4;
+		transform: scale(1.02);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(1.05);
+	}
+}
+
+.capture-button-container {
+	position: sticky;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	text-align: center;
+	padding: 20px 30px;
+	background: white;
+	border-top: 1px solid #e0e0e0;
+	box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+	z-index: 100;
+}
+
+.capture-button-container .btn {
+	min-width: 200px;
+}
+
+.capture-hint {
+	margin-top: 10px;
+	font-size: 0.85rem;
+	color: #6b7280;
+	line-height: 1.4;
+}
+
+.capture-hint code {
+	background: #fff6c6;
+	padding: 4px 8px;
+	border-radius: 6px;
+	display: inline-block;
+	margin: 6px 0;
+	color: #111;
+	font-weight: 600;
+}
+
+.btn-capture {
+	background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+	color: white;
+	padding: 12px 24px;
+	font-size: 1.1rem;
+	font-weight: 600;
+	box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+}
+
+.btn-capture:hover {
+	background: linear-gradient(135deg, #be185d 0%, #9f1239 100%);
+	box-shadow: 0 6px 16px rgba(236, 72, 153, 0.4);
+}
+
+.camera-emoji {
+	font-size: 1.4em;
+	display: inline-block;
+	vertical-align: middle;
+	margin-top: -0.4em;
+	margin-left: 6px;
 }
 
 .teams-display {
