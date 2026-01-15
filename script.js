@@ -1,5 +1,5 @@
-const teamDisplayDelay = isLocalView() ? 400 : 400;
-const blindDelay = isLocalView() ? 5000 : 5000;
+const teamDisplayDelay = isLocalView() ? 0 : 400;
+const blindDelay = isLocalView() ? null : 5000;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
 const state = {
@@ -10,6 +10,7 @@ const state = {
 	pendingConstraints: [], // array of {left: normalized, right: normalized}
 	genderBalanceEnabled: false,
 	weightBalanceEnabled: false,
+	maxTeamSizeEnabled: false,
 	membersPerTeam: 4,
 	nextId: 1,
 	teamDisplayDelay,
@@ -33,6 +34,7 @@ const state = {
 const elements = {
 	genderBalanceCheckbox: document.getElementById('genderBalanceCheckbox'),
 	weightBalanceCheckbox: document.getElementById('weightBalanceCheckbox'),
+	maxTeamSizeCheckbox: document.getElementById('maxTeamSizeCheckbox'),
 	teamSizeInput: document.getElementById('teamSizeInput'),
 	nameInput: document.getElementById('nameInput'),
 	addPersonBtn: document.getElementById('addPersonBtn'),
@@ -51,6 +53,7 @@ let warningHovering = false;
 function init() {
 	elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
 	elements.weightBalanceCheckbox.addEventListener('change', handleWeightBalanceToggle);
+	elements.maxTeamSizeCheckbox.addEventListener('change', handleMaxTeamSizeToggle);
 	elements.teamSizeInput.addEventListener('change', handleTeamSizeChange);
 	elements.addPersonBtn.addEventListener('click', addPerson);
 	elements.resetBtn.addEventListener('click', resetAll);
@@ -66,6 +69,7 @@ function init() {
 		warnClose.addEventListener('click', () => {
 			const panel = document.getElementById('warningPopup');
 			if (panel) { panel.classList.remove('is-visible'); panel.setAttribute('aria-hidden','true'); }
+			applyDuplicateHighlights([]);
 		});
 	}
 	// Hide warning popup on Enter or Escape
@@ -130,6 +134,10 @@ function handleGenderBalanceToggle(e) {
 function handleWeightBalanceToggle(e) {
 	state.weightBalanceEnabled = e.target.checked;
 	renderPeople();
+}
+
+function handleMaxTeamSizeToggle(e) {
+	state.maxTeamSizeEnabled = e.target.checked;
 }
 
 function handleTeamSizeChange(e) {
@@ -760,29 +768,45 @@ function renderPeople() {
 	elements.peopleList.innerHTML = '';
 	
 	const grouped = new Set();
+	const groupMap = new Map(); // personId -> groupIndex
 	
+	// 그룹 정보를 맵으로 저장
 	state.requiredGroups.forEach((group, groupIndex) => {
-		const groupContainer = document.createElement('div');
-		groupContainer.className = 'group-container';
-		groupContainer.style.borderColor = getGroupColor(groupIndex);
-		
 		group.forEach(personId => {
-			const person = state.people.find(p => p.id === personId);
-			if (person) {
-				grouped.add(personId);
-				const personTag = createPersonTag(person);
-				groupContainer.appendChild(personTag);
-			}
+			grouped.add(personId);
+			groupMap.set(personId, groupIndex);
 		});
-		
-		elements.peopleList.appendChild(groupContainer);
 	});
 	
+	// people 배열 순서대로 표시하되, 그룹 시작 시점에 그룹 전체를 한 번에 표시
+	const processedGroups = new Set();
+	
 	state.people.forEach(person => {
-		if (!grouped.has(person.id)) {
+		const groupIndex = groupMap.get(person.id);
+		
+		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
+			// 이 그룹을 처음 만났을 때, 그룹 전체를 표시
+			processedGroups.add(groupIndex);
+			const group = state.requiredGroups[groupIndex];
+			const groupContainer = document.createElement('div');
+			groupContainer.className = 'group-container';
+			groupContainer.style.borderColor = getGroupColor(groupIndex);
+			
+			group.forEach(personId => {
+				const groupPerson = state.people.find(p => p.id === personId);
+				if (groupPerson) {
+					const personTag = createPersonTag(groupPerson);
+					groupContainer.appendChild(personTag);
+				}
+			});
+			
+			elements.peopleList.appendChild(groupContainer);
+		} else if (groupIndex === undefined) {
+			// 그룹에 속하지 않은 개별 항목
 			const personTag = createPersonTag(person);
 			elements.peopleList.appendChild(personTag);
 		}
+		// 이미 처리된 그룹의 멤버는 스킵
 	});
 }
 
@@ -851,7 +875,14 @@ function generateTeams(people) {
 		}
 	}
 
-	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
+	// 최대인원으로 팀 생성 모드: 팀수는 (총인원 / 팀당인원)의 올림
+	// 일반 모드: 기존과 동일
+	let teamCount;
+	if (state.maxTeamSizeEnabled) {
+		teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
+	} else {
+		teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
+	}
 	const maxAttempts = 500;
 
 	// Calculate minimum gender count across all people
@@ -885,7 +916,14 @@ function generateTeams(people) {
 			let validTeams = [];
 			for (let i = 0; i < teams.length; i++) {
 				// Check 1: Size constraint
-				if (teams[i].length + groupMembers.length > state.membersPerTeam) continue;
+				if (state.maxTeamSizeEnabled) {
+					// 마지막 팀이 아니면 최대인원 체크
+					if (i < teams.length - 1 && teams[i].length + groupMembers.length > state.membersPerTeam) continue;
+					// 마지막 팀은 제한 없음
+				} else {
+					// 일반 모드: 모든 팀에 최대인원 제한 적용
+					if (teams[i].length + groupMembers.length > state.membersPerTeam) continue;
+				}
 				
 				// Check 2: No conflicts
 				let hasConflict = false;
@@ -924,8 +962,29 @@ function generateTeams(people) {
 				break;
 			}
 			
-			// Randomly pick from valid teams
-			const selectedTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
+			// 최대인원 모드와 일반 모드 모두 랜덤 선택하되, 가중치 균등 고려
+			let selectedTeam;
+			if (state.maxTeamSizeEnabled) {
+				// 최대인원 모드: 비어있는 팀이나 공간이 있는 팀 중에서 선택
+				// 가중치 균등이 활성화된 경우 가중치 고려
+				if (state.weightBalanceEnabled && validTeams.length > 1) {
+					// 가중치가 가장 낮은 팀들 중에서 랜덤 선택
+					const teamWeights = validTeams.map(idx => ({
+						idx,
+						weight: teams[idx].reduce((sum, p) => sum + (p.weight || 0), 0)
+					}));
+					const minWeight = Math.min(...teamWeights.map(t => t.weight));
+					const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
+					selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
+				} else {
+					// 가중치 균등이 없으면 validTeams 중에서 랜덤 선택
+					selectedTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
+				}
+			} else {
+				// 일반 모드: 랜덤 선택
+				selectedTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
+			}
+			
 			teams[selectedTeam].push(...groupMembers);
 			groupMembers.forEach(m => assigned.add(m.id));
 		}
@@ -943,8 +1002,15 @@ function generateTeams(people) {
 			// Find valid teams
 			let validTeams = [];
 			for (let i = 0; i < teams.length; i++) {
-				// Check 1: Size constraint
-				if (teams[i].length >= state.membersPerTeam) continue;
+				// Check 1: Size constraint - 최대인원 모드에서는 마지막 팀을 제외하고는 최대인원 체크
+				if (state.maxTeamSizeEnabled) {
+					// 마지막 팀이 아니면 최대인원까지만 허용
+					if (i < teams.length - 1 && teams[i].length >= state.membersPerTeam) continue;
+					// 마지막 팀은 제한 없음 (나머지 모두 배치)
+				} else {
+					// 일반 모드: 모든 팀에 최대인원 제한 적용
+					if (teams[i].length >= state.membersPerTeam) continue;
+				}
 				
 				// Check 2: No conflicts
 				if (teams[i].some(tm => isForbidden(tm.id, person.id))) continue;
@@ -975,37 +1041,66 @@ function generateTeams(people) {
 				break;
 			}
 			
-			// Priority 1: Teams with only 1 unit (need 2nd unit)
-			const teamUnits = validTeams.map(idx => {
-				const groupSet = new Set();
-				let ungroupedCount = 0;
-				for (const member of teams[idx]) {
-					const gi = getPersonGroupIndex(member.id);
-					if (gi === -1) ungroupedCount++;
-					else groupSet.add(gi);
-				}
-				return { idx, units: groupSet.size + ungroupedCount, size: teams[idx].length };
-			});
-			
-			const needUnit = teamUnits.filter(t => t.units < 2);
-			let candidateTeams = needUnit.length > 0 ? needUnit : teamUnits;
-			
-			// Priority 2: Among candidates, always prefer smallest teams
-			const minSize = Math.min(...candidateTeams.map(t => t.size));
-			candidateTeams = candidateTeams.filter(t => t.size === minSize);
-			
-			// Priority 3: Weight balance (if enabled)
+			// 최대인원 모드: 순차적으로 팀을 채움 (1팀 -> 2팀 -> ... -> 마지막팀)
+			// 일반 모드: 기존 로직 (균등 분배)
 			let selectedTeam;
-			if (state.weightBalanceEnabled && candidateTeams.length > 1) {
-				const teamWeights = candidateTeams.map(t => ({
-					...t,
-					weight: teams[t.idx].reduce((sum, p) => sum + (p.weight || 0), 0)
-				}));
-				const minWeight = Math.min(...teamWeights.map(t => t.weight));
-				const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
-				selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
+			if (state.maxTeamSizeEnabled) {
+				// 최대인원 모드: 가장 작은 인덱스 팀 선택 (순차적 채우기)
+				// 가중치 균등이 활성화된 경우에만 가중치 고려
+				if (state.weightBalanceEnabled && validTeams.length > 1) {
+					// 가장 작은 인덱스 팀 찾기
+					const minIdx = Math.min(...validTeams);
+					const minIdxTeams = validTeams.filter(idx => idx === minIdx);
+					
+					if (minIdxTeams.length > 1) {
+						// 동일한 인덱스 팀이 여러 개인 경우 가중치 고려
+						const teamWeights = minIdxTeams.map(idx => ({
+							idx,
+							weight: teams[idx].reduce((sum, p) => sum + (p.weight || 0), 0)
+						}));
+						const minWeight = Math.min(...teamWeights.map(t => t.weight));
+						const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
+						selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
+					} else {
+						selectedTeam = minIdxTeams[0];
+					}
+				} else {
+					// 가중치 균등이 없으면 단순히 가장 작은 인덱스 선택
+					selectedTeam = Math.min(...validTeams);
+				}
 			} else {
-				selectedTeam = candidateTeams[Math.floor(Math.random() * candidateTeams.length)].idx;
+				// 일반 모드: 기존 로직
+				// Priority 1: Teams with only 1 unit (need 2nd unit)
+				const teamUnits = validTeams.map(idx => {
+					const groupSet = new Set();
+					let ungroupedCount = 0;
+					for (const member of teams[idx]) {
+						const gi = getPersonGroupIndex(member.id);
+						if (gi === -1) ungroupedCount++;
+						else groupSet.add(gi);
+					}
+					return { idx, units: groupSet.size + ungroupedCount, size: teams[idx].length };
+				});
+				
+				const needUnit = teamUnits.filter(t => t.units < 2);
+				let candidateTeams = needUnit.length > 0 ? needUnit : teamUnits;
+				
+				// Priority 2: Among candidates, always prefer smallest teams
+				const minSize = Math.min(...candidateTeams.map(t => t.size));
+				candidateTeams = candidateTeams.filter(t => t.size === minSize);
+				
+				// Priority 3: Weight balance (if enabled)
+				if (state.weightBalanceEnabled && candidateTeams.length > 1) {
+					const teamWeights = candidateTeams.map(t => ({
+						...t,
+						weight: teams[t.idx].reduce((sum, p) => sum + (p.weight || 0), 0)
+					}));
+					const minWeight = Math.min(...teamWeights.map(t => t.weight));
+					const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
+					selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
+				} else {
+					selectedTeam = candidateTeams[Math.floor(Math.random() * candidateTeams.length)].idx;
+				}
 			}
 			
 			teams[selectedTeam].push(person);
@@ -1032,7 +1127,26 @@ function generateTeams(people) {
 			}
 		}
 		
-		if (allValid) return teams;
+		if (!allValid) continue;
+		
+		// 최대인원 모드: 마지막 팀이 아닌 팀이 최대인원보다 적으면 재정렬
+		if (state.maxTeamSizeEnabled) {
+			// 인원이 부족한 팀(마지막 팀 제외)이 있는지 확인
+			let needsReorder = false;
+			for (let i = 0; i < teams.length - 1; i++) {
+				if (teams[i].length < state.membersPerTeam) {
+					needsReorder = true;
+					break;
+				}
+			}
+			
+			if (needsReorder) {
+				// 팀을 인원수 기준으로 내림차순 정렬 (많은 팀이 앞으로)
+				teams.sort((a, b) => b.length - a.length);
+			}
+		}
+		
+		return teams;
 	}
 
 	showError('제약 조건으로 팀 배치가 불가능합니다. 제약을 검토해주세요.');
@@ -1122,58 +1236,115 @@ async function displayTeams(teams) {
 		return chunks;
 	});
 
-	// 최소 인원 팀 우선으로 청크를 하나씩 소비하는 그리디 스케줄링
-	const nextIdx = teamChunks.map(() => 0);
-	const totalChunks = teamChunks.reduce((sum, ch) => sum + ch.length, 0);
-	for (let processed = 0; processed < totalChunks; processed++) {
-		// 아직 남은 청크가 있는 팀 중 현재 인원이 가장 적은 팀 선택
-		let pick = -1;
-		let minCount = Infinity;
-		for (let i = 0; i < teamCards.length; i++) {
-			if (nextIdx[i] >= teamChunks[i].length) continue;
-			const cnt = teamCards[i].currentCount;
-			if (cnt < minCount) {
-				minCount = cnt;
-				pick = i;
+	// 최대인원 모드: 순차적으로 팀을 완성 (1팀 전체 -> 2팀 전체 -> ...)
+	// 일반 모드: 최소 인원 팀 우선으로 균등하게 분배
+	if (state.maxTeamSizeEnabled) {
+		// 최대인원 모드: 팀을 순서대로 완전히 완성
+		for (let teamIdx = 0; teamIdx < teamCards.length; teamIdx++) {
+			const teamCardData = teamCards[teamIdx];
+			const { list, title } = teamCardData;
+			const chunks = teamChunks[teamIdx];
+			
+			// 이 팀의 모든 청크를 순서대로 표시
+			for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+				const chunk = chunks[chunkIdx];
+				let addedWeight = 0;
+				
+				for (const person of chunk) {
+					const li = document.createElement('li');
+					let displayText = person.name;
+					if (state.weightBalanceEnabled) displayText += ` (${person.weight})`;
+					li.textContent = displayText;
+					li.classList.add('jelly-in');
+					if (state.genderBalanceEnabled) {
+						const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
+						li.style.borderLeft = `4px solid ${genderColor}`;
+					}
+					const groupIndex = getPersonGroupIndex(person.id);
+					if (groupIndex !== -1) {
+						const color = getGroupColor(groupIndex);
+						const dotSpan = document.createElement('span');
+						dotSpan.className = 'result-group-dot';
+						dotSpan.style.backgroundColor = color;
+						li.appendChild(dotSpan);
+					}
+					list.appendChild(li);
+					li.addEventListener('animationend', () => li.classList.remove('jelly-in'), { once: true });
+					teamCardData.currentCount += 1;
+					if (state.weightBalanceEnabled) addedWeight += person.weight || 0;
+				}
+				
+				if (chunk.length) pulseTeamCard(teamCardData.card);
+				if (state.weightBalanceEnabled) {
+					teamCardData.currentWeight += addedWeight;
+					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
+				} else {
+					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명)`;
+				}
+				
+				// 마지막 팀의 마지막 청크가 아니면 딜레이
+				const isLastTeam = teamIdx === teamCards.length - 1;
+				const isLastChunk = chunkIdx === chunks.length - 1;
+				if (!isLastTeam || !isLastChunk) {
+					await new Promise(r => setTimeout(r, state.teamDisplayDelay));
+				}
 			}
 		}
-		if (pick === -1) break; // 방어적
-		const teamCardData = teamCards[pick];
-		const { list, title } = teamCardData;
-		const chunk = teamChunks[pick][nextIdx[pick]++];
-		let addedWeight = 0;
-		for (const person of chunk) {
-			const li = document.createElement('li');
-			let displayText = person.name;
-			if (state.weightBalanceEnabled) displayText += ` (${person.weight})`;
-			li.textContent = displayText;
-			li.classList.add('jelly-in');
-			if (state.genderBalanceEnabled) {
-				const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
-				li.style.borderLeft = `4px solid ${genderColor}`;
+	} else {
+		// 일반 모드: 균등 분배 방식
+		const nextIdx = teamChunks.map(() => 0);
+		const totalChunks = teamChunks.reduce((sum, ch) => sum + ch.length, 0);
+		for (let processed = 0; processed < totalChunks; processed++) {
+			// 현재 인원이 가장 적은 팀 선택
+			let pick = -1;
+			let minCount = Infinity;
+			for (let i = 0; i < teamCards.length; i++) {
+				if (nextIdx[i] >= teamChunks[i].length) continue;
+				const cnt = teamCards[i].currentCount;
+				if (cnt < minCount) {
+					minCount = cnt;
+					pick = i;
+				}
 			}
-			const groupIndex = getPersonGroupIndex(person.id);
-			if (groupIndex !== -1) {
-				const color = getGroupColor(groupIndex);
-				const dotSpan = document.createElement('span');
-				dotSpan.className = 'result-group-dot';
-				dotSpan.style.backgroundColor = color;
-				li.appendChild(dotSpan);
+			
+			if (pick === -1) break; // 방어적
+			const teamCardData = teamCards[pick];
+			const { list, title } = teamCardData;
+			const chunk = teamChunks[pick][nextIdx[pick]++];
+			let addedWeight = 0;
+			for (const person of chunk) {
+				const li = document.createElement('li');
+				let displayText = person.name;
+				if (state.weightBalanceEnabled) displayText += ` (${person.weight})`;
+				li.textContent = displayText;
+				li.classList.add('jelly-in');
+				if (state.genderBalanceEnabled) {
+					const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
+					li.style.borderLeft = `4px solid ${genderColor}`;
+				}
+				const groupIndex = getPersonGroupIndex(person.id);
+				if (groupIndex !== -1) {
+					const color = getGroupColor(groupIndex);
+					const dotSpan = document.createElement('span');
+					dotSpan.className = 'result-group-dot';
+					dotSpan.style.backgroundColor = color;
+					li.appendChild(dotSpan);
+				}
+				list.appendChild(li);
+				li.addEventListener('animationend', () => li.classList.remove('jelly-in'), { once: true });
+				teamCardData.currentCount += 1;
+				if (state.weightBalanceEnabled) addedWeight += person.weight || 0;
 			}
-			list.appendChild(li);
-			li.addEventListener('animationend', () => li.classList.remove('jelly-in'), { once: true });
-			teamCardData.currentCount += 1;
-			if (state.weightBalanceEnabled) addedWeight += person.weight || 0;
+			if (chunk.length) pulseTeamCard(teamCardData.card);
+			if (state.weightBalanceEnabled) {
+				teamCardData.currentWeight += addedWeight;
+				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
+			} else {
+				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명)`;
+			}
+			const isLastStep = processed === totalChunks - 1;
+			if (!isLastStep) await new Promise(r => setTimeout(r, state.teamDisplayDelay));
 		}
-		if (chunk.length) pulseTeamCard(teamCardData.card);
-		if (state.weightBalanceEnabled) {
-			teamCardData.currentWeight += addedWeight;
-			title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
-		} else {
-			title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명)`;
-		}
-		const isLastStep = processed === totalChunks - 1;
-		if (!isLastStep) await new Promise(r => setTimeout(r, state.teamDisplayDelay));
 	}
 	
 	elements.resultsSection.scrollIntoView({ behavior: 'smooth' });
