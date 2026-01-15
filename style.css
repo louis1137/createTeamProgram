@@ -579,6 +579,7 @@ h2 {
 	position: relative;
 	overflow: visible;
 	transition: box-shadow 0.3s ease, outline 0.3s ease;
+	padding: 0;
 }
 
 .results-section h2 {
@@ -591,6 +592,10 @@ h2 {
 
 .results-section.capture-highlight {
 	box-shadow: 0 0 0 5px rgba(236, 72, 153, 0.2), inset 0 0 0 3px #ec4899;
+}
+
+.results-capture-area {
+	padding: 25px 30px;
 }
 
 /* 캡처 플래시 효과 - ::after 사용 */

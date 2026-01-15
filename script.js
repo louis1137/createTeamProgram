@@ -269,6 +269,13 @@ function captureResultsSection() {
 		return;
 	}
 	
+	// 캡처할 실제 영역 (::after 효과 제외)
+	const captureArea = section.querySelector('.results-capture-area');
+	if (!captureArea) {
+		alert('캡처 영역을 찾을 수 없습니다.');
+		return;
+	}
+	
 	// 플래시 효과 추가 (::after 가상요소)
 	section.classList.add('capture-flash');
 	
@@ -288,7 +295,7 @@ function captureResultsSection() {
 	
 	// 플래시 효과 후 약간 대기
 	setTimeout(() => {
-		html2canvas(section, {
+		html2canvas(captureArea, {
 		backgroundColor: '#f8f9fa',
 		scale: 2,
 		logging: false,
