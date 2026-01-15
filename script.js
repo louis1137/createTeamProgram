@@ -397,26 +397,44 @@ function captureResultsSection() {
 
 // 카메라 셔터 사운드 재생
 function playCameraShutterSound() {
-	try {
-		const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-		const oscillator = audioContext.createOscillator();
-		const gainNode = audioContext.createGain();
-		
-		oscillator.connect(gainNode);
-		gainNode.connect(audioContext.destination);
-		
-		// 찰칵 소리 효과
-		oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-		oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.1);
-		
-		gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-		gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-		
-		oscillator.start(audioContext.currentTime);
-		oscillator.stop(audioContext.currentTime + 0.1);
-	} catch (e) {
-		console.log('사운드 재생 실패:', e);
-	}
+    try {
+        const audioContext = new (window.AudioContext || window.webkitContext || window.AudioContext)();
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+
+        const now = audioContext.currentTime;
+        const freq = 2500; // 동일한 음 높이 (2500Hz)
+
+        // 비프음을 생성하는 내부 함수
+        const playBeep = (startTime, duration) => {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            osc.type = 'square'; 
+            osc.frequency.setValueAtTime(freq, startTime);
+
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(0.1, startTime + 0.002); // 삑!
+            gain.gain.linearRampToValueAtTime(0, startTime + duration); // 끝
+
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+        };
+
+        // 1. 첫 번째 "삐" (0.05초 동안)
+        playBeep(now, 0.05);
+
+        // 2. 두 번째 "빅" (0.06초 뒤에 시작, 0.05초 동안)
+        // 시작 시간을 now + 0.06으로 설정해 아주 짧은 간격을 둡니다.
+        playBeep(now + 0.06, 0.05);
+
+    } catch (e) {
+        console.log('사운드 재생 실패:', e);
+    }
 }
 
 function resetAll() {
