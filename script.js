@@ -265,7 +265,7 @@ function resetAll() {
 	state.nextId = 1;
 	state.forbiddenPairs = []; // clear id-based pairs (they become pending)
 	state.forbiddenMap = {};
-	elements.resultsSection.style.display = 'none';
+	elements.resultsSection.classList.remove('visible');
 	// show FAQ again when resetting
 	const faqSection = document.querySelector('.faq-section');
 	if (faqSection) faqSection.style.display = '';
@@ -654,8 +654,10 @@ function openForbiddenWindow() {
 			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>제약 관리</title><style>
 				:root{--accent:#667eea;--bg:#ffffff;--muted:#666}
 				body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:18px;background:var(--bg);color:#111}
-				header{background:linear-gradient(135deg,var(--accent) 0%, #764ba2 100%);color:#fff;padding:14px;border-radius:8px;margin-bottom:12px}
+				header{background:linear-gradient(135deg,var(--accent) 0%, #764ba2 100%);color:#fff;padding:14px;border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
 				h1{margin:0;font-size:18px}
+				.reset-all-btn{background:#ef4444;border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s}
+				.reset-all-btn:hover{background:#dc2626;transform:scale(1.05)}
 				.add-form{display:flex;gap:8px;margin:12px 0}
 				.add-form input{flex:1;padding:8px;border:1px solid #ddd;border-radius:8px}
 				.add-form button{padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer}
@@ -673,7 +675,7 @@ function openForbiddenWindow() {
 				.modal-show-btn{background:var(--accent);color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1.1rem;cursor:pointer}
 				.initial-modal .warn{margin-top:8px;color:#ef4444;font-size:12px;font-weight:400;line-height:1.2}
 			</style></head><body>
-			<header><h1>제약 연결</h1></header>
+			<header><h1>제약 연결</h1><button id="resetAllBtn" class="reset-all-btn">초기화</button></header>
 			<div id="initialModal" class="initial-modal visible">
 				<div class="modal-content">
 					<button id="showBtn" class="modal-show-btn">보기</button>
@@ -695,6 +697,7 @@ function openForbiddenWindow() {
 					const showBtn = document.getElementById('showBtn');
 					const modal = document.getElementById('initialModal');
 					const showWarn = document.getElementById('showWarn');
+					const resetAllBtn = document.getElementById('resetAllBtn');
 					let reShowTimeout = null;
 					let modalDisabled = false;
 					let blindTime = 1000;
@@ -736,6 +739,22 @@ function openForbiddenWindow() {
 						} catch(e){ console.log('추가 실패', e); }
 					});
 					input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') addBtn.click(); });
+					
+					// 초기화 버튼 이벤트
+					if (resetAllBtn) {
+						resetAllBtn.addEventListener('click', ()=>{
+							if (confirm('모든 제약을 초기화하시겠습니까?')) {
+								try {
+									if (parentWindow && parentWindow.clearAllConstraints) {
+										parentWindow.clearAllConstraints();
+									} else {
+										alert('부모 창 참조를 찾을 수 없습니다.');
+									}
+								} catch(e){ console.log('초기화 실패:', e); alert('초기화 실패: ' + e.message); }
+							}
+						});
+					}
+					
 					function hideModal(){
 						if (reShowTimeout){ clearTimeout(reShowTimeout); reShowTimeout = null; }
 						modal.classList.remove('visible');
@@ -843,6 +862,16 @@ function safeOpenForbiddenWindow() {
 	} else {
 		console.warn('openForbiddenWindow 함수가 정의되지 않았습니다.');
 	}
+}
+
+// 모든 제약 초기화 함수 (자식창에서 호출용)
+function clearAllConstraints() {
+	state.forbiddenPairs = [];
+	state.pendingConstraints = [];
+	state.forbiddenMap = {};
+	saveToLocalStorage();
+	console.log('제약 목록이 모두 초기화되었습니다.');
+	renderForbiddenWindowContent();
 }
 
 function escapeHtml(s) {
