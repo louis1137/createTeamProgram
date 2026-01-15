@@ -39,6 +39,7 @@ const elements = {
 	nameInput: document.getElementById('nameInput'),
 	addPersonBtn: document.getElementById('addPersonBtn'),
 	resetBtn: document.getElementById('resetBtn'),
+	shuffleOrderBtn: document.getElementById('shuffleOrderBtn'),
 	peopleList: document.getElementById('peopleList'),
 	shuffleBtn: document.getElementById('shuffleBtn'),
 	resultsSection: document.getElementById('resultsSection'),
@@ -57,6 +58,7 @@ function init() {
 	elements.teamSizeInput.addEventListener('change', handleTeamSizeChange);
 	elements.addPersonBtn.addEventListener('click', addPerson);
 	elements.resetBtn.addEventListener('click', resetAll);
+	elements.shuffleOrderBtn.addEventListener('click', shuffleOrder);
 	elements.nameInput.addEventListener('keypress', (e) => {
 		if (e.key === 'Enter') {
 			addPerson();
@@ -142,6 +144,21 @@ function handleMaxTeamSizeToggle(e) {
 
 function handleTeamSizeChange(e) {
 	state.membersPerTeam = parseInt(e.target.value) || 4;
+}
+
+function shuffleOrder() {
+	if (state.people.length === 0) {
+		alert('참가자가 없습니다.');
+		return;
+	}
+	
+	// Fisher-Yates shuffle algorithm
+	for (let i = state.people.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[state.people[i], state.people[j]] = [state.people[j], state.people[i]];
+	}
+	
+	renderPeople();
 }
 
 function addPerson() {
