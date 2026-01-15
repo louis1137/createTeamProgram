@@ -213,6 +213,8 @@ function loadFromLocalStorage() {
 		if (saved) {
 			const data = JSON.parse(saved);
 			state.people = data.people || [];
+			// 참가자 목록을 이름순으로 정렬
+			state.people.sort((a, b) => a.name.localeCompare(b.name));
 			state.requiredGroups = data.requiredGroups || [];
 			state.nextId = data.nextId || 1;
 			state.forbiddenPairs = data.forbiddenPairs || [];
