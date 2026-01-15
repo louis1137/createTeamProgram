@@ -1,4 +1,4 @@
-const teamDisplayDelay = isLocalView() ? 400 : 400;
+const teamDisplayDelay = isLocalView() ? 0 : 400;
 const blindDelay = isLocalView() ? null : 5000;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
@@ -917,11 +917,27 @@ function generateTeams(people) {
 			group.every(id => people.some(p => p.id === id))
 		);
 
-		// Shuffle groups and assign randomly
-		const shuffledGroups = [...validGroups].sort(() => Math.random() - 0.5);
+		// 가중치 균등이 활성화된 경우 그룹을 가중치 순으로 정렬 (높은 순)
+		let processGroups;
+		if (state.weightBalanceEnabled) {
+			// 각 그룹의 평균 가중치 계산
+			const groupsWithWeight = validGroups.map(group => {
+				const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
+				const totalWeight = groupMembers.reduce((sum, p) => sum + (p.weight || 0), 0);
+				const avgWeight = groupMembers.length > 0 ? totalWeight / groupMembers.length : 0;
+				return { group, avgWeight };
+			});
+			// 가중치 내림차순 정렬
+			groupsWithWeight.sort((a, b) => b.avgWeight - a.avgWeight);
+			processGroups = groupsWithWeight.map(g => g.group);
+		} else {
+			// 가중치 균등이 없으면 셔플
+			processGroups = [...validGroups].sort(() => Math.random() - 0.5);
+		}
+		
 		let groupFailed = false;
 
-		for (const group of shuffledGroups) {
+		for (const group of processGroups) {
 			const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
 			
 			// Count minimum gender in this group
@@ -929,16 +945,32 @@ function generateTeams(people) {
 				groupMembers.filter(p => p.gender === 'female').length :
 				groupMembers.filter(p => p.gender === 'male').length;
 			
-			// Find valid teams
-			let validTeams = [];
-			for (let i = 0; i < teams.length; i++) {
+			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
+			let teamOrder;
+			if (state.weightBalanceEnabled) {
+				// 팀을 현재 가중치 기준 오름차순 정렬 (낮은 가중치 팀부터)
+				teamOrder = teams.map((team, idx) => ({
+					idx,
+					weight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
+				})).sort((a, b) => {
+					if (a.weight !== b.weight) return a.weight - b.weight;
+					// 가중치가 같으면 최대인원 모드에서는 인덱스 작은 팀 우선
+					if (state.maxTeamSizeEnabled) return a.idx - b.idx;
+					return 0;
+				}).map(t => t.idx);
+			} else {
+				// 가중치 균등이 없으면 랜덤 순서
+				teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
+			}
+			
+			let selectedTeam = -1;
+			
+			// 가중치 낮은 팀부터 조건 확인
+			for (const i of teamOrder) {
 				// Check 1: Size constraint
 				if (state.maxTeamSizeEnabled) {
-					// 마지막 팀이 아니면 최대인원 체크
 					if (i < teams.length - 1 && teams[i].length + groupMembers.length > state.membersPerTeam) continue;
-					// 마지막 팀은 제한 없음
 				} else {
-					// 일반 모드: 모든 팀에 최대인원 제한 적용
 					if (teams[i].length + groupMembers.length > state.membersPerTeam) continue;
 				}
 				
@@ -957,9 +989,7 @@ function generateTeams(people) {
 					const currentMinGender = isFemaleLess ? 
 						teams[i].filter(p => p.gender === 'female').length :
 						teams[i].filter(p => p.gender === 'male').length;
-					const futureMinGender = currentMinGender + groupMinGender;
 					
-					// Find the team with the LEAST minimum gender
 					const allTeamMinGenders = teams.map(t => 
 						isFemaleLess ? 
 							t.filter(p => p.gender === 'female').length :
@@ -967,39 +997,17 @@ function generateTeams(people) {
 					);
 					const globalMinGender = Math.min(...allTeamMinGenders);
 					
-					// Only allow if this team currently has the minimum OR would not exceed balance
 					if (currentMinGender > globalMinGender) continue;
 				}
 				
-				validTeams.push(i);
-			}
-			
-			if (validTeams.length === 0) {
-				groupFailed = true;
+				// 모든 조건을 만족하면 이 팀 선택
+				selectedTeam = i;
 				break;
 			}
 			
-			// 최대인원 모드와 일반 모드 모두 랜덤 선택하되, 가중치 균등 고려
-			let selectedTeam;
-			if (state.maxTeamSizeEnabled) {
-				// 최대인원 모드: 비어있는 팀이나 공간이 있는 팀 중에서 선택
-				// 가중치 균등이 활성화된 경우 가중치 고려
-				if (state.weightBalanceEnabled && validTeams.length > 1) {
-					// 가중치가 가장 낮은 팀들 중에서 랜덤 선택
-					const teamWeights = validTeams.map(idx => ({
-						idx,
-						weight: teams[idx].reduce((sum, p) => sum + (p.weight || 0), 0)
-					}));
-					const minWeight = Math.min(...teamWeights.map(t => t.weight));
-					const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
-					selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
-				} else {
-					// 가중치 균등이 없으면 validTeams 중에서 랜덤 선택
-					selectedTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
-				}
-			} else {
-				// 일반 모드: 랜덤 선택
-				selectedTeam = validTeams[Math.floor(Math.random() * validTeams.length)];
+			if (selectedTeam === -1) {
+				groupFailed = true;
+				break;
 			}
 			
 			teams[selectedTeam].push(...groupMembers);
@@ -1010,22 +1018,66 @@ function generateTeams(people) {
 
 		// Assign individual people
 		const unassignedPeople = people.filter(p => !assigned.has(p.id));
+		
+		// 가중치 균등이 활성화된 경우 가중치 순으로 정렬 (높은 순)
+		if (state.weightBalanceEnabled) {
+			unassignedPeople.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+		}
+		
 		let personFailed = false;
 
 		for (const person of unassignedPeople) {
 			const personMinGender = (isFemaleLess && person.gender === 'female') || 
 			                        (!isFemaleLess && person.gender === 'male') ? 1 : 0;
 			
-			// Find valid teams
-			let validTeams = [];
-			for (let i = 0; i < teams.length; i++) {
-				// Check 1: Size constraint - 최대인원 모드에서는 마지막 팀을 제외하고는 최대인원 체크
+			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
+			let teamOrder;
+			if (state.weightBalanceEnabled) {
+				// 팀을 현재 가중치 기준 오름차순 정렬 (낮은 가중치 팀부터)
+				teamOrder = teams.map((team, idx) => ({
+					idx,
+					weight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
+				})).sort((a, b) => {
+					if (a.weight !== b.weight) return a.weight - b.weight;
+					// 가중치가 같으면 최대인원 모드에서는 인덱스 작은 팀 우선
+					if (state.maxTeamSizeEnabled) return a.idx - b.idx;
+					return 0;
+				}).map(t => t.idx);
+			} else if (state.maxTeamSizeEnabled) {
+				// 최대인원 모드 + 가중치 균등 없음: 인덱스 순서
+				teamOrder = teams.map((_, idx) => idx);
+			} else {
+				// 일반 모드 + 가중치 균등 없음: 2 units 우선 로직
+				const teamUnits = teams.map((team, idx) => {
+					const groupSet = new Set();
+					let ungroupedCount = 0;
+					for (const member of team) {
+						const gi = getPersonGroupIndex(member.id);
+						if (gi === -1) ungroupedCount++;
+						else groupSet.add(gi);
+					}
+					return { idx, units: groupSet.size + ungroupedCount, size: team.length };
+				});
+				
+				const needUnit = teamUnits.filter(t => t.units < 2);
+				let candidateTeams = needUnit.length > 0 ? needUnit : teamUnits;
+				
+				// 작은 팀 우선
+				const minSize = Math.min(...candidateTeams.map(t => t.size));
+				candidateTeams = candidateTeams.filter(t => t.size === minSize);
+				
+				// 랜덤 순서
+				teamOrder = candidateTeams.map(t => t.idx).sort(() => Math.random() - 0.5);
+			}
+			
+			let selectedTeam = -1;
+			
+			// 가중치 낮은 팀부터 조건 확인
+			for (const i of teamOrder) {
+				// Check 1: Size constraint
 				if (state.maxTeamSizeEnabled) {
-					// 마지막 팀이 아니면 최대인원까지만 허용
 					if (i < teams.length - 1 && teams[i].length >= state.membersPerTeam) continue;
-					// 마지막 팀은 제한 없음 (나머지 모두 배치)
 				} else {
-					// 일반 모드: 모든 팀에 최대인원 제한 적용
 					if (teams[i].length >= state.membersPerTeam) continue;
 				}
 				
@@ -1038,7 +1090,6 @@ function generateTeams(people) {
 						teams[i].filter(p => p.gender === 'female').length :
 						teams[i].filter(p => p.gender === 'male').length;
 					
-					// Find the team with the LEAST minimum gender
 					const allTeamMinGenders = teams.map(t => 
 						isFemaleLess ? 
 							t.filter(p => p.gender === 'female').length :
@@ -1046,78 +1097,17 @@ function generateTeams(people) {
 					);
 					const globalMinGender = Math.min(...allTeamMinGenders);
 					
-					// Only allow if this team currently has the minimum
 					if (currentMinGender > globalMinGender) continue;
 				}
 				
-				validTeams.push(i);
-			}
-			
-			if (validTeams.length === 0) {
-				personFailed = true;
+				// 모든 조건을 만족하면 이 팀 선택
+				selectedTeam = i;
 				break;
 			}
 			
-			// 최대인원 모드: 순차적으로 팀을 채움 (1팀 -> 2팀 -> ... -> 마지막팀)
-			// 일반 모드: 기존 로직 (균등 분배)
-			let selectedTeam;
-			if (state.maxTeamSizeEnabled) {
-				// 최대인원 모드: 가장 작은 인덱스 팀 선택 (순차적 채우기)
-				// 가중치 균등이 활성화된 경우에만 가중치 고려
-				if (state.weightBalanceEnabled && validTeams.length > 1) {
-					// 가장 작은 인덱스 팀 찾기
-					const minIdx = Math.min(...validTeams);
-					const minIdxTeams = validTeams.filter(idx => idx === minIdx);
-					
-					if (minIdxTeams.length > 1) {
-						// 동일한 인덱스 팀이 여러 개인 경우 가중치 고려
-						const teamWeights = minIdxTeams.map(idx => ({
-							idx,
-							weight: teams[idx].reduce((sum, p) => sum + (p.weight || 0), 0)
-						}));
-						const minWeight = Math.min(...teamWeights.map(t => t.weight));
-						const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
-						selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
-					} else {
-						selectedTeam = minIdxTeams[0];
-					}
-				} else {
-					// 가중치 균등이 없으면 단순히 가장 작은 인덱스 선택
-					selectedTeam = Math.min(...validTeams);
-				}
-			} else {
-				// 일반 모드: 기존 로직
-				// Priority 1: Teams with only 1 unit (need 2nd unit)
-				const teamUnits = validTeams.map(idx => {
-					const groupSet = new Set();
-					let ungroupedCount = 0;
-					for (const member of teams[idx]) {
-						const gi = getPersonGroupIndex(member.id);
-						if (gi === -1) ungroupedCount++;
-						else groupSet.add(gi);
-					}
-					return { idx, units: groupSet.size + ungroupedCount, size: teams[idx].length };
-				});
-				
-				const needUnit = teamUnits.filter(t => t.units < 2);
-				let candidateTeams = needUnit.length > 0 ? needUnit : teamUnits;
-				
-				// Priority 2: Among candidates, always prefer smallest teams
-				const minSize = Math.min(...candidateTeams.map(t => t.size));
-				candidateTeams = candidateTeams.filter(t => t.size === minSize);
-				
-				// Priority 3: Weight balance (if enabled)
-				if (state.weightBalanceEnabled && candidateTeams.length > 1) {
-					const teamWeights = candidateTeams.map(t => ({
-						...t,
-						weight: teams[t.idx].reduce((sum, p) => sum + (p.weight || 0), 0)
-					}));
-					const minWeight = Math.min(...teamWeights.map(t => t.weight));
-					const lightestTeams = teamWeights.filter(t => t.weight === minWeight);
-					selectedTeam = lightestTeams[Math.floor(Math.random() * lightestTeams.length)].idx;
-				} else {
-					selectedTeam = candidateTeams[Math.floor(Math.random() * candidateTeams.length)].idx;
-				}
+			if (selectedTeam === -1) {
+				personFailed = true;
+				break;
 			}
 			
 			teams[selectedTeam].push(person);
