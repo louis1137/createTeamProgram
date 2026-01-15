@@ -164,6 +164,20 @@
 		<ul class="warning-popup__list"></ul>
 		<button type="button" class="warning-popup__close" aria-label="닫기">×</button>
 	</div>
+
+	<!-- 제약 목록 확인 레이어 -->
+	<div id="constraintNotificationLayer" class="constraint-notification-layer" style="display: none;">
+		<div class="constraint-notification-card">
+			<div class="constraint-notification-icon">⚠️</div>
+			<h3>제약 목록이 존재합니다</h3>
+			<p>제약을 유지하거나 초기화할 수 있습니다</p>
+			<div class="constraint-notification-buttons">
+				<button id="constraintNotificationConfirm" class="btn btn-primary">제약유지(관리창 열기)</button>
+				<button id="constraintNotificationCancel" class="btn btn-secondary">제약 초기화</button>
+			</div>
+		</div>
+	</div>
+
 	<script src="script.js"></script>
 </body>
 </html>

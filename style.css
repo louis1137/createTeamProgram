@@ -8,7 +8,7 @@ body {
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 	min-height: 100vh;
-	padding: 20px;
+	padding: 60px 20px;
 }
 
 .container {
@@ -117,6 +117,93 @@ section:last-child {
 
 .tool .btn-secondary:hover {
 	background: #7c3aed;
+}
+
+/* Constraint Notification Layer */
+.constraint-notification-layer {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	width: 100vw;
+	z-index: 10000;
+	transform: translateY(100%);
+	transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.constraint-notification-layer.visible {
+	transform: translateY(0);
+}
+
+.constraint-notification-layer.hiding {
+	transform: translateY(100%);
+	transition: transform 0.3s ease-in;
+}
+
+.constraint-notification-card {
+	background: white;
+	border-radius: 16px 16px 0 0;
+	padding: 20px;
+	max-width: 500px;
+	width: 100%;
+	margin: 0 auto;
+	box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+	text-align: center;
+	border-top: 4px solid #667eea;
+}
+
+.constraint-notification-icon {
+	font-size: 2rem;
+	margin-bottom: 10px;
+}
+
+.constraint-notification-card h3 {
+	font-size: 1.1rem;
+	color: #1f2937;
+	margin-bottom: 8px;
+	font-weight: 600;
+}
+
+.constraint-notification-card p {
+	font-size: 0.9rem;
+	color: #6b7280;
+	margin-bottom: 18px;
+}
+
+.constraint-notification-buttons {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+}
+
+.constraint-notification-buttons .btn {
+	flex: 1;
+	padding: 10px 16px;
+	font-size: 0.9rem;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.constraint-notification-buttons .btn-primary {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: white;
+}
+
+.constraint-notification-buttons .btn-primary:hover {
+	box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+	transform: translateY(-2px);
+}
+
+.constraint-notification-buttons .btn-secondary {
+	background: #ef4444;
+	color: white;
+}
+
+.constraint-notification-buttons .btn-secondary:hover {
+	background: #dc2626;
+	transform: translateY(-2px);
 }
 
 h2 {

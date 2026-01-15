@@ -89,11 +89,155 @@ function init() {
 	// 팀 표시 애니메이션 시간: teamDisplayDelay의 50%로 설정
 	setTeamAnimDurationFromDelay();
 
+	// localStorage에서 데이터 복원
+	loadFromLocalStorage();
+
 	renderPeople();
 	// prepare forbidden pairs map
 	buildForbiddenMap();
 	// try to resolve any pending textual constraints (if users were added earlier)
 	tryResolvePendingConstraints();
+	
+	// 제약이 있으면 확인 레이어 띄우기 (모든 초기화 완료 후)
+	if (state.forbiddenPairs.length > 0 || state.pendingConstraints.length > 0) {
+		setTimeout(() => {
+			showConstraintNotification();
+		}, 100);
+	}
+	
+	// 제약 목록 확인 레이어 이벤트 리스너
+	const constraintNotificationConfirm = document.getElementById('constraintNotificationConfirm');
+	const constraintNotificationCancel = document.getElementById('constraintNotificationCancel');
+	
+	if (constraintNotificationConfirm) {
+		constraintNotificationConfirm.addEventListener('click', () => {
+			hideConstraintNotification();
+			safeOpenForbiddenWindow();
+		});
+	}
+	
+	if (constraintNotificationCancel) {
+		constraintNotificationCancel.addEventListener('click', () => {
+			// 제약 초기화
+			state.forbiddenPairs = [];
+			state.pendingConstraints = [];
+			state.forbiddenMap = {};
+			saveToLocalStorage();
+			console.log('제약 목록이 모두 초기화되었습니다.');
+			hideConstraintNotification();
+		});
+	}
+}
+
+// 제약 목록 확인 레이어 표시
+function showConstraintNotification() {
+	const layer = document.getElementById('constraintNotificationLayer');
+	if (layer) {
+		layer.style.display = 'block';
+		// 브라우저 리플로우를 위한 지연
+		setTimeout(() => {
+			layer.classList.add('visible');
+			layer.classList.remove('hiding');
+		}, 10);
+	}
+}
+
+// 제약 목록 확인 레이어 숨김
+function hideConstraintNotification() {
+	const layer = document.getElementById('constraintNotificationLayer');
+	if (layer) {
+		layer.classList.remove('visible');
+		layer.classList.add('hiding');
+		// 애니메이션 완료 후 display: none
+		setTimeout(() => {
+			if (layer.classList.contains('hiding')) {
+				layer.style.display = 'none';
+				layer.classList.remove('hiding');
+			}
+		}, 300);
+	}
+}
+
+// localStorage에 저장
+function saveToLocalStorage() {
+	try {
+		const data = {
+			people: state.people,
+			requiredGroups: state.requiredGroups,
+			nextId: state.nextId,
+			forbiddenPairs: state.forbiddenPairs,
+			pendingConstraints: state.pendingConstraints,
+			// 설정 값 저장
+			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
+			genderBalanceEnabled: state.genderBalanceEnabled,
+			weightBalanceEnabled: state.weightBalanceEnabled,
+			membersPerTeam: state.membersPerTeam
+		};
+		localStorage.setItem('teamMakerData', JSON.stringify(data));
+		
+		// 이름별 성별/가중치 기본값 저장
+		const personDefaults = {};
+		state.people.forEach(p => {
+			const normalized = normalizeName(p.name);
+			personDefaults[normalized] = {
+				gender: p.gender,
+				weight: p.weight
+			};
+		});
+		localStorage.setItem('teamMakerDefaults', JSON.stringify(personDefaults));
+	} catch (e) {
+		console.error('localStorage 저장 실패:', e);
+	}
+}
+
+// localStorage에서 복원
+function loadFromLocalStorage() {
+	try {
+		const saved = localStorage.getItem('teamMakerData');
+		if (saved) {
+			const data = JSON.parse(saved);
+			state.people = data.people || [];
+			state.requiredGroups = data.requiredGroups || [];
+			state.nextId = data.nextId || 1;
+			state.forbiddenPairs = data.forbiddenPairs || [];
+			state.pendingConstraints = data.pendingConstraints || [];
+			
+			// 설정 값 복원
+			if (typeof data.maxTeamSizeEnabled !== 'undefined') {
+				state.maxTeamSizeEnabled = data.maxTeamSizeEnabled;
+				elements.maxTeamSizeCheckbox.checked = data.maxTeamSizeEnabled;
+			}
+			if (typeof data.genderBalanceEnabled !== 'undefined') {
+				state.genderBalanceEnabled = data.genderBalanceEnabled;
+				elements.genderBalanceCheckbox.checked = data.genderBalanceEnabled;
+			}
+			if (typeof data.weightBalanceEnabled !== 'undefined') {
+				state.weightBalanceEnabled = data.weightBalanceEnabled;
+				elements.weightBalanceCheckbox.checked = data.weightBalanceEnabled;
+			}
+			if (typeof data.membersPerTeam !== 'undefined') {
+				state.membersPerTeam = data.membersPerTeam;
+				elements.teamSizeInput.value = data.membersPerTeam;
+			}
+		}
+	} catch (e) {
+		console.error('localStorage 복원 실패:', e);
+	}
+}
+
+// 이름별 기본값 가져오기
+function getPersonDefaults(name) {
+	try {
+		const saved = localStorage.getItem('teamMakerDefaults');
+		if (saved) {
+			const defaults = JSON.parse(saved);
+			const normalized = normalizeName(name);
+			return defaults[normalized] || null;
+		}
+	} catch (e) {
+		console.error('기본값 가져오기 실패:', e);
+	}
+	return null;
 }
 
 function resetAll() {
@@ -125,25 +269,30 @@ function resetAll() {
 	// show FAQ again when resetting
 	const faqSection = document.querySelector('.faq-section');
 	if (faqSection) faqSection.style.display = '';
+	saveToLocalStorage();
 	renderPeople();
 }
 
 function handleGenderBalanceToggle(e) {
 	state.genderBalanceEnabled = e.target.checked;
+	saveToLocalStorage();
 	renderPeople();
 }
 
 function handleWeightBalanceToggle(e) {
 	state.weightBalanceEnabled = e.target.checked;
+	saveToLocalStorage();
 	renderPeople();
 }
 
 function handleMaxTeamSizeToggle(e) {
 	state.maxTeamSizeEnabled = e.target.checked;
+	saveToLocalStorage();
 }
 
 function handleTeamSizeChange(e) {
 	state.membersPerTeam = parseInt(e.target.value) || 4;
+	saveToLocalStorage();
 }
 
 function shuffleOrder() {
@@ -158,6 +307,7 @@ function shuffleOrder() {
 		[state.people[i], state.people[j]] = [state.people[j], state.people[i]];
 	}
 	
+	saveToLocalStorage();
 	renderPeople();
 }
 
@@ -239,11 +389,15 @@ function addPerson() {
 				const normalized = normalizeName(name);
 				const exists = state.people.some(p => normalizeName(p.name) === normalized);
 				if (exists) { warnings.push(`[${name}]은(는) 이미 등록된 이름입니다.`); duplicateHits.push(name); return; }
+				
+				// 이전에 사용했던 성별/가중치 기본값 가져오기
+				const defaults = getPersonDefaults(name);
+				
 				const person = {
 					id: state.nextId++,
 					name: name,
-					gender: 'male',
-					weight: 100
+					gender: defaults ? defaults.gender : 'male',
+					weight: defaults ? defaults.weight : 100
 				};
 				state.people.push(person);
 				newIds.push(person.id);
@@ -258,7 +412,10 @@ function addPerson() {
 	elements.nameInput.value = '';
 	elements.nameInput.focus();
 	if (warnings.length) showWarnings(warnings, duplicateHits);
-	if (addedAny) renderPeople();
+	if (addedAny) {
+		saveToLocalStorage();
+		renderPeople();
+	}
 	// Hide previous warnings only if we didn't just show new ones
 	if (!warnings.length && (addedAny || constraintsTouched)) hideWarnings();
 	// After possibly adding people, try to resolve pending textual constraints
@@ -278,6 +435,7 @@ function removePerson(id) {
 				safeOpenForbiddenWindow();
 	}
 	buildForbiddenMap();
+	saveToLocalStorage();
 	renderPeople();
 }
 
@@ -285,6 +443,7 @@ function updatePersonGender(id, gender) {
 	const person = state.people.find(p => p.id === id);
 	if (person) {
 		person.gender = gender;
+		saveToLocalStorage();
 	}
 }
 
@@ -292,6 +451,7 @@ function updatePersonWeight(id, weight) {
 	const person = state.people.find(p => p.id === id);
 	if (person) {
 		person.weight = parseInt(weight) || 0;
+		saveToLocalStorage();
 	}
 }
 
@@ -328,6 +488,7 @@ function addForbiddenPairByNames(nameA, nameB) {
 	if (!exists) {
 		state.forbiddenPairs.push([pa.id, pb.id]);
 		buildForbiddenMap();
+		saveToLocalStorage();
 		console.log(`금지 제약 추가됨: ${pa.name} (id:${pa.id}) ! ${pb.name} (id:${pb.id})`);
 		safeOpenForbiddenWindow();
 		hideWarnings();
@@ -349,6 +510,7 @@ function addPendingConstraint(leftName, rightName) {
 	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
 	if (existsPending) { safeOpenForbiddenWindow(); hideWarnings(); return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
+	saveToLocalStorage();
 	console.log(`보류 제약 추가됨(사람 미등록): ${leftName} ! ${rightName}`);
 	// Update popup view if open (or open it)
 		safeOpenForbiddenWindow();
@@ -373,6 +535,7 @@ function tryResolvePendingConstraints() {
 	});
 	if (changed) {
 		buildForbiddenMap();
+		saveToLocalStorage();
 		safeOpenForbiddenWindow();
 	} 
 }
@@ -434,16 +597,18 @@ function removeForbiddenPairByNames(nameA, nameB) {
 		state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => !((a === pa.id && b === pb.id) || (a === pb.id && b === pa.id)));
 		if (state.forbiddenPairs.length !== before) {
 			buildForbiddenMap();
+			saveToLocalStorage();
 			console.log(`금지 제약 제거됨: ${pa.name} ! ${pb.name}`);
 			safeOpenForbiddenWindow();
 			hideWarnings();
-			return { ok: true }; 
+			return { ok: true };
 		}
 	}
 	// If no applied pair found (or persons not present), remove matching pending textual constraints (either order)
 	const beforePending = state.pendingConstraints.length;
 	state.pendingConstraints = state.pendingConstraints.filter(pc => !( (pc.left === na && pc.right === nb) || (pc.left === nb && pc.right === na) ));
 	if (state.pendingConstraints.length !== beforePending) {
+		saveToLocalStorage();
 		console.log(`보류 제약 제거됨: ${nameA} ! ${nameB}`);
 		safeOpenForbiddenWindow();
 		hideWarnings();
@@ -851,6 +1016,10 @@ function shuffleTeams() {
 
 	const teams = generateTeams(preShufflePeopleForGeneration(validPeople));
 	if (!teams) return; // generateTeams shows error when impossible
+	
+	// 팀 생성시 제약 레이어가 열려있으면 내리기
+	hideConstraintNotification();
+	
 	// teamDisplayDelay가 바뀔 수 있으므로 표시 전 최신값으로 반영
 	setTeamAnimDurationFromDelay();
 	displayTeams(teams);
