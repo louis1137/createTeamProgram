@@ -1,4 +1,5 @@
 const teamDisplayDelay = isLocalView() ? 0 : 400;
+const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
@@ -240,9 +241,10 @@ function loadFromLocalStorage() {
 			
 			if (state.people.length > 0) {
 				console.log('%c👥 참가자 목록', 'color: #667eea; font-weight: bold; font-size: 14px;');
-				const peopleTable = state.people.map(p => ({
+				const sortedPeople = [...state.people].sort((a, b) => a.name.localeCompare(b.name));
+				const peopleTable = sortedPeople.map(p => ({
 					'이름': p.name,
-					'성별': p.gender === 'male' ? '남 👨' : '여 👩',
+					'성별': p.gender === 'male' ? '♂️' : '♀️',
 					'가중치': p.weight || '-'
 				}));
 				console.table(peopleTable);
@@ -1640,6 +1642,26 @@ async function displayTeams(teams) {
 		return chunks;
 	});
 
+	// 총 딜레이 횟수 계산 및 조정된 딜레이 시간 계산
+	let totalDelays = 0;
+	if (state.maxTeamSizeEnabled) {
+		// 최대인원 모드: 각 팀의 청크 수 합계 - 1 (마지막 팀의 마지막 청크는 딜레이 없음)
+		totalDelays = teamChunks.reduce((sum, chunks) => sum + chunks.length, 0) - 1;
+	} else {
+		// 일반 모드: 총 청크 수 - 1 (마지막 처리는 딜레이 없음)
+		totalDelays = teamChunks.reduce((sum, chunks) => sum + chunks.length, 0) - 1;
+	}
+	
+	// 총 소요 시간이 maxTimer를 초과하면 딜레이를 조정
+	let adjustedDelay = state.teamDisplayDelay;
+	if (totalDelays > 0 && maxTimer > 0) {
+		const totalTime = totalDelays * state.teamDisplayDelay;
+		if (totalTime > maxTimer) {
+			adjustedDelay = Math.floor(maxTimer / totalDelays);
+			console.log(`⏱️ 총 소요 시간 ${totalTime}ms가 최대 시간 ${maxTimer}ms를 초과하여 딜레이를 ${state.teamDisplayDelay}ms → ${adjustedDelay}ms로 조정합니다.`);
+		}
+	}
+
 	// 최대인원 모드: 순차적으로 팀을 완성 (1팀 전체 -> 2팀 전체 -> ...)
 	// 일반 모드: 최소 인원 팀 우선으로 균등하게 분배
 	if (state.maxTeamSizeEnabled) {
@@ -1692,7 +1714,7 @@ async function displayTeams(teams) {
 				const isLastTeam = teamIdx === teamCards.length - 1;
 				const isLastChunk = chunkIdx === chunks.length - 1;
 				if (!isLastTeam || !isLastChunk) {
-					await new Promise(r => setTimeout(r, state.teamDisplayDelay));
+					await new Promise(r => setTimeout(r, adjustedDelay));
 				}
 			}
 		}
@@ -1751,7 +1773,7 @@ async function displayTeams(teams) {
 				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명)`;
 			}
 			const isLastStep = processed === totalChunks - 1;
-			if (!isLastStep) await new Promise(r => setTimeout(r, state.teamDisplayDelay));
+			if (!isLastStep) await new Promise(r => setTimeout(r, adjustedDelay));
 		}
 	}
 }
