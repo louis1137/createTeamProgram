@@ -1,4 +1,4 @@
-const teamDisplayDelay = isLocalView() ? 0 : 400;
+const teamDisplayDelay = isLocalView() ? 400 : 400;
 const blindDelay = isLocalView() ? null : 5000;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
@@ -1184,10 +1184,8 @@ async function displayTeams(teams) {
 		
 		const teamTitle = document.createElement('h3');
 		teamTitle.dataset.teamIndex = index;
-		let titleText = `팀 ${index + 1} (${team.length}명)`;
-		if (state.weightBalanceEnabled) {
-			titleText += ` - 가중치: 0`;
-		}
+		// 초기에는 팀 번호만 표시 (0명이므로 인원 수 숨김)
+		let titleText = `팀 ${index + 1}`;
 		teamTitle.textContent = titleText;
 		teamCard.appendChild(teamTitle);
 		
@@ -1294,8 +1292,10 @@ async function displayTeams(teams) {
 				if (chunk.length) pulseTeamCard(teamCardData.card);
 				if (state.weightBalanceEnabled) {
 					teamCardData.currentWeight += addedWeight;
+					// 0명이 아니면 인원 수 표시
 					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
 				} else {
+					// 0명이 아니면 인원 수 표시
 					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명)`;
 				}
 				
@@ -1355,8 +1355,10 @@ async function displayTeams(teams) {
 			if (chunk.length) pulseTeamCard(teamCardData.card);
 			if (state.weightBalanceEnabled) {
 				teamCardData.currentWeight += addedWeight;
+				// 0명이 아니면 인원 수 표시
 				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
 			} else {
+				// 0명이 아니면 인원 수 표시
 				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명)`;
 			}
 			const isLastStep = processed === totalChunks - 1;
