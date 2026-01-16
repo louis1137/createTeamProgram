@@ -912,25 +912,73 @@ h2 {
 	line-height: 1.5;
 }
 
-.duplicate-modal-list {
-	background: #fef2f2;
-	border: 1px solid #fecaca;
-	border-radius: 8px;
-	padding: 12px;
+.duplicate-comparison {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
 	margin-bottom: 20px;
-	max-height: 200px;
-	overflow-y: auto;
+	width: 100%;
 }
 
-.duplicate-modal-list-item {
-	padding: 8px 12px;
-	margin: 4px 0;
-	background: white;
-	border-radius: 6px;
-	color: #991b1b;
-	font-weight: 500;
+.duplicate-section {
+	display: flex;
+	flex-direction: row;
+	gap: 12px;
+	align-items: center;
+	flex: 1;
+}
+
+.duplicate-arrow {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin: 8px 0;
+}
+
+.duplicate-modal-list {
+	background: #f8f9fa;
+	border: 2px dashed #ddd;
+	border-radius: 8px;
+	padding: 12px;
+	max-height: 200px;
+	overflow-y: auto;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+	min-height: 80px;
+	flex: 1;
+}
+
+.duplicate-modal-list:empty::before {
+	content: '참가자 없음';
+	color: #999;
 	font-size: 0.9rem;
-	border-left: 3px solid #ef4444;
+	width: 100%;
+	text-align: center;
+}
+
+.duplicate-modal-list .person-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	background: white;
+	color: #333;
+	border-radius: 8px;
+	border: 2px solid #e0e0e0;
+	font-size: 0.95rem;
+	font-weight: 500;
+}
+
+.duplicate-modal-list .group-container {
+	display: flex;
+	gap: 6px;
+	padding: 4px;
+	background: white;
+	border: 2px solid #667eea;
+	border-radius: 12px;
+	flex-wrap: wrap;
 }
 
 .duplicate-modal-buttons {

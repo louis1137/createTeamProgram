@@ -185,10 +185,29 @@
 	<div id="duplicateConfirmModal" class="duplicate-modal" style="display: none;">
 		<div class="duplicate-modal-overlay"></div>
 		<div class="duplicate-modal-card">
-			<div class="duplicate-modal-icon">⚠️</div>
-			<h3>중복된 이름이 있습니다</h3>
+			<div class="duplicate-comparison">
+				<div class="duplicate-section">
+					<div id="duplicateModalExisting" class="duplicate-modal-list"></div>
+				</div>
+				
+				<div class="duplicate-arrow">
+					<svg width="70" height="70" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<!-- 화살표 몸통 (직사각형) -->
+						<rect x="28" y="10" width="14" height="30" fill="#06b6d4"/>
+						<!-- 화살표 머리 (삼각형) -->
+						<path d="M35 55 L15 35 L55 35 Z" fill="#06b6d4"/>
+					</svg>
+				</div>
+				
+				<div class="duplicate-section">
+					<div id="duplicateModalNew" class="duplicate-modal-list"></div>
+				</div>
+			</div>
+			
 			<p id="duplicateModalMessage">기존 참가자를 제거하고 새 그룹으로 등록하시겠습니까?</p>
-			<div id="duplicateModalList" class="duplicate-modal-list"></div>
+			
+			<div id="duplicateWarning" class="duplicate-warning" style="display: none;"></div>
+			
 			<div class="duplicate-modal-buttons">
 				<button id="duplicateConfirmBtn" class="btn btn-primary">확인</button>
 				<button id="duplicateCancelBtn" class="btn btn-secondary">취소</button>
