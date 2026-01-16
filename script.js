@@ -570,7 +570,15 @@ function loadFromLocalStorage() {
 			state.people = data.people || [];
 			// 참가자 목록을 이름순으로 정렬
 			state.people.sort((a, b) => a.name.localeCompare(b.name));
-			state.requiredGroups = data.requiredGroups || [];
+			   // 그룹 내부를 가나다순으로 정렬하여 복원
+			   state.requiredGroups = (data.requiredGroups || []).map(group => {
+				   return [...group].sort((a, b) => {
+					   const pa = state.people.find(p => p.id === a);
+					   const pb = state.people.find(p => p.id === b);
+					   if (!pa || !pb) return 0;
+					   return pa.name.localeCompare(pb.name, 'ko');
+				   });
+			   });
 			state.nextId = data.nextId || 1;
 			state.forbiddenPairs = data.forbiddenPairs || [];
 			state.pendingConstraints = data.pendingConstraints || [];
@@ -856,14 +864,22 @@ function shuffleOrder() {
 		return;
 	}
 	
-	// Fisher-Yates shuffle algorithm
-	for (let i = state.people.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[state.people[i], state.people[j]] = [state.people[j], state.people[i]];
-	}
-	
-	saveToLocalStorage();
-	renderPeople();
+	       // Fisher-Yates shuffle algorithm (전체 people 배열)
+	       for (let i = state.people.length - 1; i > 0; i--) {
+		       const j = Math.floor(Math.random() * (i + 1));
+		       [state.people[i], state.people[j]] = [state.people[j], state.people[i]];
+	       }
+	       // 그룹 내부도 섞기
+	       state.requiredGroups = state.requiredGroups.map(group => {
+		       const arr = [...group];
+		       for (let i = arr.length - 1; i > 0; i--) {
+			       const j = Math.floor(Math.random() * (i + 1));
+			       [arr[i], arr[j]] = [arr[j], arr[i]];
+		       }
+		       return arr;
+	       });
+	       saveToLocalStorage();
+	       renderPeople();
 }
 
 // 중복 확인 모달을 위한 전역 변수
@@ -1078,27 +1094,35 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 	// 4단계: 새 참가자 추가
 	const newGroupsToAdd = [];
 	
-	pendingNamesData.forEach(({ names }, index) => {
-		const newIds = [];
-		names.forEach(name => {
-			// 이전에 사용했던 성별/가중치 기본값 가져오기
-			const defaults = getPersonDefaults(name);
-			
-			const person = {
-				id: state.nextId++,
-				name: name,
-				gender: defaults ? defaults.gender : 'male',
-				weight: defaults ? defaults.weight : 100
-			};
-			state.people.push(person);
-			newIds.push(person.id);
-			addedAny = true;
-		});
-		
-		if (newIds.length > 1) {
-			newGroupsToAdd.push(newIds);
-		}
-	});
+	       pendingNamesData.forEach(({ names }, index) => {
+		       const newIds = [];
+			       names.forEach(name => {
+				       // 기존 기억된 값 무시, 완전 초기값으로 등록
+				       let weight = 0;
+				       let gender = 'male';
+				       if (state.weightBalanceEnabled) {
+					       let inputWeight = 0;
+					       const weightInputEl = document.getElementById('weightInput');
+					       if (weightInputEl) {
+						       inputWeight = parseInt(weightInputEl.value);
+						       if (isNaN(inputWeight)) inputWeight = 0;
+					       }
+					       weight = Math.max(0, inputWeight);
+				       }
+				       const person = {
+					       id: state.nextId++,
+					       name: name,
+					       gender: gender,
+					       weight: weight
+				       };
+				       state.people.push(person);
+				       newIds.push(person.id);
+				       addedAny = true;
+			       });
+		       if (newIds.length > 1) {
+			       newGroupsToAdd.push(newIds);
+		       }
+	       });
 
 	// 5단계: 새 그룹들을 마지막에 추가하면서 미리보기 색상 적용
 	newGroupsToAdd.forEach((group, idx) => {
@@ -1687,12 +1711,13 @@ function renderPeople() {
 	const groupMap = new Map(); // personId -> groupIndex
 	
 	// 그룹 정보를 맵으로 저장
-	state.requiredGroups.forEach((group, groupIndex) => {
-		group.forEach(personId => {
-			grouped.add(personId);
-			groupMap.set(personId, groupIndex);
-		});
-	});
+		       state.requiredGroups.forEach((group, groupIndex) => {
+			       // 그룹 내부는 실제 배열 순서대로(셔플 반영)
+			       group.forEach(personId => {
+				       grouped.add(personId);
+				       groupMap.set(personId, groupIndex);
+			       });
+		       });
 	
 	// people 배열 순서대로 표시하되, 그룹 시작 시점에 그룹 전체를 한 번에 표시
 	const processedGroups = new Set();
@@ -1703,20 +1728,19 @@ function renderPeople() {
 		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
 			// 이 그룹을 처음 만났을 때, 그룹 전체를 표시
 			processedGroups.add(groupIndex);
-			const group = state.requiredGroups[groupIndex];
-			const groupContainer = document.createElement('div');
-			groupContainer.className = 'group-container';
-			groupContainer.style.borderColor = getGroupColor(groupIndex);
-			
-			group.forEach(personId => {
-				const groupPerson = state.people.find(p => p.id === personId);
-				if (groupPerson) {
-					const personTag = createPersonTag(groupPerson, potentialDuplicates);
-					groupContainer.appendChild(personTag);
-				}
-			});
-			
-			elements.peopleList.appendChild(groupContainer);
+				       const group = state.requiredGroups[groupIndex];
+				       // 그룹 내부는 실제 배열 순서대로(셔플 반영)
+				       const groupContainer = document.createElement('div');
+				       groupContainer.className = 'group-container';
+				       groupContainer.style.borderColor = getGroupColor(groupIndex);
+				       group.forEach(personId => {
+					       const groupPerson = state.people.find(p => p.id === personId);
+					       if (groupPerson) {
+						       const personTag = createPersonTag(groupPerson, potentialDuplicates);
+						       groupContainer.appendChild(personTag);
+					       }
+				       });
+				       elements.peopleList.appendChild(groupContainer);
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 항목
 			const personTag = createPersonTag(person, potentialDuplicates);
