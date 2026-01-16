@@ -201,6 +201,8 @@ function showDuplicateConfirmModal(duplicateNames) {
 	const newListEl = document.getElementById('duplicateModalNew');
 	const confirmBtn = document.getElementById('duplicateConfirmBtn');
 	const warningEl = document.getElementById('duplicateWarning');
+	const arrowEl = document.querySelector('.duplicate-arrow');
+	const existingSectionEl = existingListEl?.parentElement;
 	
 	if (!modal) return;
 	
@@ -225,6 +227,15 @@ function showDuplicateConfirmModal(duplicateNames) {
 	});
 	
 	const hasInputDuplicates = duplicatesInInput.length > 0;
+	
+	// 입력 내 중복인 경우 기존 필드와 화살표 숨기기
+	if (hasInputDuplicates) {
+		if (existingSectionEl) existingSectionEl.style.display = 'none';
+		if (arrowEl) arrowEl.style.display = 'none';
+	} else {
+		if (existingSectionEl) existingSectionEl.style.display = 'block';
+		if (arrowEl) arrowEl.style.display = 'flex';
+	}
 	
 	// 기존 참가자 목록 표시
 	existingListEl.innerHTML = '';
@@ -876,6 +887,7 @@ function addPerson() {
 	let constraintsTouched = false;
 	const duplicateHits = [];
 	const pendingNamesData = []; // 등록 대기중인 이름 그룹들
+	const allInputNames = []; // 입력된 모든 이름 (정규화된 형태)
 
 	tokens.forEach(token => {
 		if (token.includes('!')) {
@@ -930,7 +942,7 @@ function addPerson() {
 			const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
 			if (names.length === 0) return;
 
-			// 중복 체크
+			// 기존 참가자와의 중복 체크
 			const groupDuplicates = [];
 			names.forEach(name => {
 				const normalized = normalizeName(name);
@@ -947,8 +959,25 @@ function addPerson() {
 
 			// 등록 대기 데이터에 추가
 			pendingNamesData.push({ names, hasDuplicates: groupDuplicates.length > 0 });
+			
+			// 모든 입력 이름을 수집 (정규화된 형태)
+			names.forEach(name => {
+				allInputNames.push(normalizeName(name));
+			});
 		}
 	});
+
+	// 여러 토큰에 걸친 입력 데이터 내 중복 체크 (예: "하/하")
+	const inputNameCount = {};
+	const duplicatesAcrossTokens = [];
+	allInputNames.forEach(normalizedName => {
+		inputNameCount[normalizedName] = (inputNameCount[normalizedName] || 0) + 1;
+		if (inputNameCount[normalizedName] === 2) {
+			duplicatesAcrossTokens.push(normalizedName);
+		}
+	});
+
+	const hasInputDuplicates = duplicatesAcrossTokens.length > 0;
 
 	// 제약 처리만 있었다면 입력창 초기화
 	if (constraintsTouched && pendingNamesData.length === 0) {
@@ -957,8 +986,8 @@ function addPerson() {
 		return;
 	}
 
-	// 중복이 하나라도 있으면 모달 표시
-	if (duplicateHits.length > 0) {
+	// 중복이 하나라도 있으면 모달 표시 (기존 참가자와 중복 또는 입력 내 중복)
+	if (duplicateHits.length > 0 || hasInputDuplicates) {
 		// 중복 확인 모달 표시
 		// 중복 제거 후 남을 그룹 개수를 예측하여 색상 인덱스 계산
 		
@@ -1004,8 +1033,10 @@ function addPerson() {
 	}
 
 	// 중복이 없으면 바로 등록
-	processAddPerson(pendingNamesData, null);
+	// renderPeople()이 입력창을 참조하지 않도록 먼저 초기화
+	const tempInput = elements.nameInput.value;
 	elements.nameInput.value = '';
+	processAddPerson(pendingNamesData, null);
 	elements.nameInput.focus();
 }
 
