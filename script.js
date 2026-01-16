@@ -72,9 +72,6 @@ const elements = {
 	captureButtonContainer: document.querySelector('.capture-button-container')
 };
 
-// Warning popup auto-hide timer id
-let warningHideTimer = null;
-let warningHovering = false;
 let captureSuccessTimer = null;
 
 function init() {
@@ -90,6 +87,10 @@ function init() {
 			addPerson();
 		}
 	});
+	// 실시간 중복 체크를 위한 input 이벤트 리스너
+	elements.nameInput.addEventListener('input', () => {
+		renderPeople();
+	});
 	elements.shuffleBtn.addEventListener('click', shuffleTeams);
 	if (elements.captureBtn) {
 		elements.captureBtn.addEventListener('click', captureResultsSection);
@@ -103,23 +104,7 @@ function init() {
 			elements.resultsSection.classList.remove('capture-highlight');
 		});
 	}
-	// Wire warning popup close
-	const warnClose = document.querySelector('#warningPopup .warning-popup__close');
-	if (warnClose) {
-		warnClose.addEventListener('click', () => {
-			const panel = document.getElementById('warningPopup');
-			if (panel) { panel.classList.remove('is-visible'); panel.setAttribute('aria-hidden','true'); }
-			applyDuplicateHighlights([]);
-		});
-	}
-	// Hide warning popup on Enter or Escape
-	document.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape' || e.key === 'Esc' || e.key === 'Enter') {
-			hideWarnings();
-		}
-	});
-	// Track pointer hover over warning popup to pause auto-hide
-	document.addEventListener('mousemove', handleWarningHover);
+
 
 	// 그룹 색상 팔레트는 세션당 한 번 랜덤 셔플
 	shuffleGroupColorsOnce();
@@ -165,6 +150,18 @@ function init() {
 			hideConstraintNotification();
 		});
 	}
+
+	// 중복 확인 모달 이벤트 리스너
+	const duplicateConfirmBtn = document.getElementById('duplicateConfirmBtn');
+	const duplicateCancelBtn = document.getElementById('duplicateCancelBtn');
+	
+	if (duplicateConfirmBtn) {
+		duplicateConfirmBtn.addEventListener('click', handleDuplicateConfirm);
+	}
+	
+	if (duplicateCancelBtn) {
+		duplicateCancelBtn.addEventListener('click', handleDuplicateCancel);
+	}
 }
 
 // 제약 목록 확인 레이어 표시
@@ -194,6 +191,80 @@ function hideConstraintNotification() {
 			}
 		}, 300);
 	}
+}
+
+// 중복 확인 모달 표시
+function showDuplicateConfirmModal(duplicateNames) {
+	const modal = document.getElementById('duplicateConfirmModal');
+	const messageEl = document.getElementById('duplicateModalMessage');
+	const listEl = document.getElementById('duplicateModalList');
+	
+	if (!modal) return;
+	
+	// 중복 목록 표시
+	listEl.innerHTML = '';
+	duplicateNames.forEach(name => {
+		const item = document.createElement('div');
+		item.className = 'duplicate-modal-list-item';
+		item.textContent = name;
+		listEl.appendChild(item);
+	});
+	
+	// 메시지 업데이트
+	if (duplicateNames.length === 1) {
+		messageEl.textContent = '기존 참가자를 제거하고 새로 등록하시겠습니까?';
+	} else {
+		messageEl.textContent = '기존 참가자들을 제거하고 새로 등록하시겠습니까?';
+	}
+	
+	// 모달 표시
+	modal.style.display = 'flex';
+	setTimeout(() => {
+		modal.classList.add('visible');
+	}, 10);
+}
+
+// 중복 확인 모달 숨김
+function hideDuplicateConfirmModal() {
+	const modal = document.getElementById('duplicateConfirmModal');
+	if (!modal) return;
+	
+	modal.classList.remove('visible');
+	setTimeout(() => {
+		modal.style.display = 'none';
+	}, 300);
+}
+
+// 중복 확인 - 확인 버튼 처리
+function handleDuplicateConfirm() {
+	if (!pendingAddData) return;
+	
+	// 입력창 먼저 초기화 (실시간 하이라이트 제거를 위해)
+	elements.nameInput.value = '';
+	
+	// 중복된 이름들을 제거하고 새로 등록
+	processAddPerson(pendingAddData.pendingNamesData);
+	
+	// 포커스
+	elements.nameInput.focus();
+	
+	// 모달 숨김
+	hideDuplicateConfirmModal();
+	
+	// 대기 데이터 초기화
+	pendingAddData = null;
+}
+
+// 중복 확인 - 취소 버튼 처리
+function handleDuplicateCancel() {
+	// 폼 내용은 유지하고 모달만 닫음
+	hideDuplicateConfirmModal();
+	
+	// 대기 데이터 초기화
+	pendingAddData = null;
+	
+	// 포커스는 입력창에 유지
+	elements.nameInput.focus();
 }
 
 // localStorage에 저장
@@ -463,8 +534,7 @@ function resetAll() {
 	if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 제약 설정(금지 제약)은 초기화되지 않습니다.')) {
 		return;
 	}
-	// Hide any visible warning popup when resetting lists/state
-	hideWarnings();
+
 	// Convert any applied (id-based) forbidden pairs into pending name-based constraints so they persist
 	let converted = 0;
 	state.forbiddenPairs.forEach(([a, b]) => {
@@ -534,9 +604,11 @@ function shuffleOrder() {
 	renderPeople();
 }
 
+// 중복 확인 모달을 위한 전역 변수
+let pendingAddData = null;
+
 function addPerson() {
 	const input = elements.nameInput.value.trim();
-	const duplicateHits = [];
 	if (input === '') {
 		alert('이름을 입력해주세요.');
 		return;
@@ -550,9 +622,9 @@ function addPerson() {
 		return;
 	}
 
-	let addedAny = false;
-	const warnings = [];
 	let constraintsTouched = false;
+	const duplicateHits = [];
+	const pendingNamesData = []; // 등록 대기중인 이름 그룹들
 
 	tokens.forEach(token => {
 		if (token.includes('!')) {
@@ -562,12 +634,12 @@ function addPerson() {
 			
 			constraintParts.forEach(constraint => {
 				// Handle removal: A!!B
-					if (constraint.includes('!!')) {
+				if (constraint.includes('!!')) {
 					const [left, right] = constraint.split('!!').map(s => s.trim());
 					if (left && right) {
 						const rres = removeForbiddenPairByNames(left, right);
 						if (!rres.ok) console.log('보류/적용 제약 제거 실패:', rres.message);
-							else { safeOpenForbiddenWindow(); constraintsTouched = true; }
+						else { safeOpenForbiddenWindow(); constraintsTouched = true; }
 					}
 				}
 				// Handle pairwise constraints: A!B!C!D -> all pairs
@@ -606,43 +678,90 @@ function addPerson() {
 			// Normal group / name token
 			const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
 			if (names.length === 0) return;
-			const newIds = [];
 
+			// 중복 체크
+			const groupDuplicates = [];
 			names.forEach(name => {
 				const normalized = normalizeName(name);
 				const exists = state.people.some(p => normalizeName(p.name) === normalized);
-				if (exists) { warnings.push(`[${name}]은(는) 이미 등록된 이름입니다.`); duplicateHits.push(name); return; }
-				
-				// 이전에 사용했던 성별/가중치 기본값 가져오기
-				const defaults = getPersonDefaults(name);
-				
-				const person = {
-					id: state.nextId++,
-					name: name,
-					gender: defaults ? defaults.gender : 'male',
-					weight: defaults ? defaults.weight : 100
-				};
-				state.people.push(person);
-				newIds.push(person.id);
-				addedAny = true;
+				if (exists) {
+					groupDuplicates.push(name);
+				}
 			});
-			if (newIds.length > 1) {
-				state.requiredGroups.push(newIds);
+
+			// 중복된 이름이 있으면 기록
+			if (groupDuplicates.length > 0) {
+				duplicateHits.push(...groupDuplicates);
 			}
+
+			// 등록 대기 데이터에 추가
+			pendingNamesData.push({ names, hasDuplicates: groupDuplicates.length > 0 });
 		}
 	});
 
+	// 제약 처리만 있었다면 입력창 초기화
+	if (constraintsTouched && pendingNamesData.length === 0) {
+		elements.nameInput.value = '';
+		elements.nameInput.focus();
+		return;
+	}
+
+	// 중복이 하나라도 있으면 모달 표시
+	if (duplicateHits.length > 0) {
+		// 중복 확인 모달 표시
+		pendingAddData = {
+			input: input,
+			pendingNamesData: pendingNamesData,
+			duplicateHits: duplicateHits
+		};
+		showDuplicateConfirmModal(duplicateHits);
+		return;
+	}
+
+	// 중복이 없으면 바로 등록
+	processAddPerson(pendingNamesData);
 	elements.nameInput.value = '';
 	elements.nameInput.focus();
-	if (warnings.length) showWarnings(warnings, duplicateHits);
+}
+
+// 실제 등록 처리 함수
+function processAddPerson(pendingNamesData) {
+	let addedAny = false;
+
+	pendingNamesData.forEach(({ names }) => {
+		const newIds = [];
+		names.forEach(name => {
+			const normalized = normalizeName(name);
+			// 중복 제거 (확인 버튼 눌렀을 경우)
+			const existing = state.people.find(p => normalizeName(p.name) === normalized);
+			if (existing) {
+				removePerson(existing.id);
+			}
+			
+			// 이전에 사용했던 성별/가중치 기본값 가져오기
+			const defaults = getPersonDefaults(name);
+			
+			const person = {
+				id: state.nextId++,
+				name: name,
+				gender: defaults ? defaults.gender : 'male',
+				weight: defaults ? defaults.weight : 100
+			};
+			state.people.push(person);
+			newIds.push(person.id);
+			addedAny = true;
+		});
+		if (newIds.length > 1) {
+			state.requiredGroups.push(newIds);
+		}
+	});
+
 	if (addedAny) {
 		saveToLocalStorage();
 		renderPeople();
+		// After possibly adding people, try to resolve pending textual constraints
+		tryResolvePendingConstraints();
 	}
-	// Hide previous warnings only if we didn't just show new ones
-	if (!warnings.length && (addedAny || constraintsTouched)) hideWarnings();
-	// After possibly adding people, try to resolve pending textual constraints
-	tryResolvePendingConstraints();
 }
 
 function removePerson(id) {
@@ -714,12 +833,10 @@ function addForbiddenPairByNames(nameA, nameB) {
 		saveToLocalStorage();
 		console.log(`금지 제약 추가됨: ${pa.name} (id:${pa.id}) ! ${pb.name} (id:${pb.id})`);
 		safeOpenForbiddenWindow();
-		hideWarnings();
 	} else {
 		console.log(`금지 제약이 이미 존재함: ${pa.name} ! ${pb.name}`);
 		// Even if the constraint already exists, open/focus the popup so users can view/manage it
 		safeOpenForbiddenWindow();
-		hideWarnings();
 	}
 	return { ok: true, added: !exists };
 } 
@@ -731,13 +848,12 @@ function addPendingConstraint(leftName, rightName) {
 	if (l === r) return { ok: false, message: '동일인 제약은 불가능합니다.' };
 	// Avoid duplicates in pending
 	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
-	if (existsPending) { safeOpenForbiddenWindow(); hideWarnings(); return { ok: true }; }
+	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
 	saveToLocalStorage();
 	console.log(`보류 제약 추가됨(사람 미등록): ${leftName} ! ${rightName}`);
 	// Update popup view if open (or open it)
 		safeOpenForbiddenWindow();
-		hideWarnings();
 	return { ok: true }; 
 }
 
@@ -823,7 +939,6 @@ function removeForbiddenPairByNames(nameA, nameB) {
 			saveToLocalStorage();
 			console.log(`금지 제약 제거됨: ${pa.name} ! ${pb.name}`);
 			safeOpenForbiddenWindow();
-			hideWarnings();
 			return { ok: true };
 		}
 	}
@@ -834,7 +949,6 @@ function removeForbiddenPairByNames(nameA, nameB) {
 		saveToLocalStorage();
 		console.log(`보류 제약 제거됨: ${nameA} ! ${nameB}`);
 		safeOpenForbiddenWindow();
-		hideWarnings();
 		return { ok: true };
 	}
 	console.log('제약 제거 실패: 해당 제약을 찾을 수 없습니다.');
@@ -1131,9 +1245,15 @@ function getGroupColor(groupIndex) {
 	return state.groupColors[groupIndex % state.groupColors.length];
 }
 
-function createPersonTag(person) {
+function createPersonTag(person, potentialDuplicates = []) {
 	const personTag = document.createElement('div');
 	personTag.className = 'person-tag';
+	
+	// 중복 체크: potentialDuplicates 배열에 이 사람의 normalized 이름이 있으면 강조
+	const normalized = normalizeName(person.name);
+	if (potentialDuplicates.includes(normalized)) {
+		personTag.classList.add('is-duplicate');
+	}
 	
 	if (state.genderBalanceEnabled) {
 		personTag.style.backgroundColor = person.gender === 'male' ? '#e0f2fe' : '#fce7f3';
@@ -1201,6 +1321,9 @@ function renderPeople() {
 	updateParticipantCount();
 	elements.peopleList.innerHTML = '';
 	
+	// 입력창에서 중복 체크를 위한 이름 목록 가져오기
+	const potentialDuplicates = getPotentialDuplicatesFromInput();
+	
 	const grouped = new Set();
 	const groupMap = new Map(); // personId -> groupIndex
 	
@@ -1229,7 +1352,7 @@ function renderPeople() {
 			group.forEach(personId => {
 				const groupPerson = state.people.find(p => p.id === personId);
 				if (groupPerson) {
-					const personTag = createPersonTag(groupPerson);
+					const personTag = createPersonTag(groupPerson, potentialDuplicates);
 					groupContainer.appendChild(personTag);
 				}
 			});
@@ -1237,11 +1360,38 @@ function renderPeople() {
 			elements.peopleList.appendChild(groupContainer);
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 항목
-			const personTag = createPersonTag(person);
+			const personTag = createPersonTag(person, potentialDuplicates);
 			elements.peopleList.appendChild(personTag);
 		}
 		// 이미 처리된 그룹의 멤버는 스킵
 	});
+}
+
+// 입력창의 텍스트에서 중복될 가능성이 있는 이름들 추출
+function getPotentialDuplicatesFromInput() {
+	const input = elements.nameInput.value.trim();
+	if (!input) return [];
+	
+	const duplicateNames = [];
+	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
+	
+	tokens.forEach(token => {
+		// 제약 조건(!로 시작하는 것)은 무시
+		if (token.includes('!')) return;
+		
+		// 쉼표로 구분된 이름들 추출
+		const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
+		names.forEach(name => {
+			const normalized = normalizeName(name);
+			// 현재 참가자 중 이 이름이 있는지 확인
+			const exists = state.people.some(p => normalizeName(p.name) === normalized);
+			if (exists) {
+				duplicateNames.push(normalized);
+			}
+		});
+	});
+	
+	return duplicateNames;
 }
 
 function shuffleTeams() {
@@ -1825,20 +1975,6 @@ function showError(message) {
 	elements.resultsSection.classList.add('visible');
 }
 
-// Highlight any existing participant tags that match duplicate names
-function applyDuplicateHighlights(names) {
-	const targets = new Set((names || []).map(normalizeName));
-	const tags = document.querySelectorAll('.person-tag');
-	tags.forEach(tag => {
-		tag.classList.remove('is-duplicate');
-		if (!targets.size) return;
-		const nameEl = tag.querySelector('.name');
-		if (!nameEl) return;
-		const label = normalizeName(nameEl.textContent || '');
-		if (targets.has(label)) tag.classList.add('is-duplicate');
-	});
-}
-
 // Briefly pulse a team card border when members are added
 function pulseTeamCard(card) {
 	if (!card) return;
@@ -1856,66 +1992,6 @@ function pulseTeamCard(card) {
 		card.classList.remove('team-card-pulse');
 		card._pulseTimer = null;
 	}, dur + 50);
-}
-
-function hideWarnings() {
-	const panel = document.getElementById('warningPopup');
-	if (!panel) return;
-	if (warningHideTimer) { clearTimeout(warningHideTimer); warningHideTimer = null; }
-	panel.classList.remove('is-visible');
-	panel.setAttribute('aria-hidden','true');
-	applyDuplicateHighlights([]);
-}
-
-function showWarnings(messages, duplicateNames = []) {
-	const panel = document.getElementById('warningPopup');
-	if (!panel) return;
-	const list = panel.querySelector('.warning-popup__list');
-	if (!list) return;
-	list.innerHTML = '';
-	messages.forEach(msg => {
-		const li = document.createElement('li');
-		li.textContent = msg;
-		list.appendChild(li);
-	});
-	if (!messages.length) return;
-	panel.classList.add('is-visible');
-	panel.setAttribute('aria-hidden','false');
-	applyDuplicateHighlights(duplicateNames);
-	// Restart auto-dismiss timer (3s) unless hovering
-	scheduleWarningHide();
-}
-
-// --- Warning popup hover-aware auto-hide helpers ---
-function pauseWarningHide() {
-	if (warningHideTimer) { clearTimeout(warningHideTimer); warningHideTimer = null; }
-}
-
-function scheduleWarningHide(delay = 3000) {
-	if (warningHovering) return; // do not schedule while hovering
-	pauseWarningHide();
-	warningHideTimer = setTimeout(() => {
-		warningHideTimer = null;
-		hideWarnings();
-	}, delay);
-}
-
-function handleWarningHover(e) {
-	const panel = document.getElementById('warningPopup');
-	if (!panel || panel.getAttribute('aria-hidden') === 'true') return;
-	const rect = panel.getBoundingClientRect();
-	const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-	if (inside) {
-		if (!warningHovering) {
-			warningHovering = true;
-			pauseWarningHide();
-		}
-	} else {
-		if (warningHovering) {
-			warningHovering = false;
-			scheduleWarningHide();
-		}
-	}
 }
 
 init();
