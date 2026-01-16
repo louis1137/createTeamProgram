@@ -356,7 +356,7 @@ h2 {
 	position: relative;
 } 
 
-.person-tag.is-duplicate {
+.is-duplicate {
 	border-color: #ef4444;
 	background: #fef2f2;
 	box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
@@ -838,7 +838,7 @@ h2 {
 	}
 }
 
-/* Duplicate Confirmation Modal */
+/* ===== Duplicate Confirmation Modal ===== */
 .duplicate-modal {
 	position: fixed;
 	top: 0;
@@ -859,6 +859,7 @@ h2 {
 	pointer-events: auto;
 }
 
+/* Modal Overlay */
 .duplicate-modal-overlay {
 	position: absolute;
 	top: 0;
@@ -869,6 +870,7 @@ h2 {
 	backdrop-filter: blur(4px);
 }
 
+/* Modal Card */
 .duplicate-modal-card {
 	position: relative;
 	background: white;
@@ -886,6 +888,7 @@ h2 {
 	transform: scale(1) translateY(0);
 }
 
+/* Modal Icon & Animations */
 .duplicate-modal-icon {
 	font-size: 3rem;
 	margin-bottom: 15px;
@@ -898,6 +901,7 @@ h2 {
 	75% { transform: rotate(10deg); }
 }
 
+/* Modal Content */
 .duplicate-modal-card h3 {
 	font-size: 1.3rem;
 	color: #1f2937;
@@ -912,6 +916,36 @@ h2 {
 	line-height: 1.5;
 }
 
+/* Warning Box */
+.duplicate-warning {
+	background: #fef2f2;
+	border-radius: 8px;
+	padding: 12px 16px;
+	margin-bottom: 20px;
+	text-align: center;
+}
+
+.duplicate-warning strong {
+	font-size: 0.95rem;
+	font-weight: 600;
+	display: block;
+	margin-bottom: 6px;
+}
+
+.duplicate-warning ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.duplicate-warning li {
+	color: #991b1b;
+	font-size: 0.9rem;
+	padding: 4px 0;
+	font-weight: 500;
+}
+
+/* Comparison Layout */
 .duplicate-comparison {
 	display: flex;
 	flex-direction: column;
@@ -935,6 +969,7 @@ h2 {
 	margin: 8px 0;
 }
 
+/* Lists Container */
 .duplicate-modal-list {
 	background: #f8f9fa;
 	border: 2px dashed #ddd;
@@ -958,6 +993,7 @@ h2 {
 	text-align: center;
 }
 
+/* Person Tags in Modal */
 .duplicate-modal-list .person-tag {
 	display: inline-flex;
 	align-items: center;
@@ -971,16 +1007,24 @@ h2 {
 	font-weight: 500;
 }
 
+.duplicate-modal-list .person-tag.is-duplicate {
+	border-color: #ef4444;
+	background: #fef2f2;
+	box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+	animation: duplicate-pulse 1.5s ease-in-out infinite;
+}
+
+/* Group Containers in Modal */
 .duplicate-modal-list .group-container {
 	display: flex;
 	gap: 6px;
 	padding: 4px;
 	background: white;
-	border: 2px solid #667eea;
 	border-radius: 12px;
 	flex-wrap: wrap;
 }
 
+/* Modal Buttons */
 .duplicate-modal-buttons {
 	display: flex;
 	gap: 12px;

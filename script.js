@@ -39,18 +39,18 @@ const state = {
 	teamDisplayDelay,
 	ungroupedColor: '#94a3b8',
 	groupColors: [
-		// Bright, high-contrast palette (kept colorblind-friendly spread)
-		'#FF6B6B', // bright coral
-		'#4ECDC4', // aqua teal
-		'#DDDD00', // vivid yellow
-		'#1E90FF', // dodger blue
-		'#8AC926', // lime green
-		'#FF1FCD', // hot pink
-		'#E71D36', // crimson red
-		'#7C3AED', // vibrant violet
-		'#F3722C', // persimmon
-		'#B5179E', // magenta
-		'#FFCA00'  // golden yellow
+		'#6FE5DD', // bright aqua teal
+		'#FFB3BA', // pastel coral
+		'#FFD93D', // bright yellow
+		'#6BCB77', // fresh green
+		'#A78BFA', // soft purple
+		'#FD9843', // warm orange
+		'#FF1493', // hot pink
+		'#38BDF8', // light blue
+		'#34D399', // mint green
+		'#9900FF', // pure purple
+		'#5B7FBF', // bright navy
+		'#0066ff'  // cobalt blue
 	]
 };
 
@@ -253,7 +253,8 @@ function showDuplicateConfirmModal(duplicateNames) {
 			
 			const groupContainer = document.createElement('div');
 			groupContainer.className = 'group-container';
-			groupContainer.style.borderColor = getGroupColor(groupIndex);
+			const color = getGroupColor(groupIndex);
+			groupContainer.style.border = `2px solid ${color}`;
 			
 			// 그룹의 모든 멤버를 표시 (중복된 사람은 진하게, 남을 사람은 연하게)
 			group.forEach(personId => {
@@ -317,7 +318,8 @@ function showDuplicateConfirmModal(duplicateNames) {
 				// 2명 이상 남으면 그룹으로 표시
 				const groupContainer = document.createElement('div');
 				groupContainer.className = 'group-container';
-				groupContainer.style.borderColor = getGroupColor(groupIndex);
+				const color = getGroupColor(groupIndex);
+				groupContainer.style.border = `2px solid ${color}`;
 				groupContainer.style.opacity = '0.5';
 				
 				remainingMembers.forEach(personId => {
@@ -350,11 +352,9 @@ function showDuplicateConfirmModal(duplicateNames) {
 				// 그룹으로 등록될 경우 - 새로 추가되는 그룹은 진하게
 				const groupContainer = document.createElement('div');
 				groupContainer.className = 'group-container';
-				const color = getPreviewGroupColor(previewColorIndex, usedColors);
-				groupContainer.style.borderColor = color;
+				const color = getGroupColor(colorIndex);
+				groupContainer.style.border = `2px solid ${color}`; // border 전체를 설정
 				previewColors.push(color);
-				// 다음 그룹을 위해 이 색상도 사용 중으로 표시
-				usedColors.push(color);
 				previewColorIndex++;
 				
 				names.forEach(name => {
@@ -364,6 +364,12 @@ function showDuplicateConfirmModal(duplicateNames) {
 					nameSpan.className = 'name';
 					nameSpan.textContent = name;
 					nameSpan.style.fontWeight = 'bold'; // 새 그룹은 두꺼운 글씨
+					
+					// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
+					if (duplicatesInInput.includes(name)) {
+						personTag.classList.add('is-duplicate');
+					}
+					
 					personTag.appendChild(nameSpan);
 					groupContainer.appendChild(personTag);
 				});
@@ -378,6 +384,11 @@ function showDuplicateConfirmModal(duplicateNames) {
 					nameSpan.className = 'name';
 					nameSpan.textContent = name;
 					nameSpan.style.fontWeight = 'bold'; // 새 참가자는 두꺼운 글씨
+					
+					// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
+					if (duplicatesInInput.includes(name)) {
+						personTag.classList.add('is-duplicate');
+					}
 					personTag.appendChild(nameSpan);
 					newListEl.appendChild(personTag);
 				});
@@ -390,15 +401,12 @@ function showDuplicateConfirmModal(duplicateNames) {
 	// 메시지 업데이트 및 확인 버튼 상태 설정
 	if (hasInputDuplicates) {
 		// 입력 내 중복이 있는 경우
-		if (duplicateNames.length === 1) {
-			messageEl.textContent = '기존 참가자를 제거하고 새로 등록하시겠습니까?';
-		} else {
-			messageEl.textContent = '기존 참가자들을 제거하고 새로 등록하시겠습니까?';
-		}
+		// 기존 질문 메시지 숨김
+		messageEl.style.display = 'none';
 		
 		// 경고 메시지를 버튼 위에 표시
 		if (warningEl) {
-			warningEl.innerHTML = `<strong>⚠️ 입력된 데이터에 중복된 이름이 있습니다!</strong><br><span style="font-size: 0.9em;">중복된 이름: ${duplicatesInInput.join(', ')}</span>`;
+			warningEl.innerHTML = `<strong>⚠️ 입력된 데이터에 중복된 이름이 있습니다!</strong>`;
 			warningEl.style.display = 'block';
 		}
 		
@@ -409,11 +417,13 @@ function showDuplicateConfirmModal(duplicateNames) {
 		}
 	} else {
 		// 정상적인 경우
+		// 질문 메시지 표시
 		if (duplicateNames.length === 1) {
 			messageEl.textContent = '기존 참가자를 제거하고 새로 등록하시겠습니까?';
 		} else {
 			messageEl.textContent = '기존 참가자들을 제거하고 새로 등록하시겠습니까?';
 		}
+		messageEl.style.display = 'block';
 		
 		// 경고 메시지 숨김
 		if (warningEl) {
@@ -1561,36 +1571,6 @@ function getGroupColor(groupIndex) {
 		return state.ungroupedColor;
 	}
 	return state.groupColors[groupIndex % state.groupColors.length];
-}
-
-// 미리보기 모달에서 사용할 별도의 색상 팔레트
-function getPreviewGroupColor(colorIndex, usedColors = []) {
-	const previewColors = [
-		'#ef4444', // 빨강
-		'#f59e0b', // 주황
-		'#10b981', // 초록
-		'#3b82f6', // 파랑
-		'#8b5cf6', // 보라
-		'#ec4899', // 핑크
-		'#14b8a6', // 청록
-		'#f97316', // 진한 주황
-		'#06b6d4', // 하늘
-		'#84cc16', // 라임
-		'#f43f5e', // 로즈
-		'#a855f7'  // 퍼플
-	];
-	
-	// 사용 중인 색상을 제외한 색상 중에서 선택
-	for (let i = 0; i < previewColors.length; i++) {
-		const idx = (colorIndex + i) % previewColors.length;
-		const color = previewColors[idx];
-		if (!usedColors.includes(color)) {
-			return color;
-		}
-	}
-	
-	// 모든 색상이 사용 중이면 기본값 반환
-	return previewColors[colorIndex % previewColors.length];
 }
 
 function createPersonTag(person, potentialDuplicates = []) {
