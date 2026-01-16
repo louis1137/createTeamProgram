@@ -242,47 +242,97 @@ function showDuplicateConfirmModal(duplicateNames) {
 	// 이미 처리된 그룹 추적
 	const processedGroups = new Set();
 	
-	// 기존 참가자 렌더링
+	// 기존 참가자 렌더링 (중복으로 영향받는 전체 그룹 표시)
 	duplicatePeople.forEach(person => {
 		const groupIndex = groupMap.get(person.id);
 		
 		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
-			// 그룹에 속한 경우
+			// 그룹에 속한 경우 - 전체 그룹을 표시
 			processedGroups.add(groupIndex);
 			const group = state.requiredGroups[groupIndex];
 			
-			// 이 그룹에서 중복된 사람들만 필터링
-			const groupDuplicates = group.filter(personId => {
-				const p = state.people.find(person => person.id === personId);
-				return p && duplicateNormalized.includes(normalizeName(p.name));
+			const groupContainer = document.createElement('div');
+			groupContainer.className = 'group-container';
+			groupContainer.style.borderColor = getGroupColor(groupIndex);
+			
+			// 그룹의 모든 멤버를 표시 (중복된 사람은 진하게, 남을 사람은 연하게)
+			group.forEach(personId => {
+				const groupPerson = state.people.find(p => p.id === personId);
+				if (groupPerson) {
+					const personTag = createDuplicatePersonTag(groupPerson);
+					const isDuplicate = duplicateNormalized.includes(normalizeName(groupPerson.name));
+					if (isDuplicate) {
+						// 중복된 사람 (바뀔 요소) - 진하게, 두꺼운 글씨
+						personTag.style.opacity = '1';
+						const nameSpan = personTag.querySelector('.name');
+						if (nameSpan) nameSpan.style.fontWeight = 'bold';
+					} else {
+						// 남을 사람 - 연하게
+						personTag.style.opacity = '0.5';
+					}
+					groupContainer.appendChild(personTag);
+				}
 			});
 			
-			if (groupDuplicates.length > 0) {
-				const groupContainer = document.createElement('div');
-				groupContainer.className = 'group-container';
-				groupContainer.style.borderColor = getGroupColor(groupIndex);
-				
-				groupDuplicates.forEach(personId => {
-					const groupPerson = state.people.find(p => p.id === personId);
-					if (groupPerson) {
-						const personTag = createDuplicatePersonTag(groupPerson);
-						groupContainer.appendChild(personTag);
-					}
-				});
-				
-				existingListEl.appendChild(groupContainer);
-			}
+			existingListEl.appendChild(groupContainer);
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 참가자
 			const personTag = createDuplicatePersonTag(person);
+			personTag.style.opacity = '1';
+			const nameSpan = personTag.querySelector('.name');
+			if (nameSpan) nameSpan.style.fontWeight = 'bold';
 			existingListEl.appendChild(personTag);
 		}
 	});
 	
-	// 새로 등록될 참가자 목록 표시
+	// 변경 필드: 영향받는 그룹들의 변화 + 새 그룹만 표시
 	newListEl.innerHTML = '';
 	if (pendingAddData && pendingAddData.pendingNamesData) {
-		// 기존 그룹들이 사용 중인 색상 수집
+		// 중복으로 영향받는 그룹 인덱스 찾기
+		const affectedGroupIndices = new Set();
+		duplicatePeople.forEach(person => {
+			const groupIndex = groupMap.get(person.id);
+			if (groupIndex !== undefined) {
+				affectedGroupIndices.add(groupIndex);
+			}
+		});
+		
+		// 영향받는 그룹들이 어떻게 변하는지 보여주기 (연한 색상으로)
+		affectedGroupIndices.forEach(groupIndex => {
+			const group = state.requiredGroups[groupIndex];
+			const remainingMembers = group.filter(personId => {
+				const person = state.people.find(p => p.id === personId);
+				return person && !duplicateNormalized.includes(normalizeName(person.name));
+			});
+			
+			if (remainingMembers.length === 1) {
+				// 1명만 남으면 개별 참가자로 표시
+				const person = state.people.find(p => p.id === remainingMembers[0]);
+				if (person) {
+					const personTag = createDuplicatePersonTag(person);
+					personTag.style.opacity = '0.5';
+					newListEl.appendChild(personTag);
+				}
+			} else if (remainingMembers.length > 1) {
+				// 2명 이상 남으면 그룹으로 표시
+				const groupContainer = document.createElement('div');
+				groupContainer.className = 'group-container';
+				groupContainer.style.borderColor = getGroupColor(groupIndex);
+				groupContainer.style.opacity = '0.5';
+				
+				remainingMembers.forEach(personId => {
+					const person = state.people.find(p => p.id === personId);
+					if (person) {
+						const personTag = createDuplicatePersonTag(person);
+						groupContainer.appendChild(personTag);
+					}
+				});
+				
+				newListEl.appendChild(groupContainer);
+			}
+		});
+		
+		// 새로 추가될 그룹들 렌더링
 		const usedColors = [];
 		state.requiredGroups.forEach((group, idx) => {
 			const color = getGroupColor(idx);
@@ -291,14 +341,13 @@ function showDuplicateConfirmModal(duplicateNames) {
 			}
 		});
 		
-		// 미리보기에서는 0부터 시작하는 순차적인 색상 인덱스 사용
 		const previewColors = [];
 		let previewColorIndex = 0;
 		pendingAddData.pendingNamesData.forEach(({ names }, index) => {
 			const colorIndex = pendingAddData.newGroupColorIndices ? pendingAddData.newGroupColorIndices[index] : -1;
 			
 			if (names.length > 1 && colorIndex >= 0) {
-				// 그룹으로 등록될 경우
+				// 그룹으로 등록될 경우 - 새로 추가되는 그룹은 진하게
 				const groupContainer = document.createElement('div');
 				groupContainer.className = 'group-container';
 				const color = getPreviewGroupColor(previewColorIndex, usedColors);
@@ -314,6 +363,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 					const nameSpan = document.createElement('span');
 					nameSpan.className = 'name';
 					nameSpan.textContent = name;
+					nameSpan.style.fontWeight = 'bold'; // 새 그룹은 두꺼운 글씨
 					personTag.appendChild(nameSpan);
 					groupContainer.appendChild(personTag);
 				});
@@ -327,6 +377,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 					const nameSpan = document.createElement('span');
 					nameSpan.className = 'name';
 					nameSpan.textContent = name;
+					nameSpan.style.fontWeight = 'bold'; // 새 참가자는 두꺼운 글씨
 					personTag.appendChild(nameSpan);
 					newListEl.appendChild(personTag);
 				});
@@ -952,48 +1003,38 @@ function addPerson() {
 function processAddPerson(pendingNamesData, groupColorIndices) {
 	let addedAny = false;
 
-	// 0단계: 중복 제거 전에 기존 그룹들의 색상을 그룹 멤버 ID와 함께 저장
-	const existingGroupColors = new Map();
-	state.requiredGroups.forEach((group, idx) => {
-		const groupKey = group.slice().sort().join(','); // 그룹 멤버 ID로 고유 키 생성
-		existingGroupColors.set(groupKey, state.groupColors[idx] || getGroupColor(idx));
-	});
-
-	// 1단계: 중복 제거 먼저 모두 처리
-	const allNamesToAdd = [];
+	// 0단계: 중복된 이름을 가진 사람들 찾기
+	const duplicateIds = [];
 	pendingNamesData.forEach(({ names }) => {
 		names.forEach(name => {
 			const normalized = normalizeName(name);
 			const existing = state.people.find(p => normalizeName(p.name) === normalized);
 			if (existing) {
-				removePerson(existing.id);
+				duplicateIds.push(existing.id);
 			}
-			allNamesToAdd.push(name);
 		});
 	});
-
-	// 1-1단계: 중복 제거 후 남은 그룹들의 색상을 복원
-	const restoredColors = [];
-	state.requiredGroups.forEach((group) => {
-		const groupKey = group.slice().sort().join(',');
-		const savedColor = existingGroupColors.get(groupKey);
-		if (savedColor) {
-			restoredColors.push(savedColor);
-		} else {
-			restoredColors.push(state.groupColors[restoredColors.length] || getGroupColor(restoredColors.length));
-		}
-	});
 	
-	// 복원된 색상을 적용
-	restoredColors.forEach((color, idx) => {
-		while (state.groupColors.length <= idx) {
-			state.groupColors.push(state.groupColors[state.groupColors.length % 11] || '#94a3b8');
+	// 1단계: 중복된 사람들을 state.people에서 제거
+	state.people = state.people.filter(p => !duplicateIds.includes(p.id));
+	
+	// 2단계: 각 그룹에서 중복된 사람들 제거 (그룹은 유지, 1명 이하가 되면 그룹 해체)
+	state.requiredGroups = state.requiredGroups.map(group => {
+		return group.filter(pid => !duplicateIds.includes(pid));
+	}).filter(group => group.length > 1);
+	
+	// 3단계: 제약 조건에서도 중복된 사람들 제거
+	duplicateIds.forEach(id => {
+		const before = state.forbiddenPairs.length;
+		state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => a !== id && b !== id);
+		const after = state.forbiddenPairs.length;
+		if (before !== after) {
+			console.log(`제약 제거: 삭제된 사람(id:${id})과 관련된 제약 ${before - after}개가 제거되었습니다.`);
 		}
-		state.groupColors[idx] = color;
 	});
+	buildForbiddenMap();
 
-	// 2단계: 중복 제거 후 현재 그룹 개수 기준으로 새 참가자 및 그룹 추가
-	const startGroupIndex = state.requiredGroups.length;
+	// 4단계: 새 참가자 추가
 	const newGroupsToAdd = [];
 	
 	pendingNamesData.forEach(({ names }, index) => {
@@ -1018,7 +1059,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 		}
 	});
 
-	// 3단계: 새 그룹들을 순서대로 추가하면서 미리보기 색상 적용
+	// 5단계: 새 그룹들을 마지막에 추가하면서 미리보기 색상 적용
 	newGroupsToAdd.forEach((group, idx) => {
 		const newGroupIndex = state.requiredGroups.length;
 		state.requiredGroups.push(group);
@@ -1027,7 +1068,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 		if (groupColorIndices && pendingAddData && pendingAddData.previewColors && pendingAddData.previewColors[idx]) {
 			// state.groupColors 배열을 확장하여 해당 인덱스에 색상 저장
 			while (state.groupColors.length <= newGroupIndex) {
-				state.groupColors.push(state.groupColors[state.groupColors.length % 8]);
+				state.groupColors.push(state.groupColors[state.groupColors.length % 11] || '#94a3b8');
 			}
 			state.groupColors[newGroupIndex] = pendingAddData.previewColors[idx];
 		}
