@@ -4,6 +4,11 @@
 	box-sizing: border-box;
 }
 
+/* 항상 세로 스크롤바를 예약해 레이아웃 점프(스크롤바 생김/사라짐)를 방지 */
+html {
+    overflow-y: scroll;
+}
+
 body {
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

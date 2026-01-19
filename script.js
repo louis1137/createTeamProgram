@@ -75,23 +75,25 @@ const elements = {
 let captureSuccessTimer = null;
 
 function init() {
-	elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
-	elements.weightBalanceCheckbox.addEventListener('change', handleWeightBalanceToggle);
-	elements.maxTeamSizeCheckbox.addEventListener('change', handleMaxTeamSizeToggle);
-	elements.teamSizeInput.addEventListener('change', handleTeamSizeChange);
-	elements.addPersonBtn.addEventListener('click', addPerson);
-	elements.resetBtn.addEventListener('click', resetAll);
-	elements.shuffleOrderBtn.addEventListener('click', shuffleOrder);
-	elements.nameInput.addEventListener('keypress', (e) => {
-		if (e.key === 'Enter') {
-			addPerson();
-		}
-	});
-	// 실시간 중복 체크를 위한 input 이벤트 리스너
-	elements.nameInput.addEventListener('input', () => {
-		renderPeople();
-	});
-	elements.shuffleBtn.addEventListener('click', shuffleTeams);
+	if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
+	if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.addEventListener('change', handleWeightBalanceToggle);
+	if (elements.maxTeamSizeCheckbox) elements.maxTeamSizeCheckbox.addEventListener('change', handleMaxTeamSizeToggle);
+	if (elements.teamSizeInput) elements.teamSizeInput.addEventListener('change', handleTeamSizeChange);
+	if (elements.addPersonBtn) elements.addPersonBtn.addEventListener('click', addPerson);
+	if (elements.resetBtn) elements.resetBtn.addEventListener('click', resetAll);
+	if (elements.shuffleOrderBtn) elements.shuffleOrderBtn.addEventListener('click', shuffleOrder);
+	if (elements.nameInput) {
+		elements.nameInput.addEventListener('keypress', (e) => {
+			if (e.key === 'Enter') {
+				addPerson();
+			}
+		});
+		// 실시간 중복 체크를 위한 input 이벤트 리스너
+		elements.nameInput.addEventListener('input', () => {
+			renderPeople();
+		});
+	}
+	if (elements.shuffleBtn) elements.shuffleBtn.addEventListener('click', shuffleTeams);
 	if (elements.captureBtn) {
 		elements.captureBtn.addEventListener('click', captureResultsSection);
 		// 호버 시 캡처 영역 하이라이트
@@ -355,7 +357,6 @@ function showDuplicateConfirmModal(duplicateNames) {
 		});
 		
 		const previewColors = [];
-		let previewColorIndex = 0;
 		pendingAddData.pendingNamesData.forEach(({ names }, index) => {
 			const colorIndex = pendingAddData.newGroupColorIndices ? pendingAddData.newGroupColorIndices[index] : -1;
 			
@@ -366,7 +367,6 @@ function showDuplicateConfirmModal(duplicateNames) {
 				const color = getGroupColor(colorIndex);
 				groupContainer.style.border = `2px solid ${color}`; // border 전체를 설정
 				previewColors.push(color);
-				previewColorIndex++;
 				
 				names.forEach(name => {
 					const personTag = document.createElement('div');
@@ -479,7 +479,7 @@ function createDuplicatePersonTag(person) {
 	if (state.weightBalanceEnabled) {
 		const weightDisplay = document.createElement('span');
 		weightDisplay.className = 'weight-display';
-		weightDisplay.textContent = `${person.weight}`;
+		weightDisplay.textContent = `${person.weight ?? 0}`;
 		personTag.appendChild(weightDisplay);
 	}
 	
@@ -570,15 +570,15 @@ function loadFromLocalStorage() {
 			state.people = data.people || [];
 			// 참가자 목록을 이름순으로 정렬
 			state.people.sort((a, b) => a.name.localeCompare(b.name));
-			   // 그룹 내부를 가나다순으로 정렬하여 복원
-			   state.requiredGroups = (data.requiredGroups || []).map(group => {
-				   return [...group].sort((a, b) => {
-					   const pa = state.people.find(p => p.id === a);
-					   const pb = state.people.find(p => p.id === b);
-					   if (!pa || !pb) return 0;
-					   return pa.name.localeCompare(pb.name, 'ko');
-				   });
-			   });
+			// 그룹 내부를 가나다순으로 정렬하여 복원
+			state.requiredGroups = (data.requiredGroups || []).map(group => {
+				return [...group].sort((a, b) => {
+					const pa = state.people.find(p => p.id === a);
+					const pb = state.people.find(p => p.id === b);
+					if (!pa || !pb) return 0;
+					return pa.name.localeCompare(pb.name, 'ko');
+				});
+			});
 			state.nextId = data.nextId || 1;
 			state.forbiddenPairs = data.forbiddenPairs || [];
 			state.pendingConstraints = data.pendingConstraints || [];
@@ -607,11 +607,27 @@ function loadFromLocalStorage() {
 			if (state.people.length > 0) {
 				console.log('%c👥 참가자 목록', 'color: #667eea; font-weight: bold; font-size: 14px;');
 				const sortedPeople = [...state.people].sort((a, b) => a.name.localeCompare(b.name));
-				const peopleTable = sortedPeople.map(p => ({
-					'이름': p.name,
-					'성별': p.gender === 'male' ? '♂️' : '♀️',
-					'가중치': p.weight || '-'
-				}));
+				// 그룹 레이블 생성: A~Z, 넘으면 A1, A2...
+				const groupLabelForIndex = (i) => {
+					const base = String.fromCharCode(65 + (i % 26));
+					return i < 26 ? base : base + Math.floor(i / 26).toString();
+				};
+				const personGroupMap = new Map();
+				state.requiredGroups.forEach((group, gi) => {
+					const label = groupLabelForIndex(gi);
+					group.forEach(pid => personGroupMap.set(pid, label));
+				});
+
+				const peopleTable = sortedPeople.map(p => {
+					const row = {
+						'이름': p.name,
+						'성별': p.gender === 'male' ? '♂️' : '♀️',
+						'가중치': p.weight ?? 0
+					};
+					const grp = personGroupMap.get(p.id);
+					if (grp) row['그룹'] = grp;
+					return row;
+				});
 				console.table(peopleTable);
 			} else {
 				console.log('%c👥 참가자: 없음', 'color: #999; font-style: italic;');
@@ -647,19 +663,7 @@ function loadFromLocalStorage() {
 }
 
 // 이름별 기본값 가져오기
-function getPersonDefaults(name) {
-	try {
-		const saved = localStorage.getItem('teamMakerDefaults');
-		if (saved) {
-			const defaults = JSON.parse(saved);
-			const normalized = normalizeName(name);
-			return defaults[normalized] || null;
-		}
-	} catch (e) {
-		console.error('기본값 가져오기 실패:', e);
-	}
-	return null;
-}
+// getPersonDefaults removed (not used). Use stored defaults directly from localStorage when needed.
 
 // 결과 섹션 캐처 기능
 function captureResultsSection() {
@@ -699,12 +703,13 @@ function captureResultsSection() {
 		section.classList.remove('capture-flash');
 	}, 600);
 	
-	// 캐처 버튼 임시 비활성화
+	// 캐처 버튼 임시 비활성화 (원본 HTML은 변경 전에 저장)
 	const btn = elements.captureBtn;
-	btn.innerHTML = '화면 캡처 <span class="camera-emoji">📸</span>';
-	const originalHTML = btn.innerHTML;
-	btn.textContent = '캡처 중...';
-	btn.disabled = true;
+	const originalHTML = btn ? btn.innerHTML : '';
+	if (btn) {
+		btn.textContent = '캡처 중...';
+		btn.disabled = true;
+	}
 	
 	// 플래시 효과 후 약간 대기
 	setTimeout(() => {
@@ -760,44 +765,46 @@ function captureResultsSection() {
 
 // 카메라 셔터 사운드 재생
 function playCameraShutterSound() {
-    try {
-        const audioContext = new (window.AudioContext || window.webkitContext || window.AudioContext)();
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
+	try {
+		const AudioCtor = window.AudioContext || window.webkitAudioContext;
+		if (!AudioCtor) throw new Error('AudioContext not supported');
+		const audioContext = new AudioCtor();
+		if (audioContext.state === 'suspended') {
+			audioContext.resume();
+		}
 
-        const now = audioContext.currentTime;
-        const freq = 2500; // 동일한 음 높이 (2500Hz)
+		const now = audioContext.currentTime;
+		const freq = 2500; // 동일한 음 높이 (2500Hz)
 
-        // 비프음을 생성하는 내부 함수
-        const playBeep = (startTime, duration) => {
-            const osc = audioContext.createOscillator();
-            const gain = audioContext.createGain();
+		// 비프음을 생성하는 내부 함수
+		const playBeep = (startTime, duration) => {
+			const osc = audioContext.createOscillator();
+			const gain = audioContext.createGain();
 
-            osc.type = 'square'; 
-            osc.frequency.setValueAtTime(freq, startTime);
+			osc.type = 'square'; 
+			osc.frequency.setValueAtTime(freq, startTime);
 
-            gain.gain.setValueAtTime(0, startTime);
-            gain.gain.linearRampToValueAtTime(0.1, startTime + 0.002); // 삑!
-            gain.gain.linearRampToValueAtTime(0, startTime + duration); // 끝
+			gain.gain.setValueAtTime(0, startTime);
+			gain.gain.linearRampToValueAtTime(0.1, startTime + 0.002); // 삑!
+			gain.gain.linearRampToValueAtTime(0, startTime + duration); // 끝
 
-            osc.connect(gain);
-            gain.connect(audioContext.destination);
+			osc.connect(gain);
+			gain.connect(audioContext.destination);
 
-            osc.start(startTime);
-            osc.stop(startTime + duration);
-        };
+			osc.start(startTime);
+			osc.stop(startTime + duration);
+		};
 
-        // 1. 첫 번째 "삐" (0.05초 동안)
-        playBeep(now, 0.05);
+		// 1. 첫 번째 "삐" (0.05초 동안)
+		playBeep(now, 0.05);
 
-        // 2. 두 번째 "빅" (0.06초 뒤에 시작, 0.05초 동안)
-        // 시작 시간을 now + 0.06으로 설정해 아주 짧은 간격을 둡니다.
-        playBeep(now + 0.06, 0.05);
+		// 2. 두 번째 "빅" (0.06초 뒤에 시작, 0.05초 동안)
+		// 시작 시간을 now + 0.06으로 설정해 아주 짧은 간격을 둡니다.
+		playBeep(now + 0.06, 0.05);
 
-    } catch (e) {
-        console.log('사운드 재생 실패:', e);
-    }
+	} catch (e) {
+		console.log('사운드 재생 실패:', e);
+	}
 }
 
 function resetAll() {
@@ -816,7 +823,7 @@ function resetAll() {
 	});
 	if (converted > 0) {
 		console.log(`초기화: 기존 제약 ${converted}개가 보류 제약으로 변환되어 유지됩니다.`);
-			safeOpenForbiddenWindow();
+		safeOpenForbiddenWindow();
 	}
 	// Clear people and groups, keep pendingConstraints intact so constraints persist
 	state.people = [];
@@ -864,22 +871,22 @@ function shuffleOrder() {
 		return;
 	}
 	
-	       // Fisher-Yates shuffle algorithm (전체 people 배열)
-	       for (let i = state.people.length - 1; i > 0; i--) {
-		       const j = Math.floor(Math.random() * (i + 1));
-		       [state.people[i], state.people[j]] = [state.people[j], state.people[i]];
-	       }
-	       // 그룹 내부도 섞기
-	       state.requiredGroups = state.requiredGroups.map(group => {
-		       const arr = [...group];
-		       for (let i = arr.length - 1; i > 0; i--) {
-			       const j = Math.floor(Math.random() * (i + 1));
-			       [arr[i], arr[j]] = [arr[j], arr[i]];
-		       }
-		       return arr;
-	       });
-	       saveToLocalStorage();
-	       renderPeople();
+		// Fisher-Yates shuffle algorithm (전체 people 배열)
+		for (let i = state.people.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[state.people[i], state.people[j]] = [state.people[j], state.people[i]];
+		}
+		// 그룹 내부도 섞기
+		state.requiredGroups = state.requiredGroups.map(group => {
+			const arr = [...group];
+			for (let i = arr.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[arr[i], arr[j]] = [arr[j], arr[i]];
+			}
+			return arr;
+		});
+		saveToLocalStorage();
+		renderPeople();
 }
 
 // 중복 확인 모달을 위한 전역 변수
@@ -936,18 +943,13 @@ function addPerson() {
 							const pb = findPersonByName(rn);
 							if (pa && pb) {
 								const res = addForbiddenPairByNames(ln, rn);
-								if (!res.ok) console.log('금지 제약 추가 실패:', res.message);
-								else {
-									if (res.added) console.log(`금지 제약 추가됨: ${ln} ! ${rn}`);
-									else console.log(`금지 제약이 이미 존재함: ${ln} ! ${rn}`);
-									constraintsTouched = true;
-								}
+								// addForbiddenPairByNames handles persistence and view updates
+								if (res.ok) constraintsTouched = true;
 								// 성공/실패 모두 자식창 표시
 								safeOpenForbiddenWindow();
 							} else {
 								const pres = addPendingConstraint(ln, rn);
-								if (!pres.ok) console.log('보류 제약 추가 실패:', pres.message);
-								else constraintsTouched = true;
+								if (pres.ok) constraintsTouched = true;
 							}
 						}
 					}
@@ -1094,35 +1096,35 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 	// 4단계: 새 참가자 추가
 	const newGroupsToAdd = [];
 	
-	       pendingNamesData.forEach(({ names }, index) => {
-		       const newIds = [];
-			       names.forEach(name => {
-				       // 기존 기억된 값 무시, 완전 초기값으로 등록
-				       let weight = 0;
-				       let gender = 'male';
-				       if (state.weightBalanceEnabled) {
-					       let inputWeight = 0;
-					       const weightInputEl = document.getElementById('weightInput');
-					       if (weightInputEl) {
-						       inputWeight = parseInt(weightInputEl.value);
-						       if (isNaN(inputWeight)) inputWeight = 0;
-					       }
-					       weight = Math.max(0, inputWeight);
-				       }
-				       const person = {
-					       id: state.nextId++,
-					       name: name,
-					       gender: gender,
-					       weight: weight
-				       };
-				       state.people.push(person);
-				       newIds.push(person.id);
-				       addedAny = true;
-			       });
-		       if (newIds.length > 1) {
-			       newGroupsToAdd.push(newIds);
-		       }
-	       });
+		pendingNamesData.forEach(({ names }, index) => {
+			const newIds = [];
+				names.forEach(name => {
+					// 기존 기억된 값 무시, 완전 초기값으로 등록
+					let weight = 0;
+					let gender = 'male';
+					if (state.weightBalanceEnabled) {
+						let inputWeight = 0;
+						const weightInputEl = document.getElementById('weightInput');
+						if (weightInputEl) {
+							inputWeight = parseInt(weightInputEl.value);
+							if (isNaN(inputWeight)) inputWeight = 0;
+						}
+						weight = Math.max(0, inputWeight);
+					}
+					const person = {
+						id: state.nextId++,
+						name: name,
+						gender: gender,
+						weight: weight
+					};
+					state.people.push(person);
+					newIds.push(person.id);
+					addedAny = true;
+				});
+			if (newIds.length > 1) {
+				newGroupsToAdd.push(newIds);
+			}
+		});
 
 	// 5단계: 새 그룹들을 마지막에 추가하면서 미리보기 색상 적용
 	newGroupsToAdd.forEach((group, idx) => {
@@ -1157,7 +1159,7 @@ function removePerson(id) {
 	const after = state.forbiddenPairs.length;
 	if (before !== after) {
 		console.log(`제약 제거: 삭제된 사람(id:${id})과 관련된 제약 ${before - after}개가 제거되었습니다.`);
-				safeOpenForbiddenWindow();
+		safeOpenForbiddenWindow();
 	}
 	buildForbiddenMap();
 	saveToLocalStorage();
@@ -1169,6 +1171,7 @@ function updatePersonGender(id, gender) {
 	if (person) {
 		person.gender = gender;
 		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	}
 }
 
@@ -1177,6 +1180,7 @@ function updatePersonWeight(id, weight) {
 	if (person) {
 		person.weight = parseInt(weight) || 0;
 		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	}
 }
 
@@ -1194,7 +1198,7 @@ function addForbiddenPairByNames(nameA, nameB) {
 	const pb = findPersonByName(nameB);
 	if (!pa || !pb) {
 		const msg = `등록된 사용자 중에 ${!pa ? nameA : nameB}을(를) 찾을 수 없습니다.`;
-		console.log('금지 제약 추가 실패:', msg);
+		// 실패 메시지는 UI 팝업에서 처리하므로 콘솔 로그는 제거
 		return { ok: false, message: msg };
 	}
 	if (pa.id === pb.id) {
@@ -1214,10 +1218,11 @@ function addForbiddenPairByNames(nameA, nameB) {
 		state.forbiddenPairs.push([pa.id, pb.id]);
 		buildForbiddenMap();
 		saveToLocalStorage();
-		console.log(`금지 제약 추가됨: ${pa.name} (id:${pa.id}) ! ${pb.name} (id:${pb.id})`);
+		// 업데이트가 있으면 콘솔 관리 뷰를 갱신하고 팝업을 연다
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		safeOpenForbiddenWindow();
 	} else {
-		console.log(`금지 제약이 이미 존재함: ${pa.name} ! ${pb.name}`);
+		// 이미 존재할 때의 디버그 로그 제거
 		// Even if the constraint already exists, open/focus the popup so users can view/manage it
 		safeOpenForbiddenWindow();
 	}
@@ -1234,7 +1239,8 @@ function addPendingConstraint(leftName, rightName) {
 	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
 	saveToLocalStorage();
-	console.log(`보류 제약 추가됨(사람 미등록): ${leftName} ! ${rightName}`);
+	// 갱신된 상태를 콘솔에 반영
+	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	// Update popup view if open (or open it)
 		safeOpenForbiddenWindow();
 	return { ok: true }; 
@@ -1249,7 +1255,7 @@ function tryResolvePendingConstraints() {
 		const pb = findPersonByName(pc.right);
 		if (pa && pb) {
 			const res = addForbiddenPairByNames(pa.name, pb.name);
-			if (res.ok) console.log(`보류 제약이 해결되어 적용됨: ${pa.name} ! ${pb.name}`);
+			// avoid noisy logs; addForbiddenPairByNames will refresh console
 			changed = true;
 			return false; // remove from pending
 		}
@@ -1258,6 +1264,7 @@ function tryResolvePendingConstraints() {
 	if (changed) {
 		buildForbiddenMap();
 		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		safeOpenForbiddenWindow();
 	} 
 }
@@ -1293,11 +1300,7 @@ function setTeamAnimDurationFromDelay() {
 }
 
 function getTeamAnimDurationMs() {
-	try {
-		const css = getComputedStyle(document.documentElement).getPropertyValue('--team-anim-duration');
-		const parsed = parseFloat(css);
-		if (Number.isFinite(parsed)) return parsed;
-	} catch (_) { /* ignore */ }
+	// Unified computation for animation duration (ms)
 	return Math.max(50, Math.round((state.teamDisplayDelay || 400) * 0.75));
 }
 
@@ -1320,7 +1323,7 @@ function removeForbiddenPairByNames(nameA, nameB) {
 		if (state.forbiddenPairs.length !== before) {
 			buildForbiddenMap();
 			saveToLocalStorage();
-			console.log(`금지 제약 제거됨: ${pa.name} ! ${pb.name}`);
+			try { printParticipantConsole(); } catch (_) { /* no-op */ }
 			safeOpenForbiddenWindow();
 			return { ok: true };
 		}
@@ -1330,11 +1333,10 @@ function removeForbiddenPairByNames(nameA, nameB) {
 	state.pendingConstraints = state.pendingConstraints.filter(pc => !( (pc.left === na && pc.right === nb) || (pc.left === nb && pc.right === na) ));
 	if (state.pendingConstraints.length !== beforePending) {
 		saveToLocalStorage();
-		console.log(`보류 제약 제거됨: ${nameA} ! ${nameB}`);
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		safeOpenForbiddenWindow();
 		return { ok: true };
 	}
-	console.log('제약 제거 실패: 해당 제약을 찾을 수 없습니다.');
 	return { ok: false, message: '해당 제약을 찾을 수 없습니다.' };
 }
 
@@ -1369,7 +1371,16 @@ function openForbiddenWindow() {
 				console.log('팝업 차단: 제약 연결 창을 열 수 없습니다. 브라우저의 팝업 차단을 확인하세요.');
 				return;
 			}
-			const doc = forbiddenPopup.document;
+			let doc;
+			try {
+				doc = forbiddenPopup.document;
+			} catch (e) {
+				console.warn('팝업에 접근할 수 없습니다 (크로스오리진 또는 차단됨):', e);
+				// Drop reference to avoid repeated exceptions
+				try { forbiddenPopup.close(); } catch(_){}
+				forbiddenPopup = null;
+				return;
+			}
 			doc.open();
 			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>제약 관리</title><style>
 				:root{--accent:#667eea;--bg:#ffffff;--muted:#666}
@@ -1526,7 +1537,15 @@ function openForbiddenWindow() {
 
 function renderForbiddenWindowContent() {
 	if (!forbiddenPopup || forbiddenPopup.closed) return;
-	const doc = forbiddenPopup.document;
+	let doc;
+	try {
+		doc = forbiddenPopup.document;
+	} catch (e) {
+		console.warn('팝업 문서에 접근할 수 없습니다 (크로스오리진):', e);
+		try { forbiddenPopup.close(); } catch(_){}
+		forbiddenPopup = null;
+		return;
+	}
 	const appliedList = doc.getElementById('appliedList');
 	const pendingList = doc.getElementById('pendingList');
 	if (!appliedList || !pendingList) return;
@@ -1590,13 +1609,11 @@ function clearAllConstraints() {
 	state.pendingConstraints = [];
 	state.forbiddenMap = {};
 	saveToLocalStorage();
-	console.log('제약 목록이 모두 초기화되었습니다.');
+	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	renderForbiddenWindowContent();
 }
 
-function escapeHtml(s) {
-	return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// escapeHtml removed (not referenced). Use DOM APIs or a small helper inline when needed.
 
 function isForbidden(aId, bId) {
 	return state.forbiddenMap[aId] && state.forbiddenMap[aId].has(bId);
@@ -1700,9 +1717,96 @@ function updateParticipantCount() {
 	}
 }
 
+// 콘솔에 현재 참가자 목록을 그룹 표시 순서대로 출력
+function printParticipantConsole() {
+	try {
+		if (!console || !console.table) return;
+		try { console.clear(); } catch (_) { /* 일부 환경에서 clear가 제한될 수 있음 */ }
+		console.group('📋 참가자 관리 (실시간)');
+		if (!state.people || state.people.length === 0) {
+			console.log('%c👥 참가자: 없음', 'color: #999; font-style: italic;');
+			console.groupEnd();
+			return;
+		}
+
+		const groupLabelForIndex = (i) => {
+			const base = String.fromCharCode(65 + (i % 26));
+			return i < 26 ? base : base + Math.floor(i / 26).toString();
+		};
+
+		const personGroupMap = new Map();
+		state.requiredGroups.forEach((group, gi) => {
+			const label = groupLabelForIndex(gi);
+			group.forEach(pid => personGroupMap.set(pid, label));
+		});
+
+		// 화면 표시 순서대로 정렬 (그룹 단위)
+		const groupMap = new Map();
+		state.requiredGroups.forEach((group, gi) => group.forEach(id => groupMap.set(id, gi)));
+		const processed = new Set();
+		const displaySeq = [];
+		state.people.forEach(p => {
+			const gi = groupMap.get(p.id);
+			if (gi !== undefined && !processed.has(gi)) {
+				processed.add(gi);
+				const g = state.requiredGroups[gi];
+				g.forEach(id => {
+					const pp = state.people.find(x => x.id === id);
+					if (pp) displaySeq.push(pp);
+				});
+			} else if (gi === undefined) {
+				displaySeq.push(p);
+			}
+		});
+
+		const peopleTable = displaySeq.map(p => {
+			const row = {
+				'이름': p.name,
+				'성별': p.gender === 'male' ? '♂️' : '♀️',
+				'가중치': typeof p.weight !== 'undefined' ? p.weight : 0
+			};
+			const grp = personGroupMap.get(p.id);
+			if (grp) row['그룹'] = grp;
+			return row;
+		});
+
+		console.table(peopleTable);
+
+		// 적용된 제약과 보류 제약도 함께 출력
+		if (state.forbiddenPairs && state.forbiddenPairs.length > 0) {
+			console.log('%c🚫 적용된 제약', 'color: #ef4444; font-weight: bold; font-size: 14px;');
+			state.forbiddenPairs.forEach((pair, idx) => {
+				const pa = state.people.find(p => p.id === pair[0]);
+				const pb = state.people.find(p => p.id === pair[1]);
+				const left = pa ? pa.name : `id:${pair[0]}`;
+				const right = pb ? pb.name : `id:${pair[1]}`;
+				console.log(`  ${idx + 1}. ${left} ↔ ${right}`);
+			});
+		} else {
+			console.log('%c🚫 적용된 제약: 없음', 'color: #999; font-style: italic;');
+		}
+
+		if (state.pendingConstraints && state.pendingConstraints.length > 0) {
+			console.log('%c⏳ 대기 중인 제약', 'color: #f59e0b; font-weight: bold; font-size: 14px;');
+			state.pendingConstraints.forEach((pc, idx) => {
+				console.log(`  ${idx + 1}. ${pc.left} ↔ ${pc.right}`);
+			});
+		} else {
+			console.log('%c⏳ 대기 중인 제약: 없음', 'color: #999; font-style: italic;');
+		}
+
+		console.groupEnd();
+	} catch (e) {
+		try { console.error('printParticipantConsole 실패:', e); } catch (_) { /* no-op */ }
+	}
+}
+
+
+
 function renderPeople() {
 	updateParticipantCount();
 	elements.peopleList.innerHTML = '';
+    
 	
 	// 입력창에서 중복 체크를 위한 이름 목록 가져오기
 	const potentialDuplicates = getPotentialDuplicatesFromInput();
@@ -1711,13 +1815,14 @@ function renderPeople() {
 	const groupMap = new Map(); // personId -> groupIndex
 	
 	// 그룹 정보를 맵으로 저장
-		       state.requiredGroups.forEach((group, groupIndex) => {
-			       // 그룹 내부는 실제 배열 순서대로(셔플 반영)
-			       group.forEach(personId => {
-				       grouped.add(personId);
-				       groupMap.set(personId, groupIndex);
-			       });
-		       });
+	state.requiredGroups.forEach((group, groupIndex) => {
+		// 그룹 내부는 실제 배열 순서대로(셔플 반영)
+		group.forEach(personId => {
+			grouped.add(personId);
+			groupMap.set(personId, groupIndex);
+		});
+	});
+
 	
 	// people 배열 순서대로 표시하되, 그룹 시작 시점에 그룹 전체를 한 번에 표시
 	const processedGroups = new Set();
@@ -1728,19 +1833,19 @@ function renderPeople() {
 		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
 			// 이 그룹을 처음 만났을 때, 그룹 전체를 표시
 			processedGroups.add(groupIndex);
-				       const group = state.requiredGroups[groupIndex];
-				       // 그룹 내부는 실제 배열 순서대로(셔플 반영)
-				       const groupContainer = document.createElement('div');
-				       groupContainer.className = 'group-container';
-				       groupContainer.style.borderColor = getGroupColor(groupIndex);
-				       group.forEach(personId => {
-					       const groupPerson = state.people.find(p => p.id === personId);
-					       if (groupPerson) {
-						       const personTag = createPersonTag(groupPerson, potentialDuplicates);
-						       groupContainer.appendChild(personTag);
-					       }
-				       });
-				       elements.peopleList.appendChild(groupContainer);
+			const group = state.requiredGroups[groupIndex];
+			// 그룹 내부는 실제 배열 순서대로(셔플 반영)
+			const groupContainer = document.createElement('div');
+			groupContainer.className = 'group-container';
+			groupContainer.style.borderColor = getGroupColor(groupIndex);
+			group.forEach(personId => {
+				const groupPerson = state.people.find(p => p.id === personId);
+				if (groupPerson) {
+					const personTag = createPersonTag(groupPerson, potentialDuplicates);
+					groupContainer.appendChild(personTag);
+				}
+			});
+			elements.peopleList.appendChild(groupContainer);
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 항목
 			const personTag = createPersonTag(person, potentialDuplicates);
@@ -1748,6 +1853,9 @@ function renderPeople() {
 		}
 		// 이미 처리된 그룹의 멤버는 스킵
 	});
+		// 콘솔 업데이트
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+        
 }
 
 // 입력창의 텍스트에서 중복될 가능성이 있는 이름들 추출
@@ -1818,6 +1926,8 @@ function shuffleTeams() {
 	// teamDisplayDelay가 바뀔 수 있으므로 표시 전 최신값으로 반영
 	setTeamAnimDurationFromDelay();
 	displayTeams(teams);
+	// 팀 생성 시 콘솔의 참가자 관리 뷰도 갱신
+	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 }
 // 팀 생성 전에 내부적으로 한 번 셔플: 그룹 내 인원은 제외(비그룹 인원만 무작위화)
 function preShufflePeopleForGeneration(people) {
@@ -1856,14 +1966,8 @@ function generateTeams(people) {
 		}
 	}
 
-	// 최대인원으로 팀 생성 모드: 팀수는 (총인원 / 팀당인원)의 올림
-	// 일반 모드: 기존과 동일
-	let teamCount;
-	if (state.maxTeamSizeEnabled) {
-		teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
-	} else {
-		teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
-	}
+	// 팀 수 계산 (총인원 / 팀당인원)의 올림 — 모드에 관계없이 동일 계산
+	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
 	const maxAttempts = 500;
 
 	// Calculate minimum gender count across all people
@@ -1991,8 +2095,7 @@ function generateTeams(people) {
 		let personFailed = false;
 
 		for (const person of unassignedPeople) {
-			const personMinGender = (isFemaleLess && person.gender === 'female') || 
-			                        (!isFemaleLess && person.gender === 'male') ? 1 : 0;
+			const personMinGender = ((isFemaleLess && person.gender === 'female') || (!isFemaleLess && person.gender === 'male')) ? 1 : 0;
 			
 			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
 			let teamOrder;
@@ -2152,12 +2255,12 @@ async function displayTeams(teams) {
 	});
 	
 	elements.resultsSection.classList.add('visible');
+
+    
 	
 	// 캡처 기능 사용 가능 여부 확인 후 버튼 컨테이너 표시
 	if (elements.captureButtonContainer) {
-		const canUseCapture = typeof html2canvas !== 'undefined' && 
-							  navigator.clipboard && 
-							  navigator.clipboard.write;
+		const canUseCapture = typeof html2canvas !== 'undefined' && navigator.clipboard && navigator.clipboard.write;
 		if (canUseCapture) {
 			elements.captureButtonContainer.style.display = 'block';
 		} else {
@@ -2254,7 +2357,7 @@ async function displayTeams(teams) {
 				for (const person of chunk) {
 					const li = document.createElement('li');
 					let displayText = person.name;
-					if (state.weightBalanceEnabled) displayText += ` (${person.weight})`;
+					if (state.weightBalanceEnabled) displayText += ` (${person.weight ?? 0})`;
 					li.textContent = displayText;
 					li.classList.add('jelly-in');
 					if (state.genderBalanceEnabled) {
@@ -2318,7 +2421,7 @@ async function displayTeams(teams) {
 			for (const person of chunk) {
 				const li = document.createElement('li');
 				let displayText = person.name;
-				if (state.weightBalanceEnabled) displayText += ` (${person.weight})`;
+				if (state.weightBalanceEnabled) displayText += ` (${person.weight ?? 0})`;
 				li.textContent = displayText;
 				li.classList.add('jelly-in');
 				if (state.genderBalanceEnabled) {
@@ -2357,6 +2460,9 @@ function showError(message) {
 	elements.teamsDisplay.innerHTML = `<div class="error-message">${message}</div>`;
 	elements.resultsSection.classList.add('visible');
 }
+
+// Calculate and store teamsDisplay height so it can keep layout space
+
 
 // Briefly pulse a team card border when members are added
 function pulseTeamCard(card) {
