@@ -2025,7 +2025,26 @@ function generateTeams(people) {
 					// 가중치가 같으면 최대인원 모드에서는 인덱스 작은 팀 우선
 					if (state.maxTeamSizeEnabled) return a.idx - b.idx;
 					return 0;
-				}).map(t => t.idx);
+					}).map(t => t.idx);
+					// 최대인원 모드일 때는 마지막 팀을 우선순위 맨 뒤로 보낸다
+					if (state.maxTeamSizeEnabled && teamOrder.length > 1) {
+						const lastIdx = teams.length - 1;
+						const pos = teamOrder.indexOf(lastIdx);
+						if (pos !== -1) {
+							teamOrder.splice(pos, 1);
+							teamOrder.push(lastIdx);
+						}
+					}
+				// 최대인원 모드일 때는 "마지막 팀"(index === teams.length-1)을
+				// 가능한 한 마지막에 배치해 다른 팀들을 먼저 채우도록 한다.
+				if (state.maxTeamSizeEnabled && teamOrder.length > 1) {
+					const lastIdx = teams.length - 1;
+					const pos = teamOrder.indexOf(lastIdx);
+					if (pos !== -1) {
+						teamOrder.splice(pos, 1);
+						teamOrder.push(lastIdx);
+					}
+				}
 			} else {
 				// 가중치 균등이 없으면 랜덤 순서
 				teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
@@ -2215,8 +2234,20 @@ function generateTeams(people) {
 			}
 			
 			if (needsReorder) {
-				// 팀을 인원수 기준으로 내림차순 정렬 (많은 팀이 앞으로)
-				teams.sort((a, b) => b.length - a.length);
+				// 기존: 전체 팀을 정렬하면 작은 팀이 중간에 섞여 버려 원하는 "마지막 팀만 언더플로우" 결과가 나오지 않음.
+				// 대신 마지막 팀에서 앞쪽 팀들을 채울 수 있으면 옮겨 채우도록 재분배한다.
+				const lastIdx = teams.length - 1;
+				const lastTeam = teams[lastIdx];
+				for (let i = 0; i < lastIdx; i++) {
+					while (teams[i].length < state.membersPerTeam && lastTeam.length > 0) {
+						// 이동: 마지막 팀의 선두 멤버를 앞 팀으로 이동
+						const member = lastTeam.shift();
+						teams[i].push(member);
+					}
+					// 모든 앞팀이 채워졌으면 중단
+					if (lastTeam.length === 0) break;
+				}
+				// 반영: teams[lastIdx]는 이미 레퍼런스로 수정됨
 			}
 		}
 		
