@@ -34,6 +34,7 @@ const state = {
 	maxTeamSizeEnabled: false,
 	membersPerTeam: 4,
 	nextId: 1,
+	lastModifiedWeight: 0, // 마지막으로 수정된 가중치
 	teamDisplayDelay,
 	ungroupedColor: '#94a3b8',
 	groupColors: [
@@ -489,7 +490,8 @@ function saveToLocalStorage() {
 			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 			genderBalanceEnabled: state.genderBalanceEnabled,
 			weightBalanceEnabled: state.weightBalanceEnabled,
-			membersPerTeam: state.membersPerTeam
+			membersPerTeam: state.membersPerTeam,
+			lastModifiedWeight: state.lastModifiedWeight
 		};
 		localStorage.setItem('teamMakerData', JSON.stringify(data));
 		
@@ -553,10 +555,9 @@ function loadFromLocalStorage() {
 				state.membersPerTeam = data.membersPerTeam;
 				elements.teamSizeInput.value = data.membersPerTeam;
 			}
-			
-			// 콘솔에 복원된 데이터 출력
-			console.group('📦 저장된 데이터 복원');
-			
+		if (typeof data.lastModifiedWeight !== 'undefined') {
+			state.lastModifiedWeight = data.lastModifiedWeight;
+		}
 			if (state.people.length > 0) {
 				console.log('%c👥 참가자 목록', 'color: #667eea; font-weight: bold; font-size: 14px;');
 				const sortedPeople = [...state.people].sort((a, b) => a.name.localeCompare(b.name));
@@ -1061,17 +1062,8 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 						const activeExisting = state.people.find(p => normalizeName(p.name) === normalized && p.enabled !== false);
 						
 						if (!activeExisting) {
-							let weight = 0;
+							let weight = state.lastModifiedWeight || 0;
 							let gender = 'male';
-							if (state.weightBalanceEnabled) {
-								let inputWeight = 0;
-								const weightInputEl = document.getElementById('weightInput');
-								if (weightInputEl) {
-									inputWeight = parseInt(weightInputEl.value);
-									if (isNaN(inputWeight)) inputWeight = 0;
-								}
-								weight = Math.max(0, inputWeight);
-							}
 							const person = {
 								id: state.nextId++,
 								name: name,
@@ -1177,7 +1169,9 @@ function updatePersonGender(id, gender) {
 function updatePersonWeight(id, weight) {
 	const person = state.people.find(p => p.id === id);
 	if (person) {
-		person.weight = parseInt(weight) || 0;
+		const newWeight = parseInt(weight) || 0;
+		person.weight = newWeight;
+		state.lastModifiedWeight = newWeight; // 마지막으로 수정한 가중치 저장
 		saveToLocalStorage();
 		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	}
