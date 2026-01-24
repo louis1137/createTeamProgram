@@ -1678,6 +1678,23 @@ function createPersonTag(person, potentialDuplicates = []) {
 		weightInput.addEventListener('input', (e) => {
 			updatePersonWeight(person.id, e.target.value);
 		});
+		weightInput.addEventListener('blur', (e) => {
+			let value = e.target.value.trim();
+			// 빈 값이면 0으로 설정
+			if (value === '' || value === null || value === undefined) {
+				value = '0';
+			} else {
+				// 숫자로 변환 (01 → 1)
+				const numValue = parseInt(value, 10);
+				if (!isNaN(numValue)) {
+					value = String(numValue);
+				} else {
+					value = '0';
+				}
+			}
+			e.target.value = value;
+			updatePersonWeight(person.id, value);
+		});
 		personTag.appendChild(weightInput);
 	}
 	
