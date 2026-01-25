@@ -1985,7 +1985,7 @@ function generateTeams(people) {
 
 	// 팀 수 계산 (총인원 / 팀당인원)의 올림 — 모드에 관계없이 동일 계산
 	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
-	const maxAttempts = 500;
+	const maxAttempts = 5;
 
 	// 전체 참가자에서 최소 성별 수 계산
 	const maleCount = people.filter(p => p.gender === 'male').length;
@@ -2083,17 +2083,7 @@ function generateTeams(people) {
 						}
 						if (hasConflict) continue;
 						
-						// 성별 균형 확인
-						if (state.genderBalanceEnabled) {
-							const currentMinGender = isFemaleLess ? teams[tryTeam].filter(p => p.gender === 'female').length : teams[tryTeam].filter(p => p.gender === 'male').length;
-							const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
-							const globalMinGender = Math.min(...allTeamMinGenders);
-							if (currentMinGender > globalMinGender) continue;
-						}
-						
-						teams[tryTeam].push(...members);
-						members.forEach(m => assigned.add(m.id));
-						placed = true;
+
 						break;
 					}
 					
@@ -2114,20 +2104,7 @@ function generateTeams(people) {
 						// 충돌(금지 제약) 확인
 						if (teams[tryTeam].some(tm => isForbidden(tm.id, person.id))) continue;
 						
-						// 성별 균형 확인
-						if (state.genderBalanceEnabled) {
-							const personMinGender = ((isFemaleLess && person.gender === 'female') || (!isFemaleLess && person.gender === 'male')) ? 1 : 0;
-							if (personMinGender === 1) {
-								const currentMinGender = isFemaleLess ? teams[tryTeam].filter(p => p.gender === 'female').length : teams[tryTeam].filter(p => p.gender === 'male').length;
-								const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
-								const globalMinGender = Math.min(...allTeamMinGenders);
-								if (currentMinGender > globalMinGender) continue;
-							}
-						}
-						
-						teams[tryTeam].push(person);
-						assigned.add(person.id);
-						placed = true;
+
 						break;
 					}
 					
@@ -2182,14 +2159,6 @@ function generateTeams(people) {
 					}
 				}
 				if (hasConflict) continue;
-				
-				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
-				if (state.genderBalanceEnabled) {
-					const currentMinGender = isFemaleLess ? teams[i].filter(p => p.gender === 'female').length : teams[i].filter(p => p.gender === 'male').length;
-					const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
-					const globalMinGender = Math.min(...allTeamMinGenders);
-					if (currentMinGender > globalMinGender) continue;
-				}
 				
 				// 모든 조건을 만족하면 이 팀 선택
 				selectedTeam = i;
@@ -2257,16 +2226,6 @@ function generateTeams(people) {
 				
 				// 체크 2: 충돌(금지 제약) 없음
 				if (teams[i].some(tm => isForbidden(tm.id, person.id))) continue;
-				
-				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
-				if (state.genderBalanceEnabled && personMinGender === 1) {
-					const currentMinGender = isFemaleLess ? teams[i].filter(p => p.gender === 'female').length : teams[i].filter(p => p.gender === 'male').length;
-
-					const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
-					const globalMinGender = Math.min(...allTeamMinGenders);
-					
-					if (currentMinGender > globalMinGender) continue;
-				}
 				
 				// 모든 조건을 만족하면 이 팀 선택
 				selectedTeam = i;
