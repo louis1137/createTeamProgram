@@ -2163,6 +2163,63 @@ function generateTeams(people) {
 }
 
 async function displayTeams(teams) {
+	// 팀 내부 멤버 순서 셔플 (그룹 단위로)
+	teams.forEach(team => {
+		// 1. 그룹별로 멤버를 분류하여 블록 생성
+		const blocks = [];
+		const groupMap = new Map(); // groupIndex -> [members]
+		
+		team.forEach(person => {
+			const gIdx = getPersonGroupIndex(person.id);
+			if (!groupMap.has(gIdx)) {
+				groupMap.set(gIdx, []);
+			}
+			groupMap.get(gIdx).push(person);
+		});
+		
+		// 2. 각 그룹을 블록으로 변환
+		groupMap.forEach((members, gIdx) => {
+			blocks.push({ groupIndex: gIdx, members });
+		});
+		
+		// 3. 블록 순서 셔플
+		for (let i = blocks.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+		}
+		
+		// 4. 각 블록 내부도 셔플
+		blocks.forEach(block => {
+			for (let i = block.members.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[block.members[i], block.members[j]] = [block.members[j], block.members[i]];
+			}
+		});
+		
+		// 5. 셔플된 블록들을 다시 평탄화하여 팀 배열 재구성
+		team.length = 0;
+		blocks.forEach(block => {
+			team.push(...block.members);
+		});
+	});
+	
+	// 팀 순서 셔플
+	if (state.maxTeamSizeEnabled && teams.length > 1) {
+		// 최대인원 모드: 마지막 팀(남은 인원)을 제외하고 나머지만 셔플
+		const lastTeam = teams.pop();
+		for (let i = teams.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[teams[i], teams[j]] = [teams[j], teams[i]];
+		}
+		teams.push(lastTeam);
+	} else {
+		// 일반 모드: 모든 팀 셔플
+		for (let i = teams.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[teams[i], teams[j]] = [teams[j], teams[i]];
+		}
+	}
+	
 	// 팀 표시 시 FAQ 섹션 숨기기
 	const faqSection = document.querySelector('.faq-section');
 	if (faqSection) faqSection.style.display = 'none';
@@ -2289,7 +2346,7 @@ async function displayTeams(teams) {
 				if (state.weightBalanceEnabled) {
 					teamCardData.currentWeight += addedWeight;
 					// 0명이 아니면 인원 수 표시
-					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
+					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명/${teamCardData.currentWeight})`;
 				} else {
 					// 0명이 아니면 인원 수 표시
 					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명)`;
@@ -2335,7 +2392,7 @@ async function displayTeams(teams) {
 			if (state.weightBalanceEnabled) {
 				teamCardData.currentWeight += addedWeight;
 				// 0명이 아니면 인원 수 표시
-				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
+				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명/${teamCardData.currentWeight})`;
 			} else {
 				// 0명이 아니면 인원 수 표시
 				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명)`;
