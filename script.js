@@ -1911,6 +1911,9 @@ function generateTeams(people) {
 		const shuffledPeople = [...people].sort(() => Math.random() - 0.5);
 		const teams = Array.from({ length: teamCount }, () => []);
 		const assigned = new Set();
+		
+		// 헬퍼 함수: 팀의 총 가중치 계산
+		const calcTeamWeight = (team) => team.reduce((sum, p) => sum + (p.weight || 0), 0);
 
 		const validGroups = state.requiredGroups.filter(group => 
 			group.every(id => shuffledPeople.some(p => p.id === id))
@@ -2017,26 +2020,26 @@ function generateTeams(people) {
 		for (const person of unassignedPeople) {
 			const personMinGender = ((isFemaleLess && person.gender === 'female') || (!isFemaleLess && person.gender === 'male')) ? 1 : 0;
 			
-			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
+			// 팀 순서 결정: 최대인원 모드, 일반 모드 + 가중치, 일반 모드 구분
 			let teamOrder;
-			if (state.weightBalanceEnabled) {
-				// 팀을 현재 가중치 기준 오름차순 정렬 (낮은 가중치 팀부터)
+			if (state.maxTeamSizeEnabled) {
+				// 최대인원 모드: 인덱스 순서
+				teamOrder = teams.map((_, idx) => idx);
+			} else if (state.weightBalanceEnabled) {
+				// 일반 모드 + 가중치: 인원 수 균등 우선, 같으면 가중치 낮은 순
 				teamOrder = teams.map((team, idx) => ({
 					idx,
-					weight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
+					size: team.length,
+					weight: calcTeamWeight(team)
 				})).sort((a, b) => {
+					// 1. 팀 크기 작은 순 (인원 균등 분배 우선)
+					if (a.size !== b.size) return a.size - b.size;
+					// 2. 크기 같으면 가중치 낮은 순
 					if (a.weight !== b.weight) return a.weight - b.weight;
-					// 가중치가 같으면 최대인원 모드에서는 인덱스 작은 팀 우선
-					if (state.maxTeamSizeEnabled) return a.idx - b.idx;
-					return 0;
+					return a.idx - b.idx;
 				}).map(t => t.idx);
-				// 최대인원 모드일 때는 마지막 팀을 우선순위 맨 뒤로 보냄
-				pushLastTeamToEndIfNeeded(teamOrder, teams);
-			} else if (state.maxTeamSizeEnabled) {
-				// 최대인원 모드 + 가중치 균등 없음: 인덱스 순서
-				teamOrder = teams.map((_, idx) => idx);
 			} else {
-				// 일반 모드 + 가중치 균등 없음: 2 유닛 우선 로직
+				// 일반 모드 + 가중치 없음: 2 유닛 우선 로직
 				const teamUnits = teams.map((team, idx) => {
 					const groupSet = new Set();
 					let ungroupedCount = 0;
@@ -2377,7 +2380,7 @@ function createResultListItem(person) {
 	const li = document.createElement('li');
 	let displayText = person.name;
 	if (state.weightBalanceEnabled) displayText += ` (${person.weight ?? 0})`;
-	li.textContent = displayText;
+	li.textContent = displayText;	
 	li.classList.add('jelly-in');
 	if (state.genderBalanceEnabled) {
 		const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
