@@ -2191,6 +2191,11 @@ function generateTeams(people) {
 }
 
 async function displayTeams(teams) {
+	// 컨테이너 축소로 인한 레이아웃 점프를 방지하기 위해 기존 높이를 유지
+	const prevContainerHeight = elements.teamsDisplay.offsetHeight || 0;
+	if (prevContainerHeight > 0) {
+		elements.teamsDisplay.style.minHeight = prevContainerHeight + 'px';
+	}
 	// 팀 표시 시 FAQ 섹션 숨기기
 	const faqSection = document.querySelector('.faq-section');
 	if (faqSection) faqSection.style.display = 'none';
@@ -2231,10 +2236,12 @@ async function displayTeams(teams) {
 	const maxMembers = Math.max(...teams.map(t => t.length));
 
 	// 팀원 추가 애니메이션 동안 카드 높이 흔들림 방지를 위해
-	// 각 팀 카드의 리스트 영역(ul)에 maxMembers 기준의 min-height를 설정
+	// 각 팀 카드의 리스트 영역(ul)과 카드 전체에 maxMembers 기준의 min-height를 설정
 	try {
 		const uls = Array.from(elements.teamsDisplay.querySelectorAll('.team-card ul'));
-		if (uls.length) {
+		const cards = Array.from(elements.teamsDisplay.querySelectorAll('.team-card'));
+		const headers = Array.from(elements.teamsDisplay.querySelectorAll('.team-card h3'));
+		if (uls.length && cards.length && headers.length) {
 			// 샘플 li를 하나 붙여 실제 렌더 높이를 측정 (마진 포함)
 			const sampleLi = document.createElement('li');
 			sampleLi.style.visibility = 'hidden';
@@ -2252,6 +2259,14 @@ async function displayTeams(teams) {
 				? (liHeight * maxMembers + mt + mb + (maxMembers - 1) * between)
 				: 0;
 			uls.forEach(ul => { ul.style.minHeight = minListHeight + 'px'; });
+
+			// 카드 전체 높이도 고정 (헤더 + 리스트 + 카드 패딩)
+			const headerH = headers[0].offsetHeight || 32;
+			const cardCS = window.getComputedStyle(cards[0]);
+			const padT = parseFloat(cardCS.paddingTop) || 0;
+			const padB = parseFloat(cardCS.paddingBottom) || 0;
+			const minCardHeight = headerH + minListHeight + padT + padB;
+			cards.forEach(card => { card.style.minHeight = minCardHeight + 'px'; });
 		}
 	} catch (_) { /* 측정 실패 시 무시하고 진행 */ }
 	
@@ -2267,6 +2282,9 @@ async function displayTeams(teams) {
 				i += 1;
 				continue;
 			}
+
+			// 최종 렌더 완료 후 컨테이너 min-height 해제
+			try { elements.teamsDisplay.style.minHeight = ''; } catch (_) { /* no-op */ }
 			const chunk = [];
 			let j = i;
 			while (j < team.length && getPersonGroupIndex(team[j].id) === gIdx) {
