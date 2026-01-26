@@ -34,6 +34,7 @@ const state = {
 	maxTeamSizeEnabled: false,
 	membersPerTeam: 4,
 	nextId: 1,
+	lastModifiedWeight: 0, // 마지막으로 수정된 가중치
 	teamDisplayDelay,
 	ungroupedColor: '#94a3b8',
 	groupColors: [
@@ -212,10 +213,10 @@ function showDuplicateConfirmModal(duplicateNames) {
 	if (existingSectionEl) existingSectionEl.style.display = hasInputDuplicates ? 'none' : 'block';
 	if (arrowEl) arrowEl.style.display = hasInputDuplicates ? 'none' : 'flex';
 	
-	// 기존 참가자 목록 표시
+	// 기존 참가자 목록 표시 (사용 중인 멤버만)
 	existingListEl.innerHTML = '';
 	const duplicateNormalized = duplicateNames.map(name => normalizeName(name));
-	const duplicatePeople = state.people.filter(p => duplicateNormalized.includes(normalizeName(p.name)));
+	const duplicatePeople = state.people.filter(p => duplicateNormalized.includes(normalizeName(p.name)) && p.enabled !== false);
 	
 	// 그룹 정보 맵 생성
 	const groupMap = new Map();
@@ -489,7 +490,8 @@ function saveToLocalStorage() {
 			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 			genderBalanceEnabled: state.genderBalanceEnabled,
 			weightBalanceEnabled: state.weightBalanceEnabled,
-			membersPerTeam: state.membersPerTeam
+			membersPerTeam: state.membersPerTeam,
+			lastModifiedWeight: state.lastModifiedWeight
 		};
 		localStorage.setItem('teamMakerData', JSON.stringify(data));
 		
@@ -515,8 +517,14 @@ function loadFromLocalStorage() {
 		if (saved) {
 			const data = JSON.parse(saved);
 			state.people = data.people || [];
-			// 참가자 목록을 이름순으로 정렬
-			state.people.sort((a, b) => a.name.localeCompare(b.name));
+			// enabled 속성이 없는 기존 멤버는 기본값 true로 설정
+			state.people.forEach(p => {
+				if (typeof p.enabled === 'undefined') {
+					p.enabled = true;
+				}
+			});
+			// 참가자 목록을 사용/미사용 순으로 정렬
+			sortPeopleByActiveStatus();
 			// 그룹 내부를 가나다순으로 정렬하여 복원
 			state.requiredGroups = (data.requiredGroups || []).map(group => {
 				return [...group].sort((a, b) => {
@@ -547,10 +555,9 @@ function loadFromLocalStorage() {
 				state.membersPerTeam = data.membersPerTeam;
 				elements.teamSizeInput.value = data.membersPerTeam;
 			}
-			
-			// 콘솔에 복원된 데이터 출력
-			console.group('📦 저장된 데이터 복원');
-			
+		if (typeof data.lastModifiedWeight !== 'undefined') {
+			state.lastModifiedWeight = data.lastModifiedWeight;
+		}
 			if (state.people.length > 0) {
 				console.log('%c👥 참가자 목록', 'color: #667eea; font-weight: bold; font-size: 14px;');
 				const sortedPeople = [...state.people].sort((a, b) => a.name.localeCompare(b.name));
@@ -566,13 +573,14 @@ function loadFromLocalStorage() {
 				});
 
 				const peopleTable = sortedPeople.map(p => {
+					const grp = personGroupMap.get(p.id);
 					const row = {
 						'이름': p.name,
 						'성별': p.gender === 'male' ? '♂️' : '♀️',
-						'가중치': p.weight ?? 0
+						'가중치': p.weight ?? 0,
+						'그룹': grp || '',
+						'상태': p.enabled === false ? '미사용' : '사용'
 					};
-					const grp = personGroupMap.get(p.id);
-					if (grp) row['그룹'] = grp;
 					return row;
 				});
 				console.table(peopleTable);
@@ -768,10 +776,11 @@ function resetAll() {
 		console.log(`초기화: 기존 제약 ${converted}개가 보류 제약으로 변환되어 유지됩니다.`);
 		safeOpenForbiddenWindow();
 	}
-	// 참가자 및 그룹 목록 초기화(보류 제약은 유지)
-	state.people = [];
+	// 참가자를 삭제하지 않고 모두 미사용 상태로 변경
+	state.people.forEach(p => {
+		p.enabled = false;
+	});
 	state.requiredGroups = [];
-	state.nextId = 1;
 	state.forbiddenPairs = []; // id 기반 제약 초기화(보류로 전환됨)
 	state.forbiddenMap = {};
 	elements.resultsSection.classList.remove('visible');
@@ -901,26 +910,26 @@ function addPerson() {
 			const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
 			if (names.length === 0) return;
 
-			// 기존 참가자와의 중복 체크
-			const groupDuplicates = [];
-			names.forEach(name => {
-				const normalized = normalizeName(name);
-				const exists = state.people.some(p => normalizeName(p.name) === normalized);
-				if (exists) groupDuplicates.push(name);
-			});
+		// 사용 중인 참가자와의 중복 체크
+		const groupDuplicates = [];
+		names.forEach(name => {
+			const normalized = normalizeName(name);
+			const exists = state.people.some(p => normalizeName(p.name) === normalized && p.enabled !== false);
+			if (exists) groupDuplicates.push(name);
+		});
 
-			// 중복된 이름이 있으면 기록
-			if (groupDuplicates.length > 0) duplicateHits.push(...groupDuplicates);
+		// 중복된 이름이 있으면 기록
+		if (groupDuplicates.length > 0) duplicateHits.push(...groupDuplicates);
 
-			// 등록 대기 데이터에 추가
-			pendingNamesData.push({ names, hasDuplicates: groupDuplicates.length > 0 });
-			
-			// 모든 입력 이름을 수집 (정규화된 형태)
-			names.forEach(name => {
-				allInputNames.push(normalizeName(name));
-			});
-		}
-	});
+		// 등록 대기 데이터에 추가
+		pendingNamesData.push({ names, hasDuplicates: groupDuplicates.length > 0 });
+		
+		// 모든 입력 이름을 수집 (정규화된 형태)
+		names.forEach(name => {
+			allInputNames.push(normalizeName(name));
+		});
+	}
+});
 
 	// 여러 토큰에 걸친 입력 데이터 내 중복 체크 (예: "하/하")
 	const inputNameCount = {};
@@ -997,18 +1006,21 @@ function addPerson() {
 function processAddPerson(pendingNamesData, groupColorIndices) {
 	let addedAny = false;
 
-	// 0단계: 중복된 이름을 가진 사람들 찾기
+	// 0단계: 중복된 이름을 가진 사용 중인 사람들 찾기
 	const duplicateIds = [];
 	pendingNamesData.forEach(({ names }) => {
 		names.forEach(name => {
 			const normalized = normalizeName(name);
-			const existing = state.people.find(p => normalizeName(p.name) === normalized);
+			const existing = state.people.find(p => normalizeName(p.name) === normalized && p.enabled !== false);
 			if (existing) duplicateIds.push(existing.id);
 		});
 	});
 	
-	// 1단계: 중복된 사람들을 state.people에서 제거
-	state.people = state.people.filter(p => !duplicateIds.includes(p.id));
+	// 1단계: 중복된 사람들을 미사용 상태로 변경 (삭제하지 않음)
+	duplicateIds.forEach(id => {
+		const person = state.people.find(p => p.id === id);
+		if (person) person.enabled = false;
+	});
 	
 	// 2단계: 각 그룹에서 중복된 사람들 제거 (그룹은 유지, 1명 이하가 되면 그룹 해체)
 	state.requiredGroups = state.requiredGroups.map(group => {
@@ -1026,33 +1038,44 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 	});
 	buildForbiddenMap();
 
-	// 4단계: 새 참가자 추가
+	// 4단계: 새 참가자 추가 (미사용 멤버가 있으면 재활용)
 	const newGroupsToAdd = [];
 	
 		pendingNamesData.forEach(({ names }, index) => {
 			const newIds = [];
 				names.forEach(name => {
-					// 기존 기억된 값 무시, 완전 초기값으로 등록
-					let weight = 0;
-					let gender = 'male';
-					if (state.weightBalanceEnabled) {
-						let inputWeight = 0;
-						const weightInputEl = document.getElementById('weightInput');
-						if (weightInputEl) {
-							inputWeight = parseInt(weightInputEl.value);
-							if (isNaN(inputWeight)) inputWeight = 0;
+					const normalized = normalizeName(name);
+					// 미사용 상태의 같은 이름이 있는지 확인
+					const existing = state.people.find(p => normalizeName(p.name) === normalized && p.enabled === false);
+					
+					if (existing) {
+						// 미사용 멤버 재활용: 사용 상태로 변경, 저장된 성별/가중치 유지
+						existing.enabled = true;
+						// 배열에서 제거 후 맨 뒤에 추가 (가장 마지막 순서로 이동)
+						state.people = state.people.filter(p => p.id !== existing.id);
+						state.people.push(existing);
+						newIds.push(existing.id);
+						addedAny = true;
+					} else {
+						// 완전히 새로운 멤버 생성 (또는 사용 중인 멤버가 없는 경우)
+						// 이미 사용 중인 같은 이름이 있는지 확인 (이 경우는 중복이 발생하지 않아야 함)
+						const activeExisting = state.people.find(p => normalizeName(p.name) === normalized && p.enabled !== false);
+						
+						if (!activeExisting) {
+							let weight = state.lastModifiedWeight || 0;
+							let gender = 'male';
+							const person = {
+								id: state.nextId++,
+								name: name,
+								gender: gender,
+								weight: weight,
+								enabled: true
+							};
+							state.people.push(person);
+							newIds.push(person.id);
+							addedAny = true;
 						}
-						weight = Math.max(0, inputWeight);
 					}
-					const person = {
-						id: state.nextId++,
-						name: name,
-						gender: gender,
-						weight: weight
-					};
-					state.people.push(person);
-					newIds.push(person.id);
-					addedAny = true;
 				});
 			if (newIds.length > 1) newGroupsToAdd.push(newIds);
 		});
@@ -1081,20 +1104,57 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 }
 
 function removePerson(id) {
-	state.people = state.people.filter(p => p.id !== id);
+	// 완전 삭제가 아닌 미사용 상태로 변경
+	const person = state.people.find(p => p.id === id);
+	if (!person) return;
+	
+	// 미사용 상태로 변경
+	person.enabled = false;
+	
+	// 그룹에서 제거
 	state.requiredGroups = state.requiredGroups.map(group => group.filter(pid => pid !== id));
 	state.requiredGroups = state.requiredGroups.filter(group => group.length > 1);
-	// 이 사람이 포함된 모든 금지(제약) 쌍 제거
+	
+	// 이 사람이 포함된 모든 금지(제약) 쌍을 보류 제약으로 변환
+	const pairsToConvert = state.forbiddenPairs.filter(([a, b]) => a === id || b === id);
+	pairsToConvert.forEach(([a, b]) => {
+		const pa = state.people.find(p => p.id === a);
+		const pb = state.people.find(p => p.id === b);
+		if (pa && pb) {
+			addPendingConstraint(pa.name, pb.name);
+		}
+	});
+	
+	// 제약 쌍에서 제거
 	const before = state.forbiddenPairs.length;
 	state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => a !== id && b !== id);
 	const after = state.forbiddenPairs.length;
 	if (before !== after) {
-		console.log(`제약 제거: 삭제된 사람(id:${id})과 관련된 제약 ${before - after}개가 제거되었습니다.`);
-		safeOpenForbiddenWindow();
+		console.log(`미사용 처리: ${person.name}과 관련된 제약 ${before - after}개가 보류 제약으로 변환되었습니다.`);
 	}
+	
 	buildForbiddenMap();
+	sortPeopleByActiveStatus();
 	saveToLocalStorage();
 	renderPeople();
+}
+
+// 멤버 배열을 사용/미사용 순으로 분리 (기존 순서 유지)
+function sortPeopleByActiveStatus() {
+	// 사용 중인 멤버와 미사용 멤버를 분리
+	const activePeople = [];
+	const inactivePeople = [];
+	
+	state.people.forEach(p => {
+		if (p.enabled !== false) {
+			activePeople.push(p);
+		} else {
+			inactivePeople.push(p);
+		}
+	});
+	
+	// 사용 -> 미사용 순으로 결합 (각 그룹 내에서는 기존 순서 유지)
+	state.people = [...activePeople, ...inactivePeople];
 }
 
 function updatePersonGender(id, gender) {
@@ -1109,7 +1169,9 @@ function updatePersonGender(id, gender) {
 function updatePersonWeight(id, weight) {
 	const person = state.people.find(p => p.id === id);
 	if (person) {
-		person.weight = parseInt(weight) || 0;
+		const newWeight = parseInt(weight) || 0;
+		person.weight = newWeight;
+		state.lastModifiedWeight = newWeight; // 마지막으로 수정한 가중치 저장
 		saveToLocalStorage();
 		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	}
@@ -1610,6 +1672,23 @@ function createPersonTag(person, potentialDuplicates = []) {
 		weightInput.addEventListener('input', (e) => {
 			updatePersonWeight(person.id, e.target.value);
 		});
+		weightInput.addEventListener('blur', (e) => {
+			let value = e.target.value.trim();
+			// 빈 값이면 0으로 설정
+			if (value === '' || value === null || value === undefined) {
+				value = '0';
+			} else {
+				// 숫자로 변환 (01 → 1)
+				const numValue = parseInt(value, 10);
+				if (!isNaN(numValue)) {
+					value = String(numValue);
+				} else {
+					value = '0';
+				}
+			}
+			e.target.value = value;
+			updatePersonWeight(person.id, value);
+		});
 		personTag.appendChild(weightInput);
 	}
 	
@@ -1626,7 +1705,7 @@ function createPersonTag(person, potentialDuplicates = []) {
 function updateParticipantCount() {
 	if (!elements.participantCount) return;
 
-	const count = state.people.length;
+	const count = state.people.filter(p => p.enabled !== false).length;
 	elements.participantCount.textContent = count;
 
 	const em = elements.participantCount.closest('em');
@@ -1678,14 +1757,20 @@ function printParticipantConsole() {
 			}
 		});
 
-		const peopleTable = displaySeq.map(p => {
+		// 사용/미사용 순서로 재정렬
+		const activeSeq = displaySeq.filter(p => p.enabled !== false);
+		const inactiveSeq = displaySeq.filter(p => p.enabled === false);
+		const sortedSeq = [...activeSeq, ...inactiveSeq];
+
+		const peopleTable = sortedSeq.map(p => {
+			const grp = personGroupMap.get(p.id);
 			const row = {
 				'이름': p.name,
 				'성별': p.gender === 'male' ? '♂️' : '♀️',
-				'가중치': typeof p.weight !== 'undefined' ? p.weight : 0
+				'가중치': typeof p.weight !== 'undefined' ? p.weight : 0,
+				'그룹': grp || '',
+				'상태': p.enabled === false ? '미사용' : '사용'
 			};
-			const grp = personGroupMap.get(p.id);
-			if (grp) row['그룹'] = grp;
 			return row;
 		});
 
@@ -1743,10 +1828,10 @@ function renderPeople() {
 	});
 
 	
-	// people 배열 순서대로 표시하되, 그룹 시작 시점에 그룹 전체를 한 번에 표시
+	// people 배열 순서대로 표시하되, 사용 중인 멤버만 표시, 그룹 시작 시점에 그룹 전체를 한 번에 표시
 	const processedGroups = new Set();
 	
-	state.people.forEach(person => {
+	state.people.filter(p => p.enabled !== false).forEach(person => {
 		const groupIndex = groupMap.get(person.id);
 		
 		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
@@ -1793,8 +1878,8 @@ function getPotentialDuplicatesFromInput() {
 		const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
 		names.forEach(name => {
 			const normalized = normalizeName(name);
-			// 현재 참가자 중 이 이름이 있는지 확인
-			const exists = state.people.some(p => normalizeName(p.name) === normalized);
+			// 현재 사용 중인 참가자 중 이 이름이 있는지 확인
+			const exists = state.people.some(p => normalizeName(p.name) === normalized && p.enabled !== false);
 			if (exists) {
 				duplicateNames.push(normalized);
 			}
@@ -1805,12 +1890,13 @@ function getPotentialDuplicatesFromInput() {
 }
 
 function shuffleTeams() {
-	if (state.people.length === 0) {
+	const activePeople = state.people.filter(p => p.enabled !== false);
+	if (activePeople.length === 0) {
 		showError('참가자를 추가해주세요.');
 		return;
 	}
 
-	const validPeople = state.people.filter(p => p.name.trim() !== '');
+	const validPeople = activePeople.filter(p => p.name.trim() !== '');
 	if (validPeople.length === 0) {
 		showError('최소 1명 이상의 이름을 입력해주세요.');
 		return;
@@ -1914,48 +2000,167 @@ function generateTeams(people) {
 			group.every(id => people.some(p => p.id === id))
 		);
 
-		// 가중치 균등이 활성화된 경우 그룹을 가중치 순으로 정렬 (높은 순)
-		let processGroups;
+		// 가중치 균등이 활성화된 경우: 지그재그 방식으로 배치
 		if (state.weightBalanceEnabled) {
-			// 각 그룹의 평균 가중치 계산
-			const groupsWithWeight = validGroups.map(group => {
-				const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
-				const totalWeight = groupMembers.reduce((sum, p) => sum + (p.weight || 0), 0);
-				const avgWeight = groupMembers.length > 0 ? totalWeight / groupMembers.length : 0;
-				return { group, avgWeight };
+			// 1단계: 모든 참가자를 가중치 순으로 정렬 (높은 순)
+			const sortedPeople = [...people].sort((a, b) => (b.weight || 0) - (a.weight || 0));
+			
+			// 2단계: 그룹 멤버 표시
+			const groupMemberIds = new Set();
+			validGroups.forEach(group => {
+				group.forEach(id => groupMemberIds.add(id));
 			});
-			// 가중치 내림차순 정렬
-			groupsWithWeight.sort((a, b) => b.avgWeight - a.avgWeight);
-			processGroups = groupsWithWeight.map(g => g.group);
+			
+			// 3단계: 개인 참가자만 필터링 (그룹에 속하지 않은 사람)
+			const individualPeople = sortedPeople.filter(p => !groupMemberIds.has(p.id));
+			
+			// 4단계: 그룹들을 총 가중치 순으로 정렬 (높은 순)
+			const sortedGroups = validGroups.map(group => {
+				const members = group.map(id => people.find(p => p.id === id)).filter(Boolean);
+				const totalWeight = members.reduce((sum, p) => sum + (p.weight || 0), 0);
+				return { group, members, totalWeight, size: members.length };
+			}).sort((a, b) => b.totalWeight - a.totalWeight);
+			
+			// 5단계: 개인과 그룹을 동적으로 배치
+			const remainingGroups = [...sortedGroups];
+			const remainingIndividuals = [...individualPeople];
+			let teamIndex = 0;
+			let direction = 1;
+			
+			while (remainingGroups.length > 0 || remainingIndividuals.length > 0) {
+				// 전체 팀의 남은 공간 계산
+				const totalCapacity = teams.reduce((sum, team, idx) => {
+					if (state.maxTeamSizeEnabled && idx < teamCount - 1) {
+						return sum + Math.max(0, state.membersPerTeam - team.length);
+					} else if (!state.maxTeamSizeEnabled) {
+						return sum + Math.max(0, state.membersPerTeam - team.length);
+					} else {
+						// 마지막 팀은 무제한
+						return sum + 1000;
+					}
+				}, 0);
+				
+				// 배치되지 않은 그룹 중 가장 큰 그룹의 크기
+				const largestGroupSize = remainingGroups.length > 0 
+					? Math.max(...remainingGroups.map(g => g.size))
+					: 0;
+				
+				// 남은 공간이 가장 큰 그룹과 같거나 작으면 그룹을 우선 배치
+				let shouldPlaceGroup = false;
+				if (remainingGroups.length > 0 && totalCapacity <= largestGroupSize) {
+					shouldPlaceGroup = true;
+				} else if (remainingGroups.length > 0 && remainingIndividuals.length === 0) {
+					shouldPlaceGroup = true;
+				} else if (remainingGroups.length > 0 && remainingIndividuals.length > 0) {
+					// 랜덤으로 그룹 또는 개인 선택 (50% 확률)
+					shouldPlaceGroup = Math.random() < 0.5;
+				}
+				
+				if (shouldPlaceGroup && remainingGroups.length > 0) {
+					// 그룹 배치
+					const { members } = remainingGroups.shift();
+					
+					// 현재 각 팀의 가중치 계산하여 가장 낮은 팀에 배치
+					const teamWeights = teams.map((team, idx) => ({
+						idx,
+						weight: team.reduce((sum, p) => sum + (p.weight || 0), 0),
+						size: team.length
+					})).sort((a, b) => a.weight - b.weight);
+					
+					let placed = false;
+					for (const { idx: tryTeam } of teamWeights) {
+						// 인원 수 제약
+						if (state.maxTeamSizeEnabled && tryTeam < teamCount - 1 && teams[tryTeam].length + members.length > state.membersPerTeam) continue;
+						if (!state.maxTeamSizeEnabled && teams[tryTeam].length + members.length > state.membersPerTeam) continue;
+						
+						// 충돌(금지 제약) 확인
+						let hasConflict = false;
+						for (const gm of members) {
+							if (teams[tryTeam].some(tm => isForbidden(gm.id, tm.id))) {
+								hasConflict = true;
+								break;
+							}
+						}
+						if (hasConflict) continue;
+						
+						// 성별 균형 확인
+						if (state.genderBalanceEnabled) {
+							const currentMinGender = isFemaleLess ? teams[tryTeam].filter(p => p.gender === 'female').length : teams[tryTeam].filter(p => p.gender === 'male').length;
+							const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
+							const globalMinGender = Math.min(...allTeamMinGenders);
+							if (currentMinGender > globalMinGender) continue;
+						}
+						
+						teams[tryTeam].push(...members);
+						members.forEach(m => assigned.add(m.id));
+						placed = true;
+						break;
+					}
+					
+					if (!placed) break; // 그룹 배치 실패
+					
+				} else if (remainingIndividuals.length > 0) {
+					// 개인 배치 (지그재그)
+					const person = remainingIndividuals.shift();
+					
+					let placed = false;
+					for (let offset = 0; offset < teamCount; offset++) {
+						const tryTeam = (teamIndex + offset) % teamCount;
+						
+						// 인원 수 제약
+						if (state.maxTeamSizeEnabled && tryTeam < teamCount - 1 && teams[tryTeam].length >= state.membersPerTeam) continue;
+						if (!state.maxTeamSizeEnabled && teams[tryTeam].length >= state.membersPerTeam) continue;
+						
+						// 충돌(금지 제약) 확인
+						if (teams[tryTeam].some(tm => isForbidden(tm.id, person.id))) continue;
+						
+						// 성별 균형 확인
+						if (state.genderBalanceEnabled) {
+							const personMinGender = ((isFemaleLess && person.gender === 'female') || (!isFemaleLess && person.gender === 'male')) ? 1 : 0;
+							if (personMinGender === 1) {
+								const currentMinGender = isFemaleLess ? teams[tryTeam].filter(p => p.gender === 'female').length : teams[tryTeam].filter(p => p.gender === 'male').length;
+								const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
+								const globalMinGender = Math.min(...allTeamMinGenders);
+								if (currentMinGender > globalMinGender) continue;
+							}
+						}
+						
+						teams[tryTeam].push(person);
+						assigned.add(person.id);
+						placed = true;
+						break;
+					}
+					
+					if (!placed) break; // 배치 실패
+					
+					// 지그재그: 끝에 도달하면 방향 전환
+					teamIndex += direction;
+					if (teamIndex >= teamCount) {
+						teamIndex = teamCount - 1;
+						direction = -1;
+					} else if (teamIndex < 0) {
+						teamIndex = 0;
+						direction = 1;
+					}
+				} else {
+					break; // 더 이상 배치할 것이 없음
+				}
+			}
+			
+			// 모든 사람이 배치되었는지 확인
+			if (assigned.size !== people.length) continue;
+			
 		} else {
-			// 가중치 균등이 없으면 셔플
-			processGroups = [...validGroups].sort(() => Math.random() - 0.5);
-		}
+			// 가중치 균등이 비활성화된 경우: 기존 로직 사용
+			let processGroups = [...validGroups].sort(() => Math.random() - 0.5);
 		
 		let groupFailed = false;
 
 		for (const group of processGroups) {
 			const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
 			
-			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
-			let teamOrder;
-			if (state.weightBalanceEnabled) {
-				// 팀을 현재 가중치 기준 오름차순 정렬 (낮은 가중치 팀부터)
-				teamOrder = teams.map((team, idx) => ({
-					idx,
-					weight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
-				})).sort((a, b) => {
-					if (a.weight !== b.weight) return a.weight - b.weight;
-					// 가중치가 같으면 최대인원 모드에서는 인덱스 작은 팀 우선
-					if (state.maxTeamSizeEnabled) return a.idx - b.idx;
-					return 0;
-				}).map(t => t.idx);
-				// 최대인원 모드일 때는 마지막 팀을 우선순위 맨 뒤로 보냄 (중복 로직을 헬퍼로 대체)
-				pushLastTeamToEndIfNeeded(teamOrder, teams);
-			} else {
-				// 가중치 균등이 없으면 랜덤 순서
-				teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
-			}
+			// 랜덤 순서로 팀 선택
+			const teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
 			
 			let selectedTeam = -1;
 			
@@ -2005,36 +2210,18 @@ function generateTeams(people) {
 		// 개별 참가자 배치
 		const unassignedPeople = people.filter(p => !assigned.has(p.id));
 		
-		// 가중치 균등이 활성화된 경우 가중치 순으로 정렬 (높은 순)
-		if (state.weightBalanceEnabled) {
-			unassignedPeople.sort((a, b) => (b.weight || 0) - (a.weight || 0));
-		}
-		
 		let personFailed = false;
 
 		for (const person of unassignedPeople) {
 			const personMinGender = ((isFemaleLess && person.gender === 'female') || (!isFemaleLess && person.gender === 'male')) ? 1 : 0;
 			
-			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
+			// 팀 순서 결정
 			let teamOrder;
-			if (state.weightBalanceEnabled) {
-				// 팀을 현재 가중치 기준 오름차순 정렬 (낮은 가중치 팀부터)
-				teamOrder = teams.map((team, idx) => ({
-					idx,
-					weight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
-				})).sort((a, b) => {
-					if (a.weight !== b.weight) return a.weight - b.weight;
-					// 가중치가 같으면 최대인원 모드에서는 인덱스 작은 팀 우선
-					if (state.maxTeamSizeEnabled) return a.idx - b.idx;
-					return 0;
-				}).map(t => t.idx);
-				// 최대인원 모드일 때는 마지막 팀을 우선순위 맨 뒤로 보냄
-				pushLastTeamToEndIfNeeded(teamOrder, teams);
-			} else if (state.maxTeamSizeEnabled) {
-				// 최대인원 모드 + 가중치 균등 없음: 인덱스 순서
+			if (state.maxTeamSizeEnabled) {
+				// 최대인원 모드: 인덱스 순서
 				teamOrder = teams.map((_, idx) => idx);
 			} else {
-				// 일반 모드 + 가중치 균등 없음: 2 유닛 우선 로직
+				// 일반 모드: 2 유닛 우선 로직
 				const teamUnits = teams.map((team, idx) => {
 					const groupSet = new Set();
 					let ungroupedCount = 0;
@@ -2095,7 +2282,8 @@ function generateTeams(people) {
 		}
 
 		if (personFailed) continue;
-
+		}
+		
 		// 검증: 충돌 없음 및 팀당 최소 2개의 유닛 확보
 		if (conflictExists(teams)) continue;
 		
