@@ -1907,11 +1907,13 @@ function generateTeams(people) {
 	const isFemaleLess = femaleCount < maleCount;
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		// 각 시도마다 people 배열을 랜덤하게 셔플하여 독립적인 시도 보장
+		const shuffledPeople = [...people].sort(() => Math.random() - 0.5);
 		const teams = Array.from({ length: teamCount }, () => []);
 		const assigned = new Set();
 
 		const validGroups = state.requiredGroups.filter(group => 
-			group.every(id => people.some(p => p.id === id))
+			group.every(id => shuffledPeople.some(p => p.id === id))
 		);
 
 		// 가중치 균등이 활성화된 경우 그룹을 가중치 순으로 정렬 (높은 순)
@@ -1919,7 +1921,7 @@ function generateTeams(people) {
 		if (state.weightBalanceEnabled) {
 			// 각 그룹의 평균 가중치 계산
 			const groupsWithWeight = validGroups.map(group => {
-				const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
+				const groupMembers = group.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
 				const totalWeight = groupMembers.reduce((sum, p) => sum + (p.weight || 0), 0);
 				const avgWeight = groupMembers.length > 0 ? totalWeight / groupMembers.length : 0;
 				return { group, avgWeight };
@@ -1935,7 +1937,7 @@ function generateTeams(people) {
 		let groupFailed = false;
 
 		for (const group of processGroups) {
-			const groupMembers = group.map(id => people.find(p => p.id === id)).filter(Boolean);
+			const groupMembers = group.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
 			
 			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
 			let teamOrder;
@@ -2002,8 +2004,8 @@ function generateTeams(people) {
 
 		if (groupFailed) continue;
 
-		// 개별 참가자 배치
-		const unassignedPeople = people.filter(p => !assigned.has(p.id));
+		// 개별 참가자 배치 - shuffledPeople 사용으로 매 시도마다 다른 순서 보장
+		const unassignedPeople = shuffledPeople.filter(p => !assigned.has(p.id));
 		
 		// 가중치 균등이 활성화된 경우 가중치 순으로 정렬 (높은 순)
 		if (state.weightBalanceEnabled) {
