@@ -2183,7 +2183,63 @@ function generateTeams(people) {
 			}
 		}
 		
-		return teams;
+		// 결과 반환 전 셔플: 팀 순서 + 각 팀 내 블럭 순서
+		// 1. 최대인원 모드인 경우 마지막 팀(나머지 팀)을 분리
+		let lastTeamForShuffle = null;
+		let teamsToShuffle = teams;
+		if (state.maxTeamSizeEnabled && teams.length > 1) {
+			const lastIdx = teams.length - 1;
+			// 마지막 팀이 나머지 팀인지 확인 (인원이 기준보다 적은 경우)
+			if (teams[lastIdx].length < state.membersPerTeam) {
+				lastTeamForShuffle = teams[lastIdx];
+				teamsToShuffle = teams.slice(0, lastIdx);
+			}
+		}
+		
+		// 2. 팀 순서 셔플 (Fisher-Yates)
+		for (let i = teamsToShuffle.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[teamsToShuffle[i], teamsToShuffle[j]] = [teamsToShuffle[j], teamsToShuffle[i]];
+		}
+		
+		// 3. 각 팀 내에서 블럭 단위로 셔플 (개인은 그대로, 그룹만 셔플)
+		const allTeamsIncludingLast = lastTeamForShuffle ? [...teamsToShuffle, lastTeamForShuffle] : teamsToShuffle;
+		for (const team of allTeamsIncludingLast) {
+			// 팀 멤버를 블럭 단위로 분해
+			const blocks = [];
+			const processed = new Set();
+			
+			for (const person of team) {
+				if (processed.has(person.id)) continue;
+				
+				const gi = getPersonGroupIndex(person.id);
+				if (gi === -1) {
+					// 개인: 단일 블럭
+					blocks.push([person]);
+					processed.add(person.id);
+				} else {
+					// 그룹: 같은 그룹의 모든 멤버를 하나의 블럭으로
+					const groupBlock = team.filter(p => {
+						const pgi = getPersonGroupIndex(p.id);
+						return pgi === gi;
+					});
+					groupBlock.forEach(p => processed.add(p.id));
+					blocks.push(groupBlock);
+				}
+			}
+			
+			// 블럭 순서 셔플 (Fisher-Yates)
+			for (let i = blocks.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+			}
+			
+			// 팀 재구성
+			team.length = 0;
+			blocks.forEach(block => team.push(...block));
+		}
+		
+		return allTeamsIncludingLast;
 	}
 
 	showError('제약 조건으로 팀 배치가 불가능합니다. 제약을 검토해주세요.');
