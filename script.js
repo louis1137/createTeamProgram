@@ -1901,10 +1901,14 @@ function generateTeams(people) {
 	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
 	const maxAttempts = 500;
 
-	// 전체 참가자에서 최소 성별 수 계산
+	// 전체 참가자에서 최소 성별(소수 성별) 계산
 	const maleCount = people.filter(p => p.gender === 'male').length;
 	const femaleCount = people.filter(p => p.gender === 'female').length;
-	const isFemaleLess = femaleCount < maleCount;
+	const minorityGender = maleCount === femaleCount ? null : (femaleCount < maleCount ? 'female' : 'male');
+	const getTeamMinorityCount = (team) => {
+		if (!minorityGender) return 0;
+		return team.filter(p => p.gender === minorityGender).length;
+	};
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
 		// 각 시도마다 people 배열을 랜덤하게 셔플하여 독립적인 시도 보장
@@ -1984,9 +1988,9 @@ function generateTeams(people) {
 				if (hasConflict) continue;
 				
 				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
-				if (state.genderBalanceEnabled) {
-					const currentMinGender = isFemaleLess ? teams[i].filter(p => p.gender === 'female').length : teams[i].filter(p => p.gender === 'male').length;
-					const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
+				if (state.genderBalanceEnabled && minorityGender) {
+					const currentMinGender = getTeamMinorityCount(teams[i]);
+					const allTeamMinGenders = teams.map(getTeamMinorityCount);
 					const globalMinGender = Math.min(...allTeamMinGenders);
 					if (currentMinGender > globalMinGender) continue;
 				}
@@ -2010,15 +2014,36 @@ function generateTeams(people) {
 		// 개별 참가자 배치 - shuffledPeople 사용으로 매 시도마다 다른 순서 보장
 		const unassignedPeople = shuffledPeople.filter(p => !assigned.has(p.id));
 		
-		// 가중치 균등이 활성화된 경우 가중치 순으로 정렬 (높은 순)
+		// 가중치 균등이 활성화된 경우: 가중치별로 그룹화 후 각 그룹 내에서 랜덤
 		if (state.weightBalanceEnabled) {
-			unassignedPeople.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+			// 1. 가중치별로 그룹화
+			const weightGroups = new Map();
+			unassignedPeople.forEach(p => {
+				const w = p.weight || 0;
+				if (!weightGroups.has(w)) weightGroups.set(w, []);
+				weightGroups.get(w).push(p);
+			});
+			
+			// 2. 각 가중치 그룹 내에서 랜덤 셔플
+			weightGroups.forEach(group => {
+				for (let i = group.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[group[i], group[j]] = [group[j], group[i]];
+				}
+			});
+			
+			// 3. 가중치 높은 순으로 재구성
+			const sortedWeights = Array.from(weightGroups.keys()).sort((a, b) => b - a);
+			unassignedPeople.length = 0;
+			sortedWeights.forEach(w => {
+				unassignedPeople.push(...weightGroups.get(w));
+			});
 		}
 		
 		let personFailed = false;
 
 		for (const person of unassignedPeople) {
-			const personMinGender = ((isFemaleLess && person.gender === 'female') || (!isFemaleLess && person.gender === 'male')) ? 1 : 0;
+			const isMinorityPerson = minorityGender && person.gender === minorityGender;
 			
 			// 팀 순서 결정: 최대인원 모드, 일반 모드 + 가중치, 일반 모드 구분
 			let teamOrder;
@@ -2026,16 +2051,16 @@ function generateTeams(people) {
 				// 최대인원 모드: 인덱스 순서
 				teamOrder = teams.map((_, idx) => idx);
 			} else if (state.weightBalanceEnabled) {
-				// 일반 모드 + 가중치: 인원 수 균등 우선, 같으면 가중치 낮은 순
+				// 가중치 균등 모드: 가중치 낮은 순 우선, 같으면 인원 수 작은 순
 				teamOrder = teams.map((team, idx) => ({
 					idx,
 					size: team.length,
 					weight: calcTeamWeight(team)
 				})).sort((a, b) => {
-					// 1. 팀 크기 작은 순 (인원 균등 분배 우선)
-					if (a.size !== b.size) return a.size - b.size;
-					// 2. 크기 같으면 가중치 낮은 순
+					// 1. 가중치 낮은 순 (가중치 균등 우선)
 					if (a.weight !== b.weight) return a.weight - b.weight;
+					// 2. 가중치 같으면 팀 크기 작은 순
+					if (a.size !== b.size) return a.size - b.size;
 					return a.idx - b.idx;
 				}).map(t => t.idx);
 			} else {
@@ -2064,12 +2089,13 @@ function generateTeams(people) {
 			
 			let selectedTeam = -1;
 			
-			// 가중치 낮은 팀부터 조건 확인
+			// 우선순위 팀부터 조건 확인
 			for (const i of teamOrder) {
 				// 체크 1: 인원 수 제약
 				if (state.maxTeamSizeEnabled) {
 					if (i < teams.length - 1 && teams[i].length >= state.membersPerTeam) continue;
 				} else {
+					// 일반 모드: 최대 인원만 체크 (가중치 균등 시에도 동일)
 					if (teams[i].length >= state.membersPerTeam) continue;
 				}
 				
@@ -2077,10 +2103,10 @@ function generateTeams(people) {
 				if (teams[i].some(tm => isForbidden(tm.id, person.id))) continue;
 				
 				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
-				if (state.genderBalanceEnabled && personMinGender === 1) {
-					const currentMinGender = isFemaleLess ? teams[i].filter(p => p.gender === 'female').length : teams[i].filter(p => p.gender === 'male').length;
-
-					const allTeamMinGenders = teams.map(t => isFemaleLess ? t.filter(p => p.gender === 'female').length : t.filter(p => p.gender === 'male').length);
+				// 가중치 균등 모드에서는 가중치 우선, 성별 균형은 참고만
+				if (state.genderBalanceEnabled && isMinorityPerson && !state.weightBalanceEnabled) {
+					const currentMinGender = getTeamMinorityCount(teams[i]);
+					const allTeamMinGenders = teams.map(getTeamMinorityCount);
 					const globalMinGender = Math.min(...allTeamMinGenders);
 					
 					if (currentMinGender > globalMinGender) continue;
