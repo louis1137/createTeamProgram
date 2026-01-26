@@ -1985,7 +1985,7 @@ function generateTeams(people) {
 
 	// 팀 수 계산 (총인원 / 팀당인원)의 올림 — 모드에 관계없이 동일 계산
 	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
-	const maxAttempts = 5;
+	const maxAttempts = 1;
 
 	// 전체 참가자에서 최소 성별 수 계산
 	const maleCount = people.filter(p => p.gender === 'male').length;
@@ -2083,7 +2083,9 @@ function generateTeams(people) {
 						}
 						if (hasConflict) continue;
 						
-
+						teams[tryTeam].push(...members);
+						members.forEach(m => assigned.add(m.id));
+						placed = true;
 						break;
 					}
 					
@@ -2104,7 +2106,9 @@ function generateTeams(people) {
 						// 충돌(금지 제약) 확인
 						if (teams[tryTeam].some(tm => isForbidden(tm.id, person.id))) continue;
 						
-
+						teams[tryTeam].push(person);
+						assigned.add(person.id);
+						placed = true;
 						break;
 					}
 					
