@@ -2329,14 +2329,44 @@ function generateTeams(people) {
 			}
 		}
 	}
+	
+	// 팀 인원수와 정확히 일치하는 그룹들을 미리 분리
+	const completeTeamGroups = []; // 완성된 팀으로 사용할 그룹들
+	const validGroups = state.requiredGroups.filter(group => 
+		group.every(id => people.some(p => p.id === id))
+	);
+	
+	const regularGroups = []; // 일반 그룹들
+	const completeTeamMemberIds = new Set(); // 완성된 팀에 속한 멤버 ID들
+	
+	validGroups.forEach(group => {
+		if (group.length === state.membersPerTeam) {
+			completeTeamGroups.push(group);
+			group.forEach(id => completeTeamMemberIds.add(id));
+		} else {
+			regularGroups.push(group);
+		}
+	});
+	
+	// 완성된 팀 그룹에 속하지 않은 사람들만 필터링
+	const remainingPeople = people.filter(p => !completeTeamMemberIds.has(p.id));
 
-	// 팀 수 계산 (총인원 / 팀당인원)의 올림 — 모드에 관계없이 동일 계산
-	const teamCount = Math.max(1, Math.ceil(people.length / state.membersPerTeam));
+	// 팀 수 계산 (완성된 팀 + 나머지 인원으로 만들 팀)
+	const additionalTeamCount = remainingPeople.length > 0 
+		? Math.max(1, Math.ceil(remainingPeople.length / state.membersPerTeam))
+		: 0;
+	const totalTeamCount = completeTeamGroups.length + additionalTeamCount;
+	
+	if (totalTeamCount === 0) {
+		showError('팀을 구성할 수 없습니다.');
+		return null;
+	}
+	
 	const maxAttempts = 500;
 
-	// 전체 참가자에서 최소 성별(소수 성별) 계산
-	const maleCount = people.filter(p => p.gender === 'male').length;
-	const femaleCount = people.filter(p => p.gender === 'female').length;
+	// 나머지 참가자에서 최소 성별(소수 성별) 계산
+	const maleCount = remainingPeople.filter(p => p.gender === 'male').length;
+	const femaleCount = remainingPeople.filter(p => p.gender === 'female').length;
 	const minorityGender = maleCount === femaleCount ? null : (femaleCount < maleCount ? 'female' : 'male');
 	const getTeamMinorityCount = (team) => {
 		if (!minorityGender) return 0;
@@ -2344,23 +2374,21 @@ function generateTeams(people) {
 	};
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
-		// 각 시도마다 people 배열을 랜덤하게 셔플하여 독립적인 시도 보장
-		const shuffledPeople = [...people].sort(() => Math.random() - 0.5);
-		const teams = Array.from({ length: teamCount }, () => []);
+		// 나머지 사람들만 셔플
+		const shuffledPeople = [...remainingPeople].sort(() => Math.random() - 0.5);
+		// 나머지 사람들로 만들 팀들만 생성
+		const teams = Array.from({ length: additionalTeamCount }, () => []);
 		const assigned = new Set();
 		
 		// 헬퍼 함수: 팀의 총 가중치 계산
 		const calcTeamWeight = (team) => team.reduce((sum, p) => sum + (p.weight || 0), 0);
 
-		const validGroups = state.requiredGroups.filter(group => 
-			group.every(id => shuffledPeople.some(p => p.id === id))
-		);
-
+		// 일반 그룹들만 처리 (regularGroups 사용)
 		// 가중치 균등이 활성화된 경우 그룹을 가중치 순으로 정렬 (높은 순)
 		let processGroups;
 		if (state.weightBalanceEnabled) {
 			// 각 그룹의 평균 가중치 계산
-			const groupsWithWeight = validGroups.map(group => {
+			const groupsWithWeight = regularGroups.map(group => {
 				const groupMembers = group.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
 				const totalWeight = groupMembers.reduce((sum, p) => sum + (p.weight || 0), 0);
 				const avgWeight = groupMembers.length > 0 ? totalWeight / groupMembers.length : 0;
@@ -2371,7 +2399,7 @@ function generateTeams(people) {
 			processGroups = groupsWithWeight.map(g => g.group);
 		} else {
 			// 가중치 균등이 없으면 셔플
-			processGroups = [...validGroups].sort(() => Math.random() - 0.5);
+			processGroups = [...regularGroups].sort(() => Math.random() - 0.5);
 		}
 		
 		let groupFailed = false;
@@ -2670,6 +2698,32 @@ function generateTeams(people) {
 			// 팀 재구성
 			team.length = 0;
 			blocks.forEach(block => team.push(...block));
+		}
+		
+		// 4. 완성된 팀 그룹들을 랜덤 위치에 끼워넣기
+		if (completeTeamGroups.length > 0) {
+			// 완성된 팀들을 person 객체 배열로 변환하고 내부 팀원 순서 셔플
+			const completeTeams = completeTeamGroups.map(group => {
+				const team = group.map(id => people.find(p => p.id === id)).filter(Boolean);
+				// 팀원 순서 셔플 (Fisher-Yates)
+				for (let i = team.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[team[i], team[j]] = [team[j], team[i]];
+				}
+				return team;
+			});
+			
+			// 완성된 팀들을 랜덤하게 섞기
+			for (let i = completeTeams.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[completeTeams[i], completeTeams[j]] = [completeTeams[j], completeTeams[i]];
+			}
+			
+			// 완성된 팀들을 기존 팀 사이에 랜덤하게 끼워넣기
+			completeTeams.forEach(completeTeam => {
+				const insertPosition = Math.floor(Math.random() * (allTeamsIncludingLast.length + 1));
+				allTeamsIncludingLast.splice(insertPosition, 0, completeTeam);
+			});
 		}
 		
 		return allTeamsIncludingLast;
@@ -3276,14 +3330,6 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 // 색상 맵 생성 함수 (전/후 화면에서 공유)
 function createColorMapForComparison(beforeTeams, afterTeams) {
 	const changedMemberColors = new Map();
-	const highlightColors = [
-		{ bg: '#fef3c7', border: '#fbbf24' }, // 노란색
-		{ bg: '#ddd6fe', border: '#a78bfa' }, // 보라색
-		{ bg: '#fecaca', border: '#f87171' }, // 빨간색
-		{ bg: '#a7f3d0', border: '#34d399' }, // 초록색
-		{ bg: '#bfdbfe', border: '#60a5fa' }, // 파란색
-		{ bg: '#fecdd3', border: '#fb7185' }, // 핑크색
-	];
 	
 	const beforeMembers = beforeTeams.map(team => new Set(team.map(p => p.id)));
 	const afterMembers = afterTeams.map(team => new Set(team.map(p => p.id)));
@@ -3302,9 +3348,13 @@ function createColorMapForComparison(beforeTeams, afterTeams) {
 	// ID로 정렬하여 일관된 색상 할당
 	const changedMembers = Array.from(changedMembersSet).sort((a, b) => a - b);
 	
-	// 각 변경된 멤버에게 고유한 색상 할당
+	// 각 변경된 멤버에게 groupColors에서 색상 할당 (파스텔 톤으로 투명도 추가)
 	changedMembers.forEach((personId, index) => {
-		changedMemberColors.set(personId, highlightColors[index % highlightColors.length]);
+		const colorIndex = index % state.groupColors.length;
+		const baseColor = state.groupColors[colorIndex];
+		// 핵사코드에 투명도 추가 (40 = 약 25% 불투명도로 파스텔 톤)
+		const pastelColor = baseColor + '40';
+		changedMemberColors.set(personId, pastelColor);
 	});
 	
 	return changedMemberColors;
@@ -3351,12 +3401,6 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 		}
 		headerText += ')';
 		
-		// 성비 블록 정보 추가
-		if (state.genderBalanceEnabled) {
-			const blockInfo = getTeamGenderBlockInfo(team);
-			headerText += ` [블록: ${blockInfo.totalBlocks}개]`;
-		}
-		
 		teamHeader.textContent = headerText;
 		teamCard.appendChild(teamHeader);
 		
@@ -3388,10 +3432,10 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 			
 			li.style.cssText = `
 				padding: 8px 12px;
-				background: ${isChanged && highlightColor ? highlightColor.bg : '#f8fafc'};
+				background: ${isChanged && highlightColor ? highlightColor : '#f8fafc'};
 				border-radius: 6px;
 				font-size: 14px;
-				${isChanged ? 'font-weight: 600; box-shadow: 0 0 0 2px ' + (highlightColor ? highlightColor.border : '#fbbf24') + ';' : ''}
+				${isChanged ? 'font-weight: 600;' : ''}
 			`;
 			
 			let displayText = person.name;
