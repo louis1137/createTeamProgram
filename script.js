@@ -2,7 +2,7 @@ const teamDisplayDelay = isLocalView() ? 50 : 400;
 const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
 // 검증 비교창 표시 여부 (true: 표시, false: 숨김)
-const SHOW_VALIDATION_COMPARISON = isLocalView() ? false : false;
+const SHOW_VALIDATION_COMPARISON = isLocalView() ? true : false;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
 // 파비콘 애니메이션
@@ -2717,7 +2717,7 @@ async function displayTeams(teams) {
 			if (state.weightBalanceEnabled) {
 				teamCardData.currentWeight += addedWeight;
 				// 0명이 아니면 인원 수 표시
-				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
+				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명/${teamCardData.currentWeight})`;
 			} else {
 				// 0명이 아니면 인원 수 표시
 				title.textContent = `팀 ${pick + 1} (${teamCardData.currentCount}명)`;
@@ -2896,10 +2896,13 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 			width: 100%;
 		`;
 		
+		// 색상 맵 미리 생성 (전/후 화면에서 공유)
+		const colorMap = createColorMapForComparison(beforeTeams, afterTeams);
+		
 		// 전 (Before)
 		const beforeSection = document.createElement('div');
 		beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">조정 전</h3>';
-		const beforeDisplay = createComparisonTeamsDisplay(beforeTeams);
+		const beforeDisplay = createComparisonTeamsDisplay(beforeTeams, afterTeams, colorMap);
 		beforeSection.appendChild(beforeDisplay);
 		
 		// 화살표
@@ -2916,7 +2919,7 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		// 후 (After)
 		const afterSection = document.createElement('div');
 		afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">조정 후</h3>';
-		const afterDisplay = createComparisonTeamsDisplay(afterTeams);
+		const afterDisplay = createComparisonTeamsDisplay(afterTeams, beforeTeams, colorMap);
 		afterSection.appendChild(afterDisplay);
 		
 		comparisonWrapper.appendChild(beforeSection);
@@ -2926,7 +2929,7 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		
 		// 닫기 버튼
 		const closeBtn = document.createElement('button');
-		closeBtn.textContent = '다음 (클릭 또는 스페이스바)';
+		closeBtn.textContent = '다음';
 		closeBtn.style.cssText = `
 			margin: 30px auto 0;
 			padding: 15px 40px;
@@ -2944,21 +2947,11 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		
 		const closeComparison = () => {
 			comparisonContainer.remove();
-			document.removeEventListener('keydown', spaceHandler);
 			resolve();
 		};
 		
 		closeBtn.onclick = closeComparison;
 		comparisonContainer.appendChild(closeBtn);
-		
-		// 스페이스바로도 닫기
-		const spaceHandler = (e) => {
-			if (e.code === 'Space') {
-				e.preventDefault();
-				closeComparison();
-			}
-		};
-		document.addEventListener('keydown', spaceHandler);
 		
 		document.body.appendChild(comparisonContainer);
 	});
@@ -3066,10 +3059,13 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 		width: 100%;
 	`;
 	
+	// 색상 맵 미리 생성 (전/후 화면에서 공유)
+	const colorMap = createColorMapForComparison(beforeTeams, afterTeams);
+	
 	// 전 (Before)
 	const beforeSection = document.createElement('div');
 	beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">검증 전</h3>';
-	const beforeDisplay = createComparisonTeamsDisplay(beforeTeams);
+	const beforeDisplay = createComparisonTeamsDisplay(beforeTeams, afterTeams, colorMap);
 	beforeSection.appendChild(beforeDisplay);
 	
 	// 화살표
@@ -3086,7 +3082,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	// 후 (After)
 	const afterSection = document.createElement('div');
 	afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">검증 후</h3>';
-	const afterDisplay = createComparisonTeamsDisplay(afterTeams);
+	const afterDisplay = createComparisonTeamsDisplay(afterTeams, beforeTeams, colorMap);
 	afterSection.appendChild(afterDisplay);
 	
 	comparisonWrapper.appendChild(beforeSection);
@@ -3096,7 +3092,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	
 	// 닫기 버튼
 	const closeBtn = document.createElement('button');
-	closeBtn.textContent = '확인 (클릭 또는 스페이스바)';
+	closeBtn.textContent = '확인';
 	closeBtn.style.cssText = `
 		margin: 30px auto 0;
 		padding: 15px 40px;
@@ -3114,7 +3110,6 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	
 	const closeComparison = () => {
 		comparisonContainer.remove();
-		document.removeEventListener('keydown', spaceHandler);
 		// 검증된 팀으로 재표시
 		displayTeams(afterTeams);
 	};
@@ -3122,26 +3117,62 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	closeBtn.onclick = closeComparison;
 	comparisonContainer.appendChild(closeBtn);
 	
-	// 스페이스바로도 닫기
-	const spaceHandler = (e) => {
-		if (e.code === 'Space') {
-			e.preventDefault();
-			closeComparison();
-		}
-	};
-	document.addEventListener('keydown', spaceHandler);
-	
 	document.body.appendChild(comparisonContainer);
 }
 
+// 색상 맵 생성 함수 (전/후 화면에서 공유)
+function createColorMapForComparison(beforeTeams, afterTeams) {
+	const changedMemberColors = new Map();
+	const highlightColors = [
+		{ bg: '#fef3c7', border: '#fbbf24' }, // 노란색
+		{ bg: '#ddd6fe', border: '#a78bfa' }, // 보라색
+		{ bg: '#fecaca', border: '#f87171' }, // 빨간색
+		{ bg: '#a7f3d0', border: '#34d399' }, // 초록색
+		{ bg: '#bfdbfe', border: '#60a5fa' }, // 파란색
+		{ bg: '#fecdd3', border: '#fb7185' }, // 핑크색
+	];
+	
+	const beforeMembers = beforeTeams.map(team => new Set(team.map(p => p.id)));
+	const afterMembers = afterTeams.map(team => new Set(team.map(p => p.id)));
+	
+	// 변경된 모든 멤버 수집 (ID 순으로 정렬하여 일관성 유지)
+	const changedMembersSet = new Set();
+	
+	afterTeams.forEach((team, teamIdx) => {
+		team.forEach(person => {
+			if (!beforeMembers[teamIdx].has(person.id)) {
+				changedMembersSet.add(person.id);
+			}
+		});
+	});
+	
+	// ID로 정렬하여 일관된 색상 할당
+	const changedMembers = Array.from(changedMembersSet).sort((a, b) => a - b);
+	
+	// 각 변경된 멤버에게 고유한 색상 할당
+	changedMembers.forEach((personId, index) => {
+		changedMemberColors.set(personId, highlightColors[index % highlightColors.length]);
+	});
+	
+	return changedMemberColors;
+}
+
 // 비교용 팀 표시 생성
-function createComparisonTeamsDisplay(teams) {
+function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberColors = null) {
 	const container = document.createElement('div');
 	container.style.cssText = `
 		display: flex;
 		flex-direction: column;
 		gap: 15px;
 	`;
+	
+	// 비교를 위한 팀 멤버 맵 생성
+	let compareTeamMembers = null;
+	if (compareTeams) {
+		compareTeamMembers = compareTeams.map(team => 
+			new Set(team.map(p => p.id))
+		);
+	}
 	
 	teams.forEach((team, index) => {
 		const teamCard = document.createElement('div');
@@ -3160,11 +3191,12 @@ function createComparisonTeamsDisplay(teams) {
 			color: #1e293b;
 		`;
 		
-		let headerText = `팀 ${index + 1} (${team.length}명)`;
+		let headerText = `팀 ${index + 1} (${team.length}명`;
 		if (state.weightBalanceEnabled) {
 			const totalWeight = team.reduce((sum, p) => sum + (p.weight || 0), 0);
-			headerText += ` - 가중치: ${totalWeight}`;
+			headerText += `/${totalWeight}`;
 		}
+		headerText += ')';
 		
 		// 성비 블록 정보 추가
 		if (state.genderBalanceEnabled) {
@@ -3188,11 +3220,25 @@ function createComparisonTeamsDisplay(teams) {
 		
 		team.forEach(person => {
 			const li = document.createElement('li');
+			
+			// 비교 대상이 있을 때 변경된 멤버 확인
+			let isChanged = false;
+			let highlightColor = null;
+			if (compareTeamMembers) {
+				// 현재 팀에 있지만 같은 위치의 비교 팀에 없으면 변경된 것
+				const compareTeamSet = compareTeamMembers[index];
+				if (compareTeamSet && !compareTeamSet.has(person.id)) {
+					isChanged = true;
+					highlightColor = changedMemberColors.get(person.id);
+				}
+			}
+			
 			li.style.cssText = `
 				padding: 8px 12px;
-				background: #f8fafc;
+				background: ${isChanged && highlightColor ? highlightColor.bg : '#f8fafc'};
 				border-radius: 6px;
 				font-size: 14px;
+				${isChanged ? 'font-weight: 600; box-shadow: 0 0 0 2px ' + (highlightColor ? highlightColor.border : '#fbbf24') + ';' : ''}
 			`;
 			
 			let displayText = person.name;
