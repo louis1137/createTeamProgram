@@ -615,7 +615,12 @@ h2 {
 }
 
 /* 캡처 플래시 효과 - ::after 사용 */
-.results-section.capture-flash::after {
+#peopleList {
+	position: relative;
+}
+
+.results-section.capture-flash::after,
+#peopleList.capture-flash::after {
 	content: '';
 	position: absolute;
 	top: -10px;

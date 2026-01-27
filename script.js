@@ -1,4 +1,4 @@
-const teamDisplayDelay = isLocalView() ? 0 : 400;
+const teamDisplayDelay = isLocalView() ? 50 : 400;
 const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
 // 검증 비교창 표시 여부 (true: 표시, false: 숨김)
@@ -103,6 +103,8 @@ function init() {
 		});
 	}
 
+	// 참가자 관리 영역에서 Ctrl+C로 참가자 복사
+	document.addEventListener('keydown', handleParticipantCopy);
 
 	// 그룹 색상 팔레트는 세션당 한 번 랜덤 셔플
 	shuffleGroupColorsOnce();
@@ -845,6 +847,146 @@ function playCameraShutterSound() {
 	} catch (e) {
 		console.log('사운드 재생 실패:', e);
 	}
+}
+
+// 참가자 복사 기능 (Ctrl+C)
+function handleParticipantCopy(e) {
+	// Ctrl+C 또는 Cmd+C 감지 (Mac 지원)
+	// e.key는 대소문자 구분하므로 소문자로 변환
+	const key = e.key.toLowerCase();
+	
+	if ((e.ctrlKey || e.metaKey) && key === 'c') {
+		// 텍스트 선택 여부 확인 - 텍스트가 선택되어 있으면 기본 복사 동작 유지
+		const selection = window.getSelection();
+		if (selection && selection.toString().length > 0) {
+			return; // 텍스트가 선택되어 있으면 기본 복사 동작
+		}
+		
+		// 입력창에 포커스가 있으면 기본 복사 동작 유지
+		const activeElement = document.activeElement;
+		if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+			return;
+		}
+		
+		// 참가자가 없으면 아무것도 하지 않음
+		if (state.people.length === 0) {
+			return;
+		}
+		
+		// 기본 동작 방지
+		e.preventDefault();
+		
+		// 참가자 데이터를 문자열로 변환
+		const participantString = convertParticipantsToString();
+		
+		// 클립보드에 복사
+		copyToClipboard(participantString);
+		
+		// 플래시 효과 발생
+		triggerParticipantFlash();
+	}
+}
+
+// 참가자 데이터를 문자열로 변환
+function convertParticipantsToString() {
+	const result = [];
+	const grouped = new Set();
+	const groupMap = new Map();
+	
+	// 그룹 정보를 맵으로 저장
+	state.requiredGroups.forEach((group, groupIndex) => {
+		group.forEach(personId => {
+			grouped.add(personId);
+			groupMap.set(personId, groupIndex);
+		});
+	});
+	
+	const processedGroups = new Set();
+	
+	state.people.forEach(person => {
+		const groupIndex = groupMap.get(person.id);
+		
+		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
+			// 그룹 처리
+			processedGroups.add(groupIndex);
+			const group = state.requiredGroups[groupIndex];
+			const groupMembers = group.map(personId => {
+				const groupPerson = state.people.find(p => p.id === personId);
+				return groupPerson ? formatPersonString(groupPerson) : '';
+			}).filter(s => s);
+			
+			result.push(groupMembers.join(','));
+		} else if (groupIndex === undefined) {
+			// 그룹에 속하지 않은 개별 항목
+			result.push(formatPersonString(person));
+		}
+	});
+	
+	return result.join('/');
+}
+
+// 개별 참가자를 문자열로 포맷
+function formatPersonString(person) {
+	let result = person.name;
+	
+	// 성별과 가중치 추가
+	const genderStr = person.gender === 'female' ? '여' : '남';
+	const weightStr = person.weight || 0;
+	
+	result += `(${genderStr}${weightStr})`;
+	
+	return result;
+}
+
+// 클립보드에 텍스트 복사
+function copyToClipboard(text) {
+	if (navigator.clipboard && navigator.clipboard.writeText) {
+		navigator.clipboard.writeText(text).then(() => {
+			console.log('참가자 데이터가 클립보드에 복사되었습니다:', text);
+		}).catch(err => {
+			console.error('클립보드 복사 실패:', err);
+			fallbackCopyToClipboard(text);
+		});
+	} else {
+		fallbackCopyToClipboard(text);
+	}
+}
+
+// 클립보드 API가 지원되지 않을 때 대체 방법
+function fallbackCopyToClipboard(text) {
+	const textArea = document.createElement('textarea');
+	textArea.value = text;
+	textArea.style.position = 'fixed';
+	textArea.style.left = '-9999px';
+	document.body.appendChild(textArea);
+	textArea.focus();
+	textArea.select();
+	
+	try {
+		document.execCommand('copy');
+		console.log('참가자 데이터가 클립보드에 복사되었습니다:', text);
+	} catch (err) {
+		console.error('클립보드 복사 실패:', err);
+	}
+	
+	document.body.removeChild(textArea);
+}
+
+// 참가자 영역에 플래시 효과 발생
+function triggerParticipantFlash() {
+	const peopleList = elements.peopleList;
+	if (!peopleList) return;
+	
+	// 플래시 효과 클래스 추가
+	peopleList.classList.add('capture-flash');
+	
+	// 찰칵 사운드 재생
+	playCameraShutterSound();
+	
+	// 애니메이션 종료 후 클래스 제거
+	setTimeout(() => {
+		peopleList.classList.remove('capture-flash');
+	}, 600);
 }
 
 function resetAll() {
@@ -1980,11 +2122,8 @@ function shuffleTeams() {
 	// teamDisplayDelay가 바뀔 수 있으므로 표시 전 최신값으로 반영
 	setTeamAnimDurationFromDelay();
 	
-	// 초기 팀 표시
-	displayTeams(teams).then(() => {
-		// 검증 루프 시작 (비교창 없이 조용히 실행)
-		startValidationLoop(teams);
-	});
+	// 검증 루프 실행 후 최종 결과만 표시
+	startValidationLoop(teams);
 	
 	// 팀 생성 시 콘솔의 참가자 관리 뷰도 갱신
 	try { printParticipantConsole(); } catch (_) { /* no-op */ }
