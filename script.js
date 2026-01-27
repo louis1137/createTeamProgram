@@ -27,6 +27,7 @@ try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
 const state = {
 	people: [],
+	inactivePeople: [], // 미참가자 목록 (성별/가중치 저장)
 	requiredGroups: [],
 	forbiddenPairs: [], // [idA, idB] 형식의 배열
 	forbiddenMap: {},   // forbiddenPairs에서 만들어진 빠른 조회용 맵
@@ -526,6 +527,9 @@ function showDuplicateConfirmModal(duplicateNames) {
 		confirmBtn.style.cursor = hasInputDuplicates ? 'not-allowed' : 'pointer';
 	}
 	
+	// 키보드 이벤트 리스너 추가
+	document.addEventListener('keydown', handleDuplicateModalKeydown);
+	
 	// 모달 표시
 	modal.style.display = 'flex';
 	setTimeout(() => {
@@ -562,10 +566,24 @@ function createDuplicatePersonTag(person) {
 	return personTag;
 }
 
+// 중복 확인 모달 키보드 이벤트 핸들러
+function handleDuplicateModalKeydown(e) {
+	if (e.key === 'Enter') {
+		e.preventDefault();
+		handleDuplicateConfirm();
+	} else if (e.key === 'Escape') {
+		e.preventDefault();
+		handleDuplicateCancel();
+	}
+}
+
 // 중복 확인 모달 숨김
 function hideDuplicateConfirmModal() {
 	const modal = document.getElementById('duplicateConfirmModal');
 	if (!modal) return;
+	
+	// 키보드 이벤트 리스너 제거
+	document.removeEventListener('keydown', handleDuplicateModalKeydown);
 	
 	modal.classList.remove('visible');
 	setTimeout(() => {
@@ -610,6 +628,7 @@ function saveToLocalStorage() {
 	try {
 		const data = {
 			people: state.people,
+			inactivePeople: state.inactivePeople, // 미참가자 목록 저장
 			requiredGroups: state.requiredGroups,
 			nextId: state.nextId,
 			forbiddenPairs: state.forbiddenPairs,
@@ -622,7 +641,7 @@ function saveToLocalStorage() {
 		};
 		localStorage.setItem('teamMakerData', JSON.stringify(data));
 		
-		// 이름별 성별/가중치 기본값 저장
+		// 이름별 성별/가중치 기본값 저장 (사용하지 않음 - inactivePeople로 대체)
 		const personDefaults = {};
 		state.people.forEach(p => {
 			const normalized = normalizeName(p.name);
@@ -644,6 +663,7 @@ function loadFromLocalStorage() {
 		if (saved) {
 			const data = JSON.parse(saved);
 			state.people = data.people || [];
+			state.inactivePeople = data.inactivePeople || []; // 미참가자 목록 복원
 			// 참가자 목록을 이름순으로 정렬
 			state.people.sort((a, b) => a.name.localeCompare(b.name));
 			// 그룹 내부를 가나다순으로 정렬하여 복원
@@ -707,6 +727,18 @@ function loadFromLocalStorage() {
 				console.table(peopleTable);
 			} else {
 				console.log('%c👥 참가자: 없음', 'color: #999; font-style: italic;');
+			}
+			
+			if (state.inactivePeople.length > 0) {
+				console.log('%c💤 미참가자 목록', 'color: #999; font-weight: bold; font-size: 14px;');
+				const inactiveTable = state.inactivePeople.map(p => ({
+					'이름': p.name,
+					'성별': p.gender === 'male' ? '♂️' : '♀️',
+					'가중치': p.weight ?? 0
+				}));
+				console.table(inactiveTable);
+			} else {
+				console.log('%c💤 미참가자: 없음', 'color: #999; font-style: italic;');
 			}
 			
 			if (state.forbiddenPairs.length > 0) {
@@ -961,12 +993,30 @@ function convertParticipantsToString() {
 function formatPersonString(person) {
 	let result = person.name;
 	
-	// 성별과 가중치 추가
-	const genderStr = person.gender === 'female' ? '여' : '남';
-	const weightStr = person.weight || 0;
+	const genderEnabled = state.genderBalanceEnabled;
+	const weightEnabled = state.weightBalanceEnabled;
 	
-	result += `(${genderStr}${weightStr})`;
+	// 둘 다 체크되어 있지 않으면 이름만
+	if (!genderEnabled && !weightEnabled) {
+		return result;
+	}
 	
+	// 괄호 안에 들어갈 내용 구성
+	let bracketContent = '';
+	
+	// 성별 추가 (체크되어 있을 때)
+	if (genderEnabled) {
+		const genderStr = person.gender === 'female' ? '여' : '남';
+		bracketContent += genderStr;
+	}
+	
+	// 가중치 추가 (체크되어 있을 때)
+	if (weightEnabled) {
+		const weightStr = person.weight || 0;
+		bracketContent += weightStr;
+	}
+	
+	result += `(${bracketContent})`;
 	return result;
 }
 
@@ -1037,6 +1087,21 @@ function resetAll() {
 		console.log(`초기화: 기존 제약 ${converted}개가 보류 제약으로 변환되어 유지됩니다.`);
 		safeOpenForbiddenWindow();
 	}
+	
+	// 모든 참가자를 미참가자 목록으로 이동
+	state.people.forEach(person => {
+		const normalized = normalizeName(person.name);
+		const existingInactive = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+		if (!existingInactive) {
+			const inactivePerson = {
+				name: person.name,
+				gender: person.gender,
+				weight: person.weight
+			};
+			state.inactivePeople.push(inactivePerson);
+		}
+	});
+	
 	// 참가자 및 그룹 목록 초기화(보류 제약은 유지)
 	state.people = [];
 	state.requiredGroups = [];
@@ -1332,10 +1397,33 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 					let weight = 0;
 					let gender = 'male';
 					
-					// 가중치 결정: 파싱된 값 우선, 없으면 입력 필드 값
+					// 미참가자 목록에서 찾기
+					const normalized = normalizeName(actualName);
+					const inactivePerson = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+					
+					// 우선순위: 1. 명령어 입력값 (parsedGender/parsedWeight)
+					//          2. 미참가자 목록 값
+					//          3. 입력 필드 값 또는 기본값
+					
+					// 성별 결정
+					if (parsedGender !== null) {
+						// 1순위: 명령어로 지정된 성별
+						gender = parsedGender;
+					} else if (inactivePerson) {
+						// 2순위: 미참가자 목록의 성별
+						gender = inactivePerson.gender;
+					}
+					// else: 3순위 기본값 'male' 유지
+					
+					// 가중치 결정
 					if (parsedWeight !== null) {
+						// 1순위: 명령어로 지정된 가중치
 						weight = Math.max(0, parsedWeight);
+					} else if (inactivePerson) {
+						// 2순위: 미참가자 목록의 가중치
+						weight = inactivePerson.weight;
 					} else if (state.weightBalanceEnabled) {
+						// 3순위: 입력 필드 값
 						let inputWeight = 0;
 						const weightInputEl = document.getElementById('weightInput');
 						if (weightInputEl) {
@@ -1344,11 +1432,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 						}
 						weight = Math.max(0, inputWeight);
 					}
-					
-					// 성별 결정: 파싱된 값 우선
-					if (parsedGender !== null) {
-						gender = parsedGender;
-					}
+					// else: 3순위 기본값 0 유지
 					
 					const person = {
 						id: state.nextId++,
@@ -1359,6 +1443,11 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 					state.people.push(person);
 					newIds.push(person.id);
 					addedAny = true;
+					
+					// 미참가자 목록에서 제거
+					if (inactivePerson) {
+						state.inactivePeople = state.inactivePeople.filter(p => normalizeName(p.name) !== normalized);
+					}
 				});
 			if (newIds.length > 1) newGroupsToAdd.push(newIds);
 		});
@@ -1387,6 +1476,22 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 }
 
 function removePerson(id) {
+	const person = state.people.find(p => p.id === id);
+	if (person) {
+		// 미참가자 목록에 추가 (중복 확인)
+		const normalized = normalizeName(person.name);
+		const existingInactive = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+		if (!existingInactive) {
+			// id 제거하고 미참가자 목록에 추가
+			const inactivePerson = {
+				name: person.name,
+				gender: person.gender,
+				weight: person.weight
+			};
+			state.inactivePeople.push(inactivePerson);
+		}
+	}
+	
 	state.people = state.people.filter(p => p.id !== id);
 	state.requiredGroups = state.requiredGroups.map(group => group.filter(pid => pid !== id));
 	state.requiredGroups = state.requiredGroups.filter(group => group.length > 1);
@@ -1998,6 +2103,19 @@ function printParticipantConsole() {
 		});
 
 		console.table(peopleTable);
+
+		// 미참가자 목록 출력
+		if (state.inactivePeople && state.inactivePeople.length > 0) {
+			console.log('%c💤 미참가자 목록', 'color: #999; font-weight: bold; font-size: 14px;');
+			const inactiveTable = state.inactivePeople.map(p => ({
+				'이름': p.name,
+				'성별': p.gender === 'male' ? '♂️' : '♀️',
+				'가중치': typeof p.weight !== 'undefined' ? p.weight : 0
+			}));
+			console.table(inactiveTable);
+		} else {
+			console.log('%c💤 미참가자: 없음', 'color: #999; font-style: italic;');
+		}
 
 		// 적용된 제약과 보류 제약도 함께 출력
 		if (state.forbiddenPairs && state.forbiddenPairs.length > 0) {
