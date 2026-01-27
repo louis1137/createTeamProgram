@@ -2719,11 +2719,23 @@ function generateTeams(people) {
 				[completeTeams[i], completeTeams[j]] = [completeTeams[j], completeTeams[i]];
 			}
 			
-			// 완성된 팀들을 기존 팀 사이에 랜덤하게 끼워넣기
-			completeTeams.forEach(completeTeam => {
-				const insertPosition = Math.floor(Math.random() * (allTeamsIncludingLast.length + 1));
-				allTeamsIncludingLast.splice(insertPosition, 0, completeTeam);
-			});
+			// 최대인원 모드일 때는 마지막 팀을 제외하고 끼워넣기
+			if (lastTeamForShuffle) {
+				// 마지막 팀 제외한 배열에 끼워넣기
+				completeTeams.forEach(completeTeam => {
+					const insertPosition = Math.floor(Math.random() * (teamsToShuffle.length + 1));
+					teamsToShuffle.splice(insertPosition, 0, completeTeam);
+				});
+				// 마지막 팀 다시 추가
+				return [...teamsToShuffle, lastTeamForShuffle];
+			} else {
+				// 일반 모드: 모든 팀 사이에 랜덤하게 끼워넣기
+				completeTeams.forEach(completeTeam => {
+					const insertPosition = Math.floor(Math.random() * (allTeamsIncludingLast.length + 1));
+					allTeamsIncludingLast.splice(insertPosition, 0, completeTeam);
+				});
+				return allTeamsIncludingLast;
+			}
 		}
 		
 		return allTeamsIncludingLast;
