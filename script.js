@@ -1,6 +1,8 @@
 const teamDisplayDelay = isLocalView() ? 0 : 400;
 const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
+// 검증 비교창 표시 여부 (true: 표시, false: 숨김)
+const SHOW_VALIDATION_COMPARISON = isLocalView() ? false : false;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
 // 파비콘 애니메이션
@@ -1958,6 +1960,10 @@ function shuffleTeams() {
 	const teams = generateTeams(preShufflePeopleForGeneration(validPeople));
 	if (!teams) return; // generateTeams가 불가능할 경우 오류를 표시함
 	
+	// 검증된 팀 저장
+	currentTeams = teams;
+	isValidated = false;
+	
 	// 팀 생성시 제약 레이어가 열려있으면 내리기
 	hideConstraintNotification();
 	
@@ -1973,7 +1979,13 @@ function shuffleTeams() {
 	
 	// teamDisplayDelay가 바뀔 수 있으므로 표시 전 최신값으로 반영
 	setTeamAnimDurationFromDelay();
-	displayTeams(teams);
+	
+	// 초기 팀 표시
+	displayTeams(teams).then(() => {
+		// 검증 루프 시작 (비교창 없이 조용히 실행)
+		startValidationLoop(teams);
+	});
+	
 	// 팀 생성 시 콘솔의 참가자 관리 뷰도 갱신
 	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 }
@@ -2627,4 +2639,1038 @@ function createResultListItem(person) {
 	return li;
 }
 
+// 검증 루프 시작
+async function startValidationLoop(initialTeams) {
+	let currentTeams = initialTeams.map(team => [...team]);
+	const maxIterations = 20; // 무한루프 방지
+	let iteration = 0;
+	
+	while (iteration < maxIterations) {
+		iteration++;
+		let hasChanges = false;
+		
+		// 1. 팀 인원 균형 검증 (최대인원 모드가 아닐 때만) - 가장 먼저 실행
+		if (!state.maxTeamSizeEnabled) {
+			const beforeTeamSize = currentTeams.map(team => [...team]);
+			currentTeams = validateAndFixTeamSizeBalance(currentTeams);
+			
+			const sizeChanged = JSON.stringify(beforeTeamSize) !== JSON.stringify(currentTeams);
+			if (sizeChanged) {
+				hasChanges = true;
+				if (SHOW_VALIDATION_COMPARISON) {
+					await showValidationStep(beforeTeamSize, currentTeams, '팀 인원 균형');
+					// 다음 검증을 위해 잠시 대기
+					await new Promise(resolve => setTimeout(resolve, 500));
+				}
+			}
+		}
+		
+		// 2. 성비 블록 균형 검증
+		if (state.genderBalanceEnabled) {
+			const beforeGender = currentTeams.map(team => [...team]);
+			currentTeams = validateAndFixGenderBlockBalance(currentTeams);
+			
+			const genderChanged = JSON.stringify(beforeGender) !== JSON.stringify(currentTeams);
+			if (genderChanged) {
+				hasChanges = true;
+				if (SHOW_VALIDATION_COMPARISON) {
+					await showValidationStep(beforeGender, currentTeams, '성비 블록 균형');
+					// 다음 검증을 위해 잠시 대기
+					await new Promise(resolve => setTimeout(resolve, 500));
+				}
+			}
+		}
+		
+		// 3. 가중치 균형 검증
+		if (state.weightBalanceEnabled) {
+			const beforeWeight = currentTeams.map(team => [...team]);
+			currentTeams = validateAndFixWeightBalance(currentTeams);
+			
+			const weightChanged = JSON.stringify(beforeWeight) !== JSON.stringify(currentTeams);
+			if (weightChanged) {
+				hasChanges = true;
+				if (SHOW_VALIDATION_COMPARISON) {
+					await showValidationStep(beforeWeight, currentTeams, '가중치 균형');
+					// 다음 검증을 위해 잠시 대기
+					await new Promise(resolve => setTimeout(resolve, 500));
+				}
+			}
+		}
+		
+		// 변경사항이 없으면 검증 완료
+		if (!hasChanges) {
+			break;
+		}
+	}
+	
+	// 최종 검증 완료
+	isValidated = true;
+	// 최종 팀으로 업데이트
+	window.currentTeams = currentTeams;
+	
+	// 최종 검증된 팀을 결과창에 표시
+	await displayTeams(currentTeams);
+}
+
+// 검증 단계 비교 화면 표시
+async function showValidationStep(beforeTeams, afterTeams, validationType) {
+	return new Promise((resolve) => {
+		// 비교 컨테이너 생성
+		const comparisonContainer = document.createElement('div');
+		comparisonContainer.id = 'comparisonContainer';
+		comparisonContainer.style.cssText = `
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, 0.95);
+			z-index: 10000;
+			display: flex;
+			flex-direction: column;
+			padding: 40px;
+			overflow-y: auto;
+		`;
+		
+		// 헤더
+		const header = document.createElement('div');
+		header.style.cssText = `
+			text-align: center;
+			color: white;
+			margin-bottom: 30px;
+		`;
+		
+		header.innerHTML = `
+			<h2 style="font-size: 32px; margin-bottom: 10px;">검증 단계</h2>
+			<p style="font-size: 16px; opacity: 0.8;">${validationType} 조정</p>
+		`;
+		comparisonContainer.appendChild(header);
+		
+		// 비교 영역
+		const comparisonWrapper = document.createElement('div');
+		comparisonWrapper.style.cssText = `
+			display: grid;
+			grid-template-columns: 1fr auto 1fr;
+			gap: 40px;
+			max-width: 1400px;
+			margin: 0 auto;
+			width: 100%;
+		`;
+		
+		// 전 (Before)
+		const beforeSection = document.createElement('div');
+		beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">조정 전</h3>';
+		const beforeDisplay = createComparisonTeamsDisplay(beforeTeams);
+		beforeSection.appendChild(beforeDisplay);
+		
+		// 화살표
+		const arrow = document.createElement('div');
+		arrow.style.cssText = `
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 48px;
+			color: #22c55e;
+		`;
+		arrow.textContent = '→';
+		
+		// 후 (After)
+		const afterSection = document.createElement('div');
+		afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">조정 후</h3>';
+		const afterDisplay = createComparisonTeamsDisplay(afterTeams);
+		afterSection.appendChild(afterDisplay);
+		
+		comparisonWrapper.appendChild(beforeSection);
+		comparisonWrapper.appendChild(arrow);
+		comparisonWrapper.appendChild(afterSection);
+		comparisonContainer.appendChild(comparisonWrapper);
+		
+		// 닫기 버튼
+		const closeBtn = document.createElement('button');
+		closeBtn.textContent = '다음 (클릭 또는 스페이스바)';
+		closeBtn.style.cssText = `
+			margin: 30px auto 0;
+			padding: 15px 40px;
+			background: #3b82f6;
+			color: white;
+			border: none;
+			border-radius: 8px;
+			font-size: 18px;
+			font-weight: 600;
+			cursor: pointer;
+			transition: background 0.2s;
+		`;
+		closeBtn.onmouseover = () => closeBtn.style.background = '#2563eb';
+		closeBtn.onmouseout = () => closeBtn.style.background = '#3b82f6';
+		
+		const closeComparison = () => {
+			comparisonContainer.remove();
+			document.removeEventListener('keydown', spaceHandler);
+			resolve();
+		};
+		
+		closeBtn.onclick = closeComparison;
+		comparisonContainer.appendChild(closeBtn);
+		
+		// 스페이스바로도 닫기
+		const spaceHandler = (e) => {
+			if (e.code === 'Space') {
+				e.preventDefault();
+				closeComparison();
+			}
+		};
+		document.addEventListener('keydown', spaceHandler);
+		
+		document.body.appendChild(comparisonContainer);
+	});
+}
+
+// 스페이스바 안내 메시지 표시
+function showValidationHint() {
+	if (!state.genderBalanceEnabled) return;
+	
+	const hint = document.createElement('div');
+	hint.id = 'validationHint';
+	hint.style.cssText = `
+		position: fixed;
+		bottom: 30px;
+		left: 50%;
+		transform: translateX(-50%);
+		background: rgba(59, 130, 246, 0.95);
+		color: white;
+		padding: 12px 24px;
+		border-radius: 8px;
+		font-size: 14px;
+		font-weight: 500;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+		z-index: 10000;
+		animation: fadeInUp 0.3s ease-out;
+	`;
+	hint.textContent = '스페이스바를 눌러 성비 블록 균형을 검증하세요';
+	
+	document.body.appendChild(hint);
+	
+	// 5초 후 자동 제거
+	setTimeout(() => {
+		if (hint.parentNode) {
+			hint.style.animation = 'fadeOut 0.3s ease-out';
+			setTimeout(() => hint.remove(), 300);
+		}
+	}, 5000);
+}
+
+// 검증 및 재표시
+async function validateAndRedisplayTeams() {
+	if (!currentTeams || isValidated) return;
+	
+	// 검증 로직 실행
+	const validatedTeams = validateAndFixGenderBlockBalance(currentTeams);
+	
+	// 검증된 팀으로 업데이트
+	currentTeams = validatedTeams;
+	isValidated = true;
+	
+	// 검증된 팀으로 바로 표시
+	await displayTeams(validatedTeams);
+}
+
+// 변경사항 없음 메시지 (자동 검증 시에는 표시하지 않음)
+function showNoChangesMessage() {
+	// 자동 검증이므로 메시지 표시 없이 그냥 리턴
+	isValidated = true;
+}
+
+// 전/후 비교 화면 표시
+async function showBeforeAfterComparison(beforeTeams, afterTeams) {
+	// 비교 컨테이너 생성
+	const comparisonContainer = document.createElement('div');
+	comparisonContainer.id = 'comparisonContainer';
+	comparisonContainer.style.cssText = `
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.95);
+		z-index: 10000;
+		display: flex;
+		flex-direction: column;
+		padding: 40px;
+		overflow-y: auto;
+	`;
+	
+	// 헤더
+	const header = document.createElement('div');
+	header.style.cssText = `
+		text-align: center;
+		color: white;
+		margin-bottom: 30px;
+	`;
+	
+	const titleParts = [];
+	if (state.weightBalanceEnabled) titleParts.push('가중치 균형');
+	
+	header.innerHTML = `
+		<h2 style="font-size: 32px; margin-bottom: 10px;">검증 결과</h2>
+		<p style="font-size: 16px; opacity: 0.8;">${titleParts.length ? titleParts.join(' 및 ') + '이 조정되었습니다' : '팀이 조정되었습니다'}</p>
+	`;
+	comparisonContainer.appendChild(header);
+	
+	// 비교 영역
+	const comparisonWrapper = document.createElement('div');
+	comparisonWrapper.style.cssText = `
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		gap: 40px;
+		max-width: 1400px;
+		margin: 0 auto;
+		width: 100%;
+	`;
+	
+	// 전 (Before)
+	const beforeSection = document.createElement('div');
+	beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">검증 전</h3>';
+	const beforeDisplay = createComparisonTeamsDisplay(beforeTeams);
+	beforeSection.appendChild(beforeDisplay);
+	
+	// 화살표
+	const arrow = document.createElement('div');
+	arrow.style.cssText = `
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 48px;
+		color: #22c55e;
+	`;
+	arrow.textContent = '→';
+	
+	// 후 (After)
+	const afterSection = document.createElement('div');
+	afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">검증 후</h3>';
+	const afterDisplay = createComparisonTeamsDisplay(afterTeams);
+	afterSection.appendChild(afterDisplay);
+	
+	comparisonWrapper.appendChild(beforeSection);
+	comparisonWrapper.appendChild(arrow);
+	comparisonWrapper.appendChild(afterSection);
+	comparisonContainer.appendChild(comparisonWrapper);
+	
+	// 닫기 버튼
+	const closeBtn = document.createElement('button');
+	closeBtn.textContent = '확인 (클릭 또는 스페이스바)';
+	closeBtn.style.cssText = `
+		margin: 30px auto 0;
+		padding: 15px 40px;
+		background: #3b82f6;
+		color: white;
+		border: none;
+		border-radius: 8px;
+		font-size: 18px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 0.2s;
+	`;
+	closeBtn.onmouseover = () => closeBtn.style.background = '#2563eb';
+	closeBtn.onmouseout = () => closeBtn.style.background = '#3b82f6';
+	
+	const closeComparison = () => {
+		comparisonContainer.remove();
+		document.removeEventListener('keydown', spaceHandler);
+		// 검증된 팀으로 재표시
+		displayTeams(afterTeams);
+	};
+	
+	closeBtn.onclick = closeComparison;
+	comparisonContainer.appendChild(closeBtn);
+	
+	// 스페이스바로도 닫기
+	const spaceHandler = (e) => {
+		if (e.code === 'Space') {
+			e.preventDefault();
+			closeComparison();
+		}
+	};
+	document.addEventListener('keydown', spaceHandler);
+	
+	document.body.appendChild(comparisonContainer);
+}
+
+// 비교용 팀 표시 생성
+function createComparisonTeamsDisplay(teams) {
+	const container = document.createElement('div');
+	container.style.cssText = `
+		display: flex;
+		flex-direction: column;
+		gap: 15px;
+	`;
+	
+	teams.forEach((team, index) => {
+		const teamCard = document.createElement('div');
+		teamCard.style.cssText = `
+			background: white;
+			border-radius: 12px;
+			padding: 20px;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+		`;
+		
+		// 팀 헤더
+		const teamHeader = document.createElement('h4');
+		teamHeader.style.cssText = `
+			margin: 0 0 15px 0;
+			font-size: 20px;
+			color: #1e293b;
+		`;
+		
+		let headerText = `팀 ${index + 1} (${team.length}명)`;
+		if (state.weightBalanceEnabled) {
+			const totalWeight = team.reduce((sum, p) => sum + (p.weight || 0), 0);
+			headerText += ` - 가중치: ${totalWeight}`;
+		}
+		
+		// 성비 블록 정보 추가
+		if (state.genderBalanceEnabled) {
+			const blockInfo = getTeamGenderBlockInfo(team);
+			headerText += ` [블록: ${blockInfo.totalBlocks}개]`;
+		}
+		
+		teamHeader.textContent = headerText;
+		teamCard.appendChild(teamHeader);
+		
+		// 멤버 리스트
+		const membersList = document.createElement('ul');
+		membersList.style.cssText = `
+			list-style: none;
+			padding: 0;
+			margin: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		`;
+		
+		team.forEach(person => {
+			const li = document.createElement('li');
+			li.style.cssText = `
+				padding: 8px 12px;
+				background: #f8fafc;
+				border-radius: 6px;
+				font-size: 14px;
+			`;
+			
+			let displayText = person.name;
+			if (state.weightBalanceEnabled) displayText += ` (${person.weight ?? 0})`;
+			
+			if (state.genderBalanceEnabled) {
+				const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
+				li.style.borderLeft = `4px solid ${genderColor}`;
+			}
+			
+			const groupIndex = getPersonGroupIndex(person.id);
+			if (groupIndex !== -1) {
+				displayText = '● ' + displayText;
+			}
+			
+			li.textContent = displayText;
+			membersList.appendChild(li);
+		});
+		
+		teamCard.appendChild(membersList);
+		container.appendChild(teamCard);
+	});
+	
+	return container;
+}
+
+// 성별 블록 균형 검증 및 수정
+function validateAndFixGenderBlockBalance(teams) {
+	if (!state.genderBalanceEnabled) return teams;
+	
+	// 소수 성별 파악
+	const allPeople = teams.flat();
+	const maleCount = allPeople.filter(p => p.gender === 'male').length;
+	const femaleCount = allPeople.filter(p => p.gender === 'female').length;
+	
+	if (maleCount === femaleCount || maleCount === 0 || femaleCount === 0) {
+		return teams; // 성비가 동일하거나 한쪽만 있으면 검증 불필요
+	}
+	
+	const minorityGender = femaleCount < maleCount ? 'female' : 'male';
+	
+	// 최대 10번 반복 (무한루프 방지)
+	let iterations = 0;
+	const maxIterations = 10;
+	let modified = true;
+	
+	while (modified && iterations < maxIterations) {
+		modified = false;
+		iterations++;
+		
+		// 각 팀의 소수성별 블록 수 계산
+		const teamBlockCounts = teams.map((team, idx) => ({
+			teamIdx: idx,
+			blocks: getTeamGenderBlockInfo(team, minorityGender).totalBlocks
+		}));
+		
+		// 최대/최소 블록 팀 찾기
+		const maxBlockTeam = teamBlockCounts.reduce((max, curr) => 
+			curr.blocks > max.blocks ? curr : max
+		);
+		const minBlockTeam = teamBlockCounts.reduce((min, curr) => 
+			curr.blocks < min.blocks ? curr : min
+		);
+		
+		// 차이가 2 이상이면 교체
+		if (maxBlockTeam.blocks - minBlockTeam.blocks >= 2) {
+			const swapResult = swapToBalanceBlocks(
+				teams,
+				maxBlockTeam.teamIdx,
+				minBlockTeam.teamIdx,
+				minorityGender
+			);
+			
+			if (swapResult) {
+				modified = true;
+			}
+		}
+	}
+	
+	return teams;
+}
+
+// 가중치 균형 검증 및 수정
+function validateAndFixWeightBalance(teams) {
+	if (!state.weightBalanceEnabled) return teams;
+	
+	// 최대 10번 반복 (무한루프 방지)
+	let iterations = 0;
+	const maxIterations = 10;
+	let modified = true;
+	
+	while (modified && iterations < maxIterations) {
+		modified = false;
+		iterations++;
+		
+		// 각 팀의 총 가중치 계산
+		const teamWeights = teams.map((team, idx) => ({
+			teamIdx: idx,
+			totalWeight: team.reduce((sum, p) => sum + (p.weight || 0), 0),
+			team: team
+		}));
+		
+		// 가중치 기준 정렬
+		teamWeights.sort((a, b) => a.totalWeight - b.totalWeight);
+		
+		// 가장 낮은 팀과 가장 높은 팀
+		const minWeightTeam = teamWeights[0];
+		const maxWeightTeam = teamWeights[teamWeights.length - 1];
+		
+		// 가장 낮은 팀의 최고 점수 팀원
+		const minTeamMaxPerson = minWeightTeam.team.reduce((max, p) => 
+			(p.weight || 0) > (max.weight || 0) ? p : max
+		);
+		
+		// 가장 높은 팀의 최저 점수 팀원
+		const maxTeamMinPerson = maxWeightTeam.team.reduce((min, p) => 
+			(p.weight || 0) < (min.weight || 0) ? p : min
+		);
+		
+		// 조건 확인: 낮은 팀의 최고 점수 <= 높은 팀의 최저 점수
+		if ((minTeamMaxPerson.weight || 0) <= (maxTeamMinPerson.weight || 0)) {
+			// 교체 로직 실행
+			const swapResult = swapToBalanceWeight(
+				teams,
+				teamWeights,
+				minWeightTeam.teamIdx,
+				maxWeightTeam.teamIdx
+			);
+			
+			if (swapResult) {
+				modified = true;
+			} else {
+				// 첫 번째 교체 실패 시, 두 번째로 높은 팀과 시도
+				if (teamWeights.length > 2) {
+					const secondMaxWeightTeam = teamWeights[teamWeights.length - 2];
+					const swapResult2 = swapToBalanceWeight(
+						teams,
+						teamWeights,
+						minWeightTeam.teamIdx,
+						secondMaxWeightTeam.teamIdx
+					);
+					if (swapResult2) modified = true;
+				}
+			}
+		}
+	}
+	
+	return teams;
+}
+
+// 가중치 균형을 위한 팀원 교체
+function swapToBalanceWeight(teams, teamWeights, minTeamIdx, maxTeamIdx) {
+	const minTeam = teams[minTeamIdx];
+	const maxTeam = teams[maxTeamIdx];
+	
+	// 전체 팀 중 최대 소수성별 블록 수 계산
+	let maxMinorityBlocks = 0;
+	let minorityGender = null;
+	
+	if (state.genderBalanceEnabled) {
+		const allPeople = teams.flat();
+		const maleCount = allPeople.filter(p => p.gender === 'male').length;
+		const femaleCount = allPeople.filter(p => p.gender === 'female').length;
+		
+		if (maleCount !== femaleCount && maleCount !== 0 && femaleCount !== 0) {
+			minorityGender = femaleCount < maleCount ? 'female' : 'male';
+			
+			// 모든 팀의 소수성별 블록 수 계산
+			teams.forEach(team => {
+				const blockInfo = getTeamGenderBlockInfo(team, minorityGender);
+				if (blockInfo.totalBlocks > maxMinorityBlocks) {
+					maxMinorityBlocks = blockInfo.totalBlocks;
+				}
+			});
+		}
+	}
+	
+	// 1. 낮은 팀의 최고 점수 팀원 찾기 (그룹이 아닌 개인만)
+	const minTeamIndividuals = minTeam.filter(person => {
+		const groupIndex = getPersonGroupIndex(person.id);
+		return groupIndex === -1;
+	});
+	
+	if (minTeamIndividuals.length === 0) {
+		return false; // 교체할 개인이 없음
+	}
+	
+	// 최고 점수 팀원
+	const minTeamMaxPerson = minTeamIndividuals.reduce((max, p) => 
+		(p.weight || 0) > (max.weight || 0) ? p : max
+	);
+	
+	// 2. 높은 팀에서 최고 가중치 팀원 찾기 (그룹이 아닌 개인만)
+	const maxTeamIndividuals = maxTeam.filter(person => {
+		const groupIndex = getPersonGroupIndex(person.id);
+		return groupIndex === -1;
+	});
+	
+	if (maxTeamIndividuals.length === 0) {
+		return false; // 교체할 개인이 없음
+	}
+	
+	// 후보들을 가중치 높은 순으로 정렬
+	const candidates = maxTeamIndividuals.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+	
+	// 각 후보에 대해 교체 가능성 검사
+	for (const maxTeamTargetPerson of candidates) {
+		// 제약 확인
+		if (isForbidden(minTeamMaxPerson.id, maxTeamTargetPerson.id)) {
+			continue;
+		}
+		
+		// 점수가 동일한지 확인
+		if ((minTeamMaxPerson.weight || 0) === (maxTeamTargetPerson.weight || 0)) {
+			continue; // 동일하면 교체 불필요
+		}
+		
+		// 성비 균등이 활성화된 경우, 교체 후 블록 수 검증
+		if (minorityGender && state.genderBalanceEnabled) {
+			// 교체 후 시뮬레이션
+			const minTeamAfter = minTeam.map(p => 
+				p.id === minTeamMaxPerson.id ? maxTeamTargetPerson : p
+			);
+			const maxTeamAfter = maxTeam.map(p => 
+				p.id === maxTeamTargetPerson.id ? minTeamMaxPerson : p
+			);
+			
+			// 교체 후 양 팀의 소수성별 블록 수 계산
+			const minTeamBlocksAfter = getTeamGenderBlockInfo(minTeamAfter, minorityGender).totalBlocks;
+			const maxTeamBlocksAfter = getTeamGenderBlockInfo(maxTeamAfter, minorityGender).totalBlocks;
+			
+			// 양 팀 모두 최대 블록 수를 넘지 않으면 교체 가능
+			if (minTeamBlocksAfter > maxMinorityBlocks || maxTeamBlocksAfter > maxMinorityBlocks) {
+				continue; // 블록 수가 초과되면 다음 후보로
+			}
+		}
+		
+		// 교체 실행
+		const minPersonIdx = minTeam.indexOf(minTeamMaxPerson);
+		const maxPersonIdx = maxTeam.indexOf(maxTeamTargetPerson);
+		
+		if (minPersonIdx !== -1 && maxPersonIdx !== -1) {
+			// 배열에서 교체
+			[teams[minTeamIdx][minPersonIdx], teams[maxTeamIdx][maxPersonIdx]] = 
+			[teams[maxTeamIdx][maxPersonIdx], teams[minTeamIdx][minPersonIdx]];
+			
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+// 팀 인원 균형 검증 및 수정 (최대인원 모드가 아닐 때)
+function validateAndFixTeamSizeBalance(teams) {
+	if (state.maxTeamSizeEnabled) return teams;
+	
+	// 최대 10번 반복 (무한루프 방지)
+	let iterations = 0;
+	const maxIterations = 10;
+	let modified = true;
+	
+	while (modified && iterations < maxIterations) {
+		modified = false;
+		iterations++;
+		
+		// 각 팀의 인원 수 계산
+		const teamSizes = teams.map((team, idx) => ({
+			teamIdx: idx,
+			size: team.length
+		}));
+		
+		// 최대/최소 인원 팀 찾기
+		const maxSizeTeam = teamSizes.reduce((max, curr) => 
+			curr.size > max.size ? curr : max
+		);
+		const minSizeTeam = teamSizes.reduce((min, curr) => 
+			curr.size < min.size ? curr : min
+		);
+		
+		// 차이가 2명 이상이면 조정
+		if (maxSizeTeam.size - minSizeTeam.size >= 2) {
+			// 받는 팀이 이미 최고 가중치 팀인지 확인
+			let isMinTeamMaxWeight = false;
+			if (state.weightBalanceEnabled) {
+				const allWeights = teams.map(team => 
+					team.reduce((sum, p) => sum + (p.weight || 0), 0)
+				);
+				const maxWeight = Math.max(...allWeights);
+				const minTeamWeight = teams[minSizeTeam.teamIdx].reduce((sum, p) => sum + (p.weight || 0), 0);
+				isMinTeamMaxWeight = (minTeamWeight === maxWeight);
+			}
+			
+			let bestCandidate = null;
+			let bestSourceTeamIdx = -1;
+			
+			if (isMinTeamMaxWeight) {
+				// 받는 팀이 이미 최고 가중치 팀 -> 가장 점수가 낮은 개인을 찾되, 성비 블록만 체크
+				let lowestWeight = Infinity;
+				
+				for (let sourceTeamIdx = 0; sourceTeamIdx < teams.length; sourceTeamIdx++) {
+					const sourceTeam = teams[sourceTeamIdx];
+					
+					// 최소 인원 팀이거나 인원이 2명 이하면 스킵
+					if (sourceTeamIdx === minSizeTeam.teamIdx || sourceTeam.length <= 2) {
+						continue;
+					}
+					
+					// 이 팀의 개인 멤버들 (그룹이 아닌)
+					const individuals = sourceTeam.filter(person => {
+						const groupIndex = getPersonGroupIndex(person.id);
+						return groupIndex === -1;
+					});
+					
+					// 각 후보에 대해 검증
+					for (const candidate of individuals) {
+						const candidateWeight = candidate.weight || 0;
+						
+						// 제약 확인
+						let hasConstraint = false;
+						for (const teamMember of teams[minSizeTeam.teamIdx]) {
+							if (isForbidden(candidate.id, teamMember.id)) {
+								hasConstraint = true;
+								break;
+							}
+						}
+						if (hasConstraint) continue;
+						
+						// 성비 블록만 체크
+						if (canMoveMemberToTeamGenderOnly(teams, candidate, sourceTeamIdx, minSizeTeam.teamIdx)) {
+							if (candidateWeight < lowestWeight) {
+								lowestWeight = candidateWeight;
+								bestCandidate = candidate;
+								bestSourceTeamIdx = sourceTeamIdx;
+							}
+						}
+					}
+				}
+			} else {
+				// 받는 팀이 최고 가중치 팀이 아님 -> 기존 로직 (전체 조건 체크)
+				for (let sourceTeamIdx = 0; sourceTeamIdx < teams.length; sourceTeamIdx++) {
+					const sourceTeam = teams[sourceTeamIdx];
+					
+					// 최소 인원 팀이거나 인원이 2명 이하면 스킵
+					if (sourceTeamIdx === minSizeTeam.teamIdx || sourceTeam.length <= 2) {
+						continue;
+					}
+					
+					// 이 팀의 개인 멤버들 (그룹이 아닌)
+					const individuals = sourceTeam.filter(person => {
+						const groupIndex = getPersonGroupIndex(person.id);
+						return groupIndex === -1;
+					});
+					
+					// 각 후보에 대해 검증
+					for (const candidate of individuals) {
+						if (canMoveMemberToTeam(teams, candidate, sourceTeamIdx, minSizeTeam.teamIdx)) {
+							bestCandidate = candidate;
+							bestSourceTeamIdx = sourceTeamIdx;
+							break;
+						}
+					}
+					
+					if (bestCandidate) break;
+				}
+			}
+			
+			// 적합한 후보를 찾았으면 이동
+			if (bestCandidate && bestSourceTeamIdx !== -1) {
+				const candidateIdx = teams[bestSourceTeamIdx].indexOf(bestCandidate);
+				if (candidateIdx !== -1) {
+					// 멤버를 다른 팀으로 이동
+					const member = teams[bestSourceTeamIdx].splice(candidateIdx, 1)[0];
+					teams[minSizeTeam.teamIdx].push(member);
+					modified = true;
+				}
+			}
+		}
+	}
+	
+	return teams;
+}
+
+// 멤버를 다른 팀으로 이동 가능한지 검증 (성비만)
+function canMoveMemberToTeamGenderOnly(teams, member, fromTeamIdx, toTeamIdx) {
+	const toTeam = teams[toTeamIdx];
+	
+	// 성비 균형 확인만
+	if (state.genderBalanceEnabled) {
+		const allPeople = teams.flat();
+		const maleCount = allPeople.filter(p => p.gender === 'male').length;
+		const femaleCount = allPeople.filter(p => p.gender === 'female').length;
+		
+		if (maleCount !== femaleCount && maleCount !== 0 && femaleCount !== 0) {
+			const minorityGender = femaleCount < maleCount ? 'female' : 'male';
+			
+			// 이동 후 시뮬레이션
+			const simulatedToTeam = [...toTeam, member];
+			
+			// 이동 후 받는 팀의 블록 수
+			const toTeamBlocksAfter = getTeamGenderBlockInfo(simulatedToTeam, minorityGender).totalBlocks;
+			
+			// 모든 팀의 현재 블록 수 계산
+			const allBlockCounts = teams.map((team, idx) => {
+				if (idx === toTeamIdx) {
+					return toTeamBlocksAfter;
+				}
+				return getTeamGenderBlockInfo(team, minorityGender).totalBlocks;
+			});
+			
+			const maxBlocks = Math.max(...allBlockCounts);
+			const minBlocks = Math.min(...allBlockCounts);
+			
+			// 최대-최소 차이가 2 이상이면 안됨
+			if (maxBlocks - minBlocks >= 2) {
+				return false;
+			}
+		}
+	}
+	
+	return true;
+}
+
+// 멤버를 다른 팀으로 이동 가능한지 검증
+function canMoveMemberToTeam(teams, member, fromTeamIdx, toTeamIdx) {
+	const toTeam = teams[toTeamIdx];
+	
+	// 1. 제약 조건 확인
+	for (const teamMember of toTeam) {
+		if (isForbidden(member.id, teamMember.id)) {
+			return false;
+		}
+	}
+	
+	// 2. 성비 균형 확인
+	if (state.genderBalanceEnabled) {
+		const allPeople = teams.flat();
+		const maleCount = allPeople.filter(p => p.gender === 'male').length;
+		const femaleCount = allPeople.filter(p => p.gender === 'female').length;
+		
+		if (maleCount !== femaleCount && maleCount !== 0 && femaleCount !== 0) {
+			const minorityGender = femaleCount < maleCount ? 'female' : 'male';
+			
+			// 이동 후 시뮬레이션
+			const simulatedToTeam = [...toTeam, member];
+			
+			// 이동 후 받는 팀의 블록 수
+			const toTeamBlocksAfter = getTeamGenderBlockInfo(simulatedToTeam, minorityGender).totalBlocks;
+			
+			// 모든 팀의 현재 블록 수 계산
+			const allBlockCounts = teams.map((team, idx) => {
+				if (idx === toTeamIdx) {
+					return toTeamBlocksAfter;
+				}
+				return getTeamGenderBlockInfo(team, minorityGender).totalBlocks;
+			});
+			
+			const maxBlocks = Math.max(...allBlockCounts);
+			const minBlocks = Math.min(...allBlockCounts);
+			
+			// 최대-최소 차이가 2 이상이면 안됨
+			if (maxBlocks - minBlocks >= 2) {
+				return false;
+			}
+		}
+	}
+	
+	// 3. 가중치 균형 확인
+	if (state.weightBalanceEnabled) {
+		// 이동 후 받는 팀의 총 가중치
+		const toTeamWeightAfter = toTeam.reduce((sum, p) => sum + (p.weight || 0), 0) + (member.weight || 0);
+		
+		// 모든 팀의 가중치 계산 (이동 후 시뮬레이션)
+		const allWeights = teams.map((team, idx) => {
+			if (idx === toTeamIdx) {
+				return toTeamWeightAfter;
+			} else if (idx === fromTeamIdx) {
+				// 출발 팀은 해당 멤버 제외
+				return team.reduce((sum, p) => sum + (p.weight || 0), 0) - (member.weight || 0);
+			}
+			return team.reduce((sum, p) => sum + (p.weight || 0), 0);
+		});
+		
+		const maxWeight = Math.max(...allWeights);
+		
+		// 받는 팀이 최고 가중치 팀이 되면 안됨
+		if (toTeamWeightAfter >= maxWeight && toTeamIdx !== teams.findIndex(t => 
+			t.reduce((sum, p) => sum + (p.weight || 0), 0) === maxWeight
+		)) {
+			return false;
+		}
+	}
+	
+	return true;
+}
+
+// 팀의 성별 블록 정보 계산
+function getTeamGenderBlockInfo(team, targetGender = null) {
+	// targetGender가 없으면 소수 성별 자동 파악
+	if (!targetGender) {
+		const maleCount = team.filter(p => p.gender === 'male').length;
+		const femaleCount = team.filter(p => p.gender === 'female').length;
+		if (maleCount === femaleCount) return { totalBlocks: 0, groupBlocks: 0, individualBlocks: 0 };
+		targetGender = femaleCount < maleCount ? 'female' : 'male';
+	}
+	
+	let groupBlocks = 0;
+	let individualBlocks = 0;
+	const processedGroups = new Set();
+	
+	team.forEach(person => {
+		const groupIndex = getPersonGroupIndex(person.id);
+		
+		if (groupIndex !== -1) {
+			// 그룹에 속한 경우
+			if (!processedGroups.has(groupIndex)) {
+				processedGroups.add(groupIndex);
+				// 이 그룹에 targetGender가 있는지 확인
+				const group = state.requiredGroups[groupIndex];
+				const hasTargetGender = group.some(memberId => {
+					const member = team.find(p => p.id === memberId);
+					return member && member.gender === targetGender;
+				});
+				if (hasTargetGender) groupBlocks++;
+			}
+		} else {
+			// 개인인 경우
+			if (person.gender === targetGender) {
+				individualBlocks++;
+			}
+		}
+	});
+	
+	return {
+		totalBlocks: groupBlocks + individualBlocks,
+		groupBlocks,
+		individualBlocks
+	};
+}
+
+// 블록 균형을 위한 팀원 교체
+function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
+	const maxTeam = teams[maxTeamIdx];
+	const minTeam = teams[minTeamIdx];
+	
+	// 1. 최대 블록 팀에서 소수성별 개인 찾기
+	const maxTeamIndividuals = maxTeam.filter(person => {
+		const groupIndex = getPersonGroupIndex(person.id);
+		return groupIndex === -1 && person.gender === minorityGender;
+	});
+	
+	if (maxTeamIndividuals.length === 0) {
+		return false; // 교체할 개인이 없음
+	}
+	
+	// 2. 최소 블록 팀에서 교체 대상 찾기
+	let targetPerson = null;
+	
+	if (state.weightBalanceEnabled) {
+		// 가중치가 가장 비슷한 사람 찾기
+		let minWeightDiff = Infinity;
+		
+		maxTeamIndividuals.forEach(maxPerson => {
+			minTeam.forEach(minPerson => {
+				// 그룹이 아니고, 제약이 없는 경우만
+				const groupIndex = getPersonGroupIndex(minPerson.id);
+				if (groupIndex !== -1) return;
+				if (isForbidden(maxPerson.id, minPerson.id)) return;
+				
+				const weightDiff = Math.abs((maxPerson.weight || 0) - (minPerson.weight || 0));
+				if (weightDiff < minWeightDiff) {
+					minWeightDiff = weightDiff;
+					targetPerson = { from: maxPerson, to: minPerson };
+				}
+			});
+		});
+	} else {
+		// 랜덤 선택
+		const minTeamIndividuals = minTeam.filter(person => {
+			const groupIndex = getPersonGroupIndex(person.id);
+			return groupIndex === -1;
+		});
+		
+		if (minTeamIndividuals.length > 0) {
+			const maxPerson = maxTeamIndividuals[Math.floor(Math.random() * maxTeamIndividuals.length)];
+			const minPerson = minTeamIndividuals[Math.floor(Math.random() * minTeamIndividuals.length)];
+			
+			// 제약 확인
+			if (!isForbidden(maxPerson.id, minPerson.id)) {
+				targetPerson = { from: maxPerson, to: minPerson };
+			}
+		}
+	}
+	
+	if (!targetPerson) {
+		return false; // 교체 가능한 쌍이 없음
+	}
+	
+	// 3. 교체 실행
+	const maxPersonIdx = maxTeam.indexOf(targetPerson.from);
+	const minPersonIdx = minTeam.indexOf(targetPerson.to);
+	
+	if (maxPersonIdx !== -1 && minPersonIdx !== -1) {
+		// 배열에서 교체
+		[teams[maxTeamIdx][maxPersonIdx], teams[minTeamIdx][minPersonIdx]] = 
+		[teams[minTeamIdx][minPersonIdx], teams[maxTeamIdx][maxPersonIdx]];
+		
+		return true;
+	}
+	
+	return false;
+}
+
+// 전역 변수: 현재 표시된 팀과 검증 상태
+let currentTeams = null;
+let isValidated = false;
+
+// 초기화 실행
 init();
+
