@@ -150,6 +150,38 @@ function init() {
 	if (duplicateCancelBtn) duplicateCancelBtn.addEventListener('click', handleDuplicateCancel);
 }
 
+// 입력 내용에서 성별/가중치 패턴 감지하여 자동 체크
+function autoDetectAndCheckOptions() {
+	const text = elements.nameInput.value;
+	
+	// 패턴 감지 (괄호 안에 남/여가 있는지, 숫자가 있는지)
+	const hasGenderPattern = text.includes('(남)') || text.includes('(여)') || /\(.*남.*\)/.test(text) || /\(.*여.*\)/.test(text);
+	const hasWeightPattern = /\(\d+\)/.test(text) || /\(.*\d+.*\)/.test(text);
+	
+	// 성별 패턴이 있으면 성별균등 자동 체크
+	if (hasGenderPattern && !state.genderBalanceEnabled) {
+		if (elements.genderBalanceCheckbox) {
+			elements.genderBalanceCheckbox.checked = true;
+			state.genderBalanceEnabled = true;
+			saveToLocalStorage();
+		}
+	}
+	
+	// 가중치 패턴이 있으면 가중치균등 자동 체크
+	if (hasWeightPattern && !state.weightBalanceEnabled) {
+		if (elements.weightBalanceCheckbox) {
+			elements.weightBalanceCheckbox.checked = true;
+			state.weightBalanceEnabled = true;
+			saveToLocalStorage();
+			// 가중치 입력 필드 표시
+			const weightInputContainer = document.getElementById('weightInputContainer');
+			if (weightInputContainer) {
+				weightInputContainer.style.display = 'block';
+			}
+		}
+	}
+}
+
 // 제약 목록 확인 레이어 표시
 function showConstraintNotification() {
 	const layer = document.getElementById('constraintNotificationLayer');
@@ -1076,6 +1108,9 @@ function addPerson() {
 		alert('이름을 입력해주세요.');
 		return;
 	}
+
+	// 입력 내용에서 성별/가중치 패턴 감지하여 자동 체크
+	autoDetectAndCheckOptions();
 
 	// '/'로 분리하여 토큰 처리; '!'가 포함된 토큰은 제약, 아니면 이름/그룹으로 처리
 	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
