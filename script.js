@@ -2741,7 +2741,7 @@ function generateTeams(people) {
 		return allTeamsIncludingLast;
 	}
 
-	showError('제약 조건으로 팀 배치가 불가능합니다. 제약을 검토해주세요.');
+	showError('제약 조건으로 팀 배치가 불가능합니다. 다시 시도해주세요.');
 	return null;
 }
 
