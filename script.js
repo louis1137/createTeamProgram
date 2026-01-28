@@ -2890,7 +2890,7 @@ async function displayTeams(teams) {
 				if (state.weightBalanceEnabled) {
 					teamCardData.currentWeight += addedWeight;
 					// 0명이 아니면 인원 수 표시
-					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명) - 가중치: ${teamCardData.currentWeight}`;
+					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명/${teamCardData.currentWeight})`;
 				} else {
 					// 0명이 아니면 인원 수 표시
 					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명)`;
