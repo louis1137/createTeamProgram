@@ -1501,8 +1501,6 @@ function addPerson(fromConsole = false) {
 			}
 			
 			if (firstPart && parts.length > 0) {
-				console.log(`🔗 히든 그룹 체인 파싱: "${token}" → 주:"${firstPart}", 후보:${parts.map(p => `${p.name}(${p.probability}%)`).join(', ')}`);
-				
 				// 참가자 확인 및 추가
 				const primaryPerson = findPersonByName(firstPart);
 				if (primaryPerson) {
@@ -1520,7 +1518,7 @@ function addPerson(fromConsole = false) {
 					}
 					
 					if (allFound) {
-						console.log(`✅ 체인 참가자 모두 발견: ${firstPart} → ${parts.map(p => p.name).join(', ')}`);
+						console.log(`📋 [체인 등록 전] hiddenGroupChains:`, JSON.parse(JSON.stringify(state.hiddenGroupChains)));
 						// 기존 체인이 있으면 후보를 병합
 						const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryPerson.id);
 						if (existingChain) {
@@ -1529,29 +1527,46 @@ function addPerson(fromConsole = false) {
 								const existing = existingChain.candidates.find(c => c.id === newCandidate.id);
 								if (existing) {
 									existing.probability = newCandidate.probability;
-									const candidatePerson = state.people.find(p => p.id === newCandidate.id);
-									const candidateName = candidatePerson ? candidatePerson.name : `ID ${newCandidate.id}`;
-									console.log(`🔄 체인 후보 확률 갱신: ${firstPart} → ${candidateName}(${newCandidate.probability}%)`);
 								} else {
 									existingChain.candidates.push(newCandidate);
-									const candidatePerson = state.people.find(p => p.id === newCandidate.id);
-									const candidateName = candidatePerson ? candidatePerson.name : `ID ${newCandidate.id}`;
-									console.log(`➕ 체인에 후보 추가: ${firstPart} → ${candidateName}(${newCandidate.probability}%)`);
 								}
 							});
 							saveToLocalStorage();
+							console.log(`✅ [체인 등록 후] hiddenGroupChains:`, JSON.parse(JSON.stringify(state.hiddenGroupChains)));
 						} else {
+							// 기존 단일 쌍(hiddenGroups)을 체인으로 이관
+							const singlePairs = [];
+							state.hiddenGroups = state.hiddenGroups.filter(group => {
+								if (group[0] === primaryPerson.id || group[1] === primaryPerson.id) {
+									const otherId = group[0] === primaryPerson.id ? group[1] : group[0];
+									const prob = group[2] || 50;
+									singlePairs.push({ id: otherId, probability: prob });
+									return false;
+								}
+								return true;
+							});
+							
+							// 이관된 단일 쌍 + 새로운 후보들을 합쳐서 체인 생성
+							const allCandidates = [...singlePairs];
+							candidateIds.forEach(newCandidate => {
+								const existing = allCandidates.find(c => c.id === newCandidate.id);
+								if (existing) {
+									existing.probability = newCandidate.probability;
+								} else {
+									allCandidates.push(newCandidate);
+								}
+							});
+							
 							// 새 체인 생성
-							addHiddenGroupChain(primaryPerson.id, candidateIds);
+							addHiddenGroupChain(primaryPerson.id, allCandidates);
+							console.log(`✅ [체인 등록 후] hiddenGroupChains:`, JSON.parse(JSON.stringify(state.hiddenGroupChains)));
 						}
 						constraintsTouched = true;
 					} else {
-						console.log(`⏳ 체인 참가자 일부 미발견 (보류)`);
 						addPendingHiddenGroupChain(firstPart, parts);
 						constraintsTouched = true;
 					}
 				} else {
-					console.log(`⏳ 체인 주 참가자 미발견 (보류): ${firstPart}`);
 					addPendingHiddenGroupChain(firstPart, parts);
 					constraintsTouched = true;
 				}
@@ -1562,39 +1577,38 @@ function addPerson(fromConsole = false) {
 		// 히든 그룹 단일 쌍 체크: A(50)B 패턴 (체이닝이 아닌 경우)
 		const hiddenGroupMatch = token.match(/^([^(]+)\((\d+)\)([^(]+)$/);
 		if (hiddenGroupMatch) {
-			// 히든 그룹 처리
 			const leftName = hiddenGroupMatch[1].trim();
 			const probability = parseInt(hiddenGroupMatch[2]);
 			const rightName = hiddenGroupMatch[3].trim();
-			console.log(`🔍 히든 그룹 파싱: "${token}" → 왼쪽:"${leftName}", 확률:${probability}%, 오른쪽:"${rightName}"`);
 			if (leftName && rightName && probability >= 0 && probability <= 100) {
 				const pa = findPersonByName(leftName);
 				const pb = findPersonByName(rightName);
 				if (pa && pb) {
-					console.log(`✅ 참가자 발견: ${leftName}(ID:${pa.id}), ${rightName}(ID:${pb.id})`);
+					console.log(`📋 [단일 쌍 등록 전] hiddenGroupChains:`, JSON.parse(JSON.stringify(state.hiddenGroupChains)));
 					// 기존 체인에 추가할 수 있는지 확인
 					const existingChain = state.hiddenGroupChains.find(chain => chain.primary === pa.id);
 					if (existingChain) {
 						// 기존 체인에 후보 추가
 						const existingCandidate = existingChain.candidates.find(c => c.id === pb.id);
 						if (existingCandidate) {
-							// 이미 있는 후보면 확률 업데이트
 							existingCandidate.probability = probability;
-							console.log(`🔄 체인 후보 확률 갱신: ${leftName} → ${rightName}(${probability}%)`);
 						} else {
-							// 새 후보 추가
 							existingChain.candidates.push({ id: pb.id, probability: probability });
-							console.log(`➕ 체인에 후보 추가: ${leftName} → ${rightName}(${probability}%)`);
 						}
 						saveToLocalStorage();
 						constraintsTouched = true;
+						console.log(`✅ [단일 쌍 등록 후] hiddenGroupChains:`, JSON.parse(JSON.stringify(state.hiddenGroupChains)));
 					} else {
-						// 기존 체인이 없으면 단일 쌍으로 추가
-						const res = addHiddenGroupByNames(leftName, rightName, probability);
-						if (res.ok) constraintsTouched = true;
+						// 기존 체인이 없으면 새 체인 생성
+						state.hiddenGroupChains.push({
+							primary: pa.id,
+							candidates: [{ id: pb.id, probability: probability }]
+						});
+						saveToLocalStorage();
+						constraintsTouched = true;
+						console.log(`✅ [단일 쌍 등록 후] hiddenGroupChains:`, JSON.parse(JSON.stringify(state.hiddenGroupChains)));
 					}
 				} else {
-					console.log(`⏳ 참가자 미발견 (보류): ${!pa ? leftName : ''}${!pa && !pb ? ', ' : ''}${!pb ? rightName : ''}`);
 					const pres = addPendingHiddenGroup(leftName, rightName, probability);
 					if (pres.ok) constraintsTouched = true;
 				}
@@ -2399,43 +2413,64 @@ function tryResolveHiddenGroups() {
 
 // 히든 그룹 체인 추가
 function addHiddenGroupChain(primaryId, candidates) {
-	// 기존 체인 제거 (같은 primary)
-	state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryId);
+	// 기존 체인 찾기
+	const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryId);
 	
-	// 새 체인 추가
-	state.hiddenGroupChains.push({
-		primary: primaryId,
-		candidates: candidates
-	});
+	if (existingChain) {
+		// 기존 체인이 있으면 후보들을 병합 (덮어쓰지 않고 추가)
+		candidates.forEach(newCandidate => {
+			const existing = existingChain.candidates.find(c => c.id === newCandidate.id);
+			if (existing) {
+				// 이미 있는 후보면 확률만 업데이트
+				existing.probability = newCandidate.probability;
+			} else {
+				// 없는 후보면 추가
+				existingChain.candidates.push(newCandidate);
+			}
+		});
+	} else {
+		// 기존 체인이 없으면 새로 생성
+		state.hiddenGroupChains.push({
+			primary: primaryId,
+			candidates: candidates
+		});
+	}
 	
 	saveToLocalStorage();
-	
-	const primaryPerson = state.people.find(p => p.id === primaryId);
-	const primaryName = primaryPerson ? primaryPerson.name : `ID ${primaryId}`;
-	const candidateNames = candidates.map(c => {
-		const p = state.people.find(person => person.id === c.id);
-		return `${p ? p.name : 'ID ' + c.id}(${c.probability}%)`;
-	}).join(' → ');
-	console.log(`✅ 히든 그룹 체인 추가: ${primaryName} → ${candidateNames}`);
 }
 
 // 보류 히든 그룹 체인 추가
 function addPendingHiddenGroupChain(primaryName, candidates) {
 	const normalizedPrimary = normalizeName(primaryName);
 	
-	// 기존 보류 체인 제거 (같은 primary)
-	state.pendingHiddenGroupChains = state.pendingHiddenGroupChains.filter(
-		chain => chain.primary !== normalizedPrimary
-	);
+	console.log(`📋 [보류 체인 등록 전] pendingHiddenGroupChains:`, JSON.parse(JSON.stringify(state.pendingHiddenGroupChains)));
 	
-	// 새 보류 체인 추가
-	state.pendingHiddenGroupChains.push({
-		primary: normalizedPrimary,
-		candidates: candidates.map(c => ({ name: normalizeName(c.name), probability: c.probability }))
-	});
+	// 기존 보류 체인 찾기
+	const existingChain = state.pendingHiddenGroupChains.find(chain => chain.primary === normalizedPrimary);
+	
+	if (existingChain) {
+		// 기존 체인이 있으면 후보들을 병합 (덮어쓰지 않고 추가)
+		candidates.forEach(newCandidate => {
+			const normalizedName = normalizeName(newCandidate.name);
+			const existing = existingChain.candidates.find(c => c.name === normalizedName);
+			if (existing) {
+				// 이미 있는 후보면 확률만 업데이트
+				existing.probability = newCandidate.probability;
+			} else {
+				// 없는 후보면 추가
+				existingChain.candidates.push({ name: normalizedName, probability: newCandidate.probability });
+			}
+		});
+	} else {
+		// 기존 체인이 없으면 새로 생성
+		state.pendingHiddenGroupChains.push({
+			primary: normalizedPrimary,
+			candidates: candidates.map(c => ({ name: normalizeName(c.name), probability: c.probability }))
+		});
+	}
 	
 	saveToLocalStorage();
-	console.log(`⏳ 보류 히든 그룹 체인 추가: ${primaryName} → ${candidates.map(c => `${c.name}(${c.probability}%)`).join(' → ')}`);
+	console.log(`✅ [보류 체인 등록 후] pendingHiddenGroupChains:`, JSON.parse(JSON.stringify(state.pendingHiddenGroupChains)));
 }
 
 // 히든 그룹 확인 (현재 활성화된 것만)
