@@ -30,6 +30,13 @@ function initFirebase() {
 			firebaseApp = firebase.initializeApp(firebaseConfig);
 			database = firebase.database();
 			console.log('✅ Firebase 초기화 완료');
+			
+			// URL에서 프로필 키 읽기
+			currentRoomKey = getRoomKeyFromURL();
+			if (currentRoomKey) {
+				console.log(`📡 프로필 키 감지: ${currentRoomKey}`);
+			}
+			
 			return true;
 		} else {
 			console.log('⚠️ Firebase 설정이 필요합니다. firebase-sync.js의 firebaseConfig를 설정하세요.');
@@ -52,7 +59,6 @@ function setupRealtimeSync() {
 			const timeDiff = Date.now() - data.timestamp;
 			if (timeDiff > 1000) { // 1초 이상 차이나면 다른 사용자의 변경
 				loadStateFromData(data);
-				commandConsole.log('🔄 다른 사용자의 변경사항이 동기화되었습니다.', 'info');
 			}
 		}
 	});
@@ -113,3 +119,6 @@ function clearState() {
 	
 	renderPeople();
 }
+
+// 페이지 로드 시 Firebase 초기화
+initFirebase();

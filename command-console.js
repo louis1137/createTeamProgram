@@ -421,6 +421,40 @@ const commandConsole = {
 				this.restoreInputField();
 				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
 			}
+		} else if (this.inputMode === 'password-ask-switch') {
+			// 프로필 전환 시 비밀번호 입력 확인
+			if (confirmed) {
+				this.log('🔒 비밀번호를 입력하세요:', 'info');
+				this.inputMode = 'auth-switch';
+				this.restoreInputField();
+				this.input.type = 'password';
+				this.input.placeholder = '비밀번호 입력...';
+				setTimeout(() => this.input.focus(), 50);
+			} else {
+				// 비밀번호 입력 취소 - 읽기 전용 모드로 사용
+				this.log('비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.', 'info');
+				this.inputMode = 'normal';
+				this.authenticated = false; // 인증되지 않음
+				this.restoreInputField();
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			}
+		} else if (this.inputMode === 'password-ask-initial') {
+			// 초기 접속 시 비밀번호 입력 확인
+			if (confirmed) {
+				this.log('🔒 비밀번호를 입력하세요:', 'info');
+				this.inputMode = 'auth';
+				this.restoreInputField();
+				this.input.type = 'password';
+				this.input.placeholder = '비밀번호 입력...';
+				setTimeout(() => this.input.focus(), 50);
+			} else {
+				// 비밀번호 입력 취소 - 읽기 전용 모드로 사용
+				this.log('비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.', 'info');
+				this.inputMode = 'normal';
+				this.authenticated = false; // 인증되지 않음
+				this.restoreInputField();
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			}
 		}
 	},
 	
@@ -430,15 +464,7 @@ const commandConsole = {
 		const entry = document.createElement('div');
 		entry.className = `command-log command-log-${type}`;
 		
-		const icon = {
-			info: 'ℹ️',
-			success: '✅',
-			error: '❌',
-			warning: '⚠️',
-			command: '💬'
-		}[type] || 'ℹ️';
-		
-		entry.innerHTML = `<span class="log-time">[${timestamp}]</span><span class="log-content">${icon} ${message}</span>`;
+		entry.innerHTML = `<span class="log-time">[${timestamp}]</span><span class="log-content">${message}</span>`;
 		this.output.appendChild(entry);
 		this.output.scrollTop = this.output.scrollHeight;
 	},
@@ -518,29 +544,63 @@ const commandConsole = {
 									this.log(`데이터 로드 실패: ${error.message}`, 'error');
 								});
 						} else {
-							this.log(`📡 프로필 '${cmd}' 발견<br>🔒 비밀번호를 입력하세요:`, 'info');
-							this.inputMode = 'auth-switch';
-							this.input.type = 'password';
-							this.input.placeholder = '비밀번호 입력...';
-							setTimeout(() => this.input.focus(), 50);
-							
-							if (!syncEnabled) {
-								syncEnabled = true;
-								setupRealtimeSync();
-							}
+							// 데이터 먼저 로드
+							database.ref(`rooms/${currentRoomKey}`).once('value')
+								.then((snapshot) => {
+									const data = snapshot.val();
+									if (data && (data.people || data.timestamp)) {
+										loadStateFromData(data);
+										this.log(`📡 프로필 '${cmd}' 발견 (참가자: ${state.people.length}명)`, 'info');
+									} else {
+										this.log(`📡 프로필 '${cmd}' 발견 (초기 상태)`, 'info');
+									}
+									this.log('🔄 실시간 동기화 활성화됨', 'success');
+									
+									if (!syncEnabled) {
+										syncEnabled = true;
+										setupRealtimeSync();
+									}
+									
+									this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+									this.inputMode = 'password-ask-switch';
+									this.showConfirmButtons();
+								})
+								.catch((error) => {
+									this.log(`데이터 로드 실패: ${error.message}`, 'error');
+									this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+									this.inputMode = 'password-ask-switch';
+									this.showConfirmButtons();
+								});
 						}
 					} else {
 						// 초기 접속 모드
-						this.log(`📡 프로필 '${cmd}' 발견<br>🔒 비밀번호를 입력하세요:`, 'info');
-						this.inputMode = 'auth-switch';
-						this.input.type = 'password';
-						this.input.placeholder = '비밀번호 입력...';
-						setTimeout(() => this.input.focus(), 50);
-						
-						if (!syncEnabled) {
-							syncEnabled = true;
-							setupRealtimeSync();
-						}
+						// 데이터 먼저 로드
+						database.ref(`rooms/${currentRoomKey}`).once('value')
+							.then((snapshot) => {
+								const data = snapshot.val();
+								if (data && (data.people || data.timestamp)) {
+									loadStateFromData(data);
+									this.log(`📡 프로필 '${cmd}' 발견 (참가자: ${state.people.length}명)`, 'info');
+								} else {
+									this.log(`📡 프로필 '${cmd}' 발견 (초기 상태)`, 'info');
+								}
+								this.log('🔄 실시간 동기화 활성화됨', 'success');
+								
+								if (!syncEnabled) {
+									syncEnabled = true;
+									setupRealtimeSync();
+								}
+								
+								this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+								this.inputMode = 'password-ask-initial';
+								this.showConfirmButtons();
+							})
+							.catch((error) => {
+								this.log(`데이터 로드 실패: ${error.message}`, 'error');
+								this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+								this.inputMode = 'password-ask-initial';
+								this.showConfirmButtons();
+							});
 					}
 				} else {
 					this.tempProfile = cmd;
@@ -634,6 +694,24 @@ const commandConsole = {
 		}
 		
 		if (this.inputMode === 'password-change') {
+			// 1단계: 현재 비밀번호 확인
+			if (cmd === this.storedPassword) {
+				this.log('현재 비밀번호가 확인되었습니다.', 'success');
+				this.log('새 비밀번호를 입력하세요:', 'info');
+				this.inputMode = 'password-change-new';
+				this.input.placeholder = '새 비밀번호 입력...';
+				setTimeout(() => this.input.focus(), 50);
+			} else {
+				this.log('현재 비밀번호가 일치하지 않습니다. 다시 시도해주세요.', 'error');
+				this.inputMode = 'normal';
+				this.input.type = 'text';
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			}
+			return;
+		}
+		
+		if (this.inputMode === 'password-change-new') {
+			// 2단계: 새 비밀번호 입력
 			this.tempPassword = cmd;
 			this.log('새 비밀번호를 다시 한번 입력해주세요:', 'info');
 			this.inputMode = 'password-change-confirm';
@@ -643,11 +721,13 @@ const commandConsole = {
 		}
 		
 		if (this.inputMode === 'password-change-confirm') {
+			// 3단계: 새 비밀번호 확인
 			if (cmd === this.tempPassword) {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}/password`).set(this.tempPassword)
 						.then(() => {
 							this.log('🔑 비밀번호가 변경되었습니다.', 'success');
+							this.storedPassword = this.tempPassword; // 저장된 비밀번호 업데이트
 						})
 						.catch((error) => {
 							this.log(`비밀번호 변경 실패: ${error.message}`, 'error');
@@ -659,7 +739,7 @@ const commandConsole = {
 				this.tempPassword = '';
 			} else {
 				this.log('비밀번호가 일치하지 않습니다. 다시 시도해주세요.<br>새 비밀번호를 입력하세요:', 'error');
-				this.inputMode = 'password-change';
+				this.inputMode = 'password-change-new';
 				this.input.placeholder = '새 비밀번호 입력...';
 				this.tempPassword = '';
 				setTimeout(() => this.input.focus(), 50);
@@ -683,8 +763,14 @@ const commandConsole = {
 		}
 		
 		if (!this.authenticated && currentRoomKey) {
-			this.log('인증이 필요합니다. 콘솔을 닫고 다시 열어서 비밀번호를 입력하세요.', 'error');
-			return;
+			// 읽기 모드에서는 save와 입력 관련 명령어만 차단
+			const [command] = cmd.split(' ');
+			const writeCommands = ['save', '저장', 'input', '입력', 'clear', '초기화'];
+			if (writeCommands.includes(command.toLowerCase())) {
+				this.log('⚠️ 읽기 전용 모드입니다. 이 명령어를 사용하려면 비밀번호 인증이 필요합니다.', 'warning');
+				this.log('비밀번호를 입력하시려면 "비밀번호" 명령어를 사용하세요.', 'info');
+				return;
+			}
 		}
 		
 		const [command, ...args] = cmd.split(' ');
@@ -708,7 +794,19 @@ const commandConsole = {
 				break;
 			case 'password':
 			case '비밀번호':
-				this.passwordCommand(args.join(' '));
+				// "비밀번호"만 입력하면 입력 모드로 전환
+				if (args.length === 0) {
+					this.passwordInputCommand();
+				} else {
+					// "비밀번호 변경", "비밀번호 수정" 등은 변경 모드로
+					const subCommand = args[0];
+					if (subCommand === '변경' || subCommand === '수정' || subCommand === 'modify' || subCommand === 'change') {
+						this.passwordCommand(args.slice(1).join(' '));
+					} else {
+						// 나머지는 새 비밀번호로 간주
+						this.passwordCommand(args.join(' '));
+					}
+				}
 				break;
 			case 'profile':
 			case '프로필':
@@ -724,6 +822,7 @@ const commandConsole = {
 				this.constraintsCommand();
 				break;
 			case '히든':
+			case '확률':
 				this.hiddenCommand();
 				break;
 			case 'input':
@@ -826,7 +925,7 @@ const commandConsole = {
 	},
 	
 	helpCommand() {
-		this.log('=== 📋 명령어 도움말 ===<br><br>💾 save / 저장<br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>📥 load / 불러오기<br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>🗑️ clear / 초기화<br>   서버에 저장된 현재 Room의 모든 데이터를 삭제합니다.<br>   ⚠️ 삭제된 데이터는 복구할 수 없으니 주의하세요!<br><br>📊 status / 상태<br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>🔑 password / 비밀번호 [새 비밀번호]<br>   현재 프로필의 비밀번호를 변경합니다.<br>   새 비밀번호를 입력하지 않으면 입력 모드로 전환됩니다.<br>   입력 모드에서는 비밀번호를 두 번 입력하여 확인합니다.<br><br>👤 profile / 프로필<br>   다른 프로필로 전환합니다.<br>   프로필 이름을 입력하면 해당 프로필로 전환하고 데이터를 불러옵니다.<br>   존재하지 않는 프로필이면 생성 여부를 묻습니다.<br><br>✏️ input / 입력 [참가자 데이터]<br>   참가자 추가 폼과 동일한 방식으로 참가자를 추가합니다.<br>   예시: 입력 홍길동,김철수 / 이영희(남)50 / A!B / C(80)D<br>   쉼표로 그룹 구분, / 로 토큰 구분, ! 로 제약, () 로 확률/가중치 설정<br><br>👥 참가자<br>   현재 등록된 모든 참가자 목록을 표시합니다.<br>   각 참가자의 이름, 성별, 가중치 정보를 확인할 수 있습니다.<br><br>👻 미참가자<br>   현재 미참가자로 설정된 목록을 표시합니다.<br>   미참가자는 팀 생성 시 제외됩니다.<br><br>🚫 제약<br>   현재 설정된 제약 조건 목록을 표시합니다.<br>   특정 참가자들이 같은 팀에 배치되지 않도록 하는 규칙입니다.<br><br>🔒 히든<br>   히든 그룹과 히든 그룹 체인 목록을 표시합니다.<br>   확률 기반 그룹핑 규칙을 확인할 수 있습니다.<br><br>❓ help / 도움<br>   이 도움말을 표시합니다.<br><br>💡 TIP: 콘솔을 닫으려면 우측 상단의 X 버튼을 클릭하세요.<br>💡 TIP: cmd 또는 command를 입력하면 언제든 콘솔을 다시 열 수 있습니다.', 'info');
+		this.log('=== 📋 명령어 도움말 ===<br><br>💾 save / 저장<br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>📥 load / 불러오기<br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>🗑️ clear / 초기화<br>   서버에 저장된 현재 Room의 모든 데이터를 삭제합니다.<br>   ⚠️ 삭제된 데이터는 복구할 수 없으니 주의하세요!<br><br>📊 status / 상태<br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>🔑 password / 비밀번호 [새 비밀번호]<br>   현재 프로필의 비밀번호를 변경합니다.<br>   새 비밀번호를 입력하지 않으면 입력 모드로 전환됩니다.<br>   입력 모드에서는 비밀번호를 두 번 입력하여 확인합니다.<br><br>👤 profile / 프로필<br>   다른 프로필로 전환합니다.<br>   프로필 이름을 입력하면 해당 프로필로 전환하고 데이터를 불러옵니다.<br>   존재하지 않는 프로필이면 생성 여부를 묻습니다.<br><br>✏️ input / 입력 [참가자 데이터]<br>   참가자 추가 폼과 동일한 방식으로 참가자를 추가합니다.<br>   예시: 입력 홍길동,김철수 / 이영희(남)50 / A!B / C(80)D<br>   쉼표로 그룹 구분, / 로 토큰 구분, ! 로 제약, () 로 확률/가중치 설정<br><br>👥 참가자<br>   현재 등록된 모든 참가자 목록을 표시합니다.<br>   각 참가자의 이름, 성별, 가중치 정보를 확인할 수 있습니다.<br><br>👻 미참가자<br>   현재 미참가자로 설정된 목록을 표시합니다.<br>   미참가자는 팀 생성 시 제외됩니다.<br><br>🚫 제약<br>   현재 설정된 제약 조건 목록을 표시합니다.<br>   특정 참가자들이 같은 팀에 배치되지 않도록 하는 규칙입니다.<br><br>🎲 확률<br>   확률 기반 그룹 목록을 표시합니다.<br>   특정 참가자들이 설정된 확률로 같은 팀에 배치되도록 하는 규칙입니다.<br><br>❓ help / 도움<br>   이 도움말을 표시합니다.<br><br>💡 TIP: 콘솔을 닫으려면 우측 상단의 X 버튼을 클릭하세요.<br>💡 TIP: cmd 또는 command를 입력하면 언제든 콘솔을 다시 열 수 있습니다.', 'info');
 	},
 	
 	profileCommand() {
@@ -842,25 +941,36 @@ const commandConsole = {
 			return;
 		}
 		
-		// 인자가 제공된 경우 바로 처리
-		if (newPassword) {
-			const passwordToSet = newPassword.trim();
-			
-			database.ref(`rooms/${currentRoomKey}/password`).set(passwordToSet)
-				.then(() => {
-					this.log(`🔑 비밀번호가 변경되었습니다.`, 'success');
-				})
-				.catch((error) => {
-					this.log(`비밀번호 변경 실패: ${error.message}`, 'error');
-				});
-		} else {
-			// 인자가 없으면 입력 모드로 전환
-			this.log('새 비밀번호를 입력하세요:', 'info');
+		// 인자가 제공된 경우 - 비밀번호 변경 플로우 시작
+		if (newPassword && newPassword.trim()) {
+			this.log('⚠️ 보안을 위해 비밀번호 변경은 대화형 모드로만 가능합니다.', 'warning');
+			this.log('현재 비밀번호를 입력하세요:', 'info');
 			this.inputMode = 'password-change';
 			this.input.type = 'password';
-			this.input.placeholder = '새 비밀번호 입력...';
+			this.input.placeholder = '현재 비밀번호 입력...';
+			setTimeout(() => this.input.focus(), 50);
+		} else {
+			// 인자가 없으면 비밀번호 변경 모드로 전환
+			this.log('현재 비밀번호를 입력하세요:', 'info');
+			this.inputMode = 'password-change';
+			this.input.type = 'password';
+			this.input.placeholder = '현재 비밀번호 입력...';
 			setTimeout(() => this.input.focus(), 50);
 		}
+	},
+	
+	passwordInputCommand() {
+		if (!syncEnabled || !currentRoomKey) {
+			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			return;
+		}
+		
+		// 비밀번호 입력 모드로 전환 (현재 비밀번호 확인용)
+		this.log('🔒 비밀번호를 입력하세요:', 'info');
+		this.inputMode = 'auth';
+		this.input.type = 'password';
+		this.input.placeholder = '비밀번호 입력...';
+		setTimeout(() => this.input.focus(), 50);
 	},
 	
 	participantsCommand() {
@@ -1049,8 +1159,8 @@ const commandConsole = {
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
-							<th style="padding: 6px; text-align: left; width: 100px;">Primary</th>
-							<th style="padding: 6px; text-align: left;">Candidate</th>
+							<th style="padding: 6px; text-align: left;">멤버 A</th>
+							<th style="padding: 6px; text-align: left;">멤버 B</th>
 							<th style="padding: 6px; text-align: center; width: 80px;">확률</th>
 						</tr>
 					</thead>
@@ -1067,17 +1177,18 @@ const commandConsole = {
 							// probability가 1보다 크면 이미 퍼센트 값, 아니면 0~1 범위
 							const displayPercent = candidate.probability > 1 ? Math.round(candidate.probability) : Math.round(candidate.probability * 100);
 							if (idx === 0) {
-								// 첨 번째 행: primary를 rowspan으로 표시
+								// 첫 번째 행: primary 표시
 								output += `
 									<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-										<td style="padding: 6px; vertical-align: top; border-right: 1px solid rgba(255,255,255,0.2);" rowspan="${candidates.length}">'${primaryPerson.name}'</td>
+										<td style="padding: 6px;">'${primaryPerson.name}'</td>
 										<td style="padding: 6px;">'${candidatePerson.name}'</td>
 										<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
 									</tr>`;
 							} else {
-								// 나머지 행: primary 없이 candidate만
+								// 나머지 행: 멤버 A는 공백
 								output += `
 									<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+										<td style="padding: 6px;"></td>
 										<td style="padding: 6px;">'${candidatePerson.name}'</td>
 										<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
 									</tr>`;
@@ -1106,15 +1217,48 @@ const commandConsole = {
 		// 보류 히든 그룹 체인 (pendingHiddenGroupChains)
 		if (state.pendingHiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 히든 그룹 체인 (${state.pendingHiddenGroupChains.length}개):</div>`;
-			state.pendingHiddenGroupChains.forEach((chain, index) => {
-				const candidatesStr = chain.candidates.map(c => {
-					const displayPercent = c.probability > 1 ? Math.round(c.probability) : Math.round(c.probability * 100);
-					return `${c.name}(${displayPercent}%)`;
-				}).join(', ');
-				output += `<div style="padding: 4px 0;">${index + 1}. ${chain.primary} → [${candidatesStr}]</div>`;
+				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 히든 그룹 체인 (${state.pendingHiddenGroupChains.length}개):</div>
+				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+					<thead>
+						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
+							<th style="padding: 6px; text-align: left;">멤버 A</th>
+							<th style="padding: 6px; text-align: left;">멤버 B</th>
+							<th style="padding: 6px; text-align: center; width: 80px;">확률</th>
+						</tr>
+					</thead>
+					<tbody>`;
+			
+			state.pendingHiddenGroupChains.forEach((chain) => {
+				const candidates = chain.candidates || [];
+				
+				if (candidates.length > 0) {
+					candidates.forEach((candidate, idx) => {
+						const displayPercent = candidate.probability > 1 ? Math.round(candidate.probability) : Math.round(candidate.probability * 100);
+						if (idx === 0) {
+							// 첫 번째 행: primary 표시
+							output += `
+								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+									<td style="padding: 6px;">'${chain.primary}'</td>
+									<td style="padding: 6px;">'${candidate.name}'</td>
+									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
+								</tr>`;
+						} else {
+							// 나머지 행: 멤버 A는 공백
+							output += `
+								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+									<td style="padding: 6px;"></td>
+									<td style="padding: 6px;">'${candidate.name}'</td>
+									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
+								</tr>`;
+						}
+					});
+				}
 			});
-			output += `</div>`;
+			
+			output += `
+					</tbody>
+				</table>
+			</div>`;
 		}
 		
 		output += `</div>`;

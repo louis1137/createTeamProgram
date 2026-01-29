@@ -188,6 +188,7 @@ function checkDevToolsAndOpenConsole() {
 				
 				if (commandConsole.output) {
 					if (currentRoomKey) {
+						console.log(`📡 프로필 키 감지: ${currentRoomKey}`);
 						// 프로필이 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 						if (commandConsole.authenticated) {
 							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`, 'success');
@@ -213,6 +214,7 @@ function checkDevToolsAndOpenConsole() {
 													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`, 'success');
 												}
 												commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+												setupRealtimeSync();
 												commandConsole.log('콘솔이 준비되었습니다.', 'success');
 											})
 											.catch((error) => {
@@ -235,17 +237,17 @@ function checkDevToolsAndOpenConsole() {
 													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`, 'info');
 												}
 												commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
-												commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+												setupRealtimeSync();
+												commandConsole.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+												commandConsole.inputMode = 'password-ask-initial';
+												commandConsole.showConfirmButtons();
 											})
 											.catch((error) => {
 												commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
-												commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+												commandConsole.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+												commandConsole.inputMode = 'password-ask-initial';
+												commandConsole.showConfirmButtons();
 											});
-										
-										commandConsole.inputMode = 'auth';
-										commandConsole.input.type = 'password';
-										commandConsole.input.placeholder = '비밀번호 입력...';
-										setTimeout(() => commandConsole.input.focus(), 100);
 									}
 								} else {
 									commandConsole.tempProfile = currentRoomKey;
@@ -1345,6 +1347,7 @@ function addPerson() {
 					if (commandConsole.authenticated) {
 						commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`, 'success');
 						commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+						setupRealtimeSync();
 						commandConsole.log('콘솔이 준비되었습니다.', 'success');
 						setTimeout(() => commandConsole.input.focus(), 100);
 					} else if (database) {
@@ -1368,6 +1371,7 @@ function addPerson() {
 												commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`, 'success');
 											}
 											commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+											setupRealtimeSync();
 											commandConsole.log('콘솔이 준비되었습니다.', 'success');
 										})
 										.catch((error) => {
@@ -1392,6 +1396,7 @@ function addPerson() {
 												commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`, 'info');
 											}
 											commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+											setupRealtimeSync();
 											commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
 										})
 										.catch((error) => {
