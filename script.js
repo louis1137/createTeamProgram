@@ -2153,8 +2153,7 @@ function buildForbiddenMap() {
 // 팀 생성 시 히든 그룹 활성화 (확률 기반)
 function activateHiddenGroupsForTeamGeneration() {
 	state.activeHiddenGroupMap = {};
-	state.activeHiddenGroupChainInfo = {};
-	console.log(`🎲 히든 그룹 활성화 시작 (단일: ${state.hiddenGroups.length}개, 체인: ${state.hiddenGroupChains.length}개)`);
+	state.activeHiddenGroupChainInfo = [];
 	
 	// 단일 쌍 히든 그룹 처리
 	state.hiddenGroups.forEach(([a, b, probability]) => {
@@ -2171,9 +2170,6 @@ function activateHiddenGroupsForTeamGeneration() {
 			if (!state.activeHiddenGroupMap[b]) state.activeHiddenGroupMap[b] = new Set();
 			state.activeHiddenGroupMap[a].add(b);
 			state.activeHiddenGroupMap[b].add(a);
-			console.log(`히든 그룹 생성 : ${nameA},${nameB}(${probability}%)`);
-		} else {
-			console.log(`❌ 히든 그룹 미활성화 : ${nameA},${nameB}(${probability}%) - 확률 실패 (${random.toFixed(1)} >= ${probability})`);
 		}
 	});
 	
@@ -2182,7 +2178,6 @@ function activateHiddenGroupsForTeamGeneration() {
 		// primary 이름으로 참가자 찾기
 		const primaryPerson = state.people.find(p => p.name === chain.primary);
 		if (!primaryPerson) {
-			console.log(`⚠️ 체인 스킵: 주 참가자 "${chain.primary}" 없음`);
 			return; // 주 참가자가 없으면 스킵
 		}
 		const primaryName = primaryPerson.name;
@@ -2192,7 +2187,6 @@ function activateHiddenGroupsForTeamGeneration() {
 			// candidate 이름으로 참가자 찾기
 			const candidatePerson = state.people.find(p => p.name === candidate.name);
 			if (!candidatePerson) {
-				console.log(`⚠️ 후보 스킵: "${candidate.name}" 없음`);
 				continue; // 후보가 없으면 다음 후보로
 			}
 			
@@ -2206,20 +2200,20 @@ function activateHiddenGroupsForTeamGeneration() {
 				state.activeHiddenGroupMap[primaryPerson.id].add(candidatePerson.id);
 				state.activeHiddenGroupMap[candidatePerson.id].add(primaryPerson.id);
 				
-				// 체이닝 정보 저장
-				if (!state.activeHiddenGroupChainInfo[primaryPerson.id]) state.activeHiddenGroupChainInfo[primaryPerson.id] = {};
-				state.activeHiddenGroupChainInfo[primaryPerson.id][candidatePerson.id] = candidate.probability;
+				// 체이닝 정보 저장 (배열에 추가)
+				state.activeHiddenGroupChainInfo.push({
+					primaryName: primaryName,
+					candidateName: candidateName,
+					probability: candidate.probability
+				});
 				
-				console.log(`히든 그룹 생성 (체인) : ${primaryName},${candidateName}(${candidate.probability}%)`);
 				activated = true;
 				break; // 체인에서 첫 번째 성공하면 중단
-			} else {
-				console.log(`❌ 체인 시도 실패 : ${primaryName} → ${candidateName}(${candidate.probability}%) - 다음 후보로...`);
 			}
 		}
 		
 		if (!activated) {
-			console.log(`❌ 체인 모두 실패 : ${primaryName}`);
+			// 체인 모두 실패
 		}
 	});
 }
@@ -2263,14 +2257,12 @@ function deactivateHiddenGroups() {
 				
 				if (isChain) {
 					// 체이닝 형식: "A(체이닝의 맨앞에 선언된 참가자) - B(히든그룹으로 묶인 멤버) (확률)"
-					console.log(`히든그룹매칭성공 : ${primaryName} - ${partnerName} (${probability}%)`);
 				} else {
 					// 일반 히든 그룹 형식
 					const hiddenGroup = state.hiddenGroups.find(([a, b]) => 
 						(a === parseInt(aId) && b === parseInt(bId)) || (a === parseInt(bId) && b === parseInt(aId))
 					);
 					probability = hiddenGroup ? hiddenGroup[2] : '?';
-					console.log(`히든그룹매칭성공 : ${nameA} - ${nameB} (${probability}%)`);
 				}
 			}
 		});
@@ -3846,6 +3838,71 @@ function createResultListItem(person) {
 	return li;
 }
 
+// cmd 콘솔에 팀 생성 결과 출력
+function logTeamResultsToConsole(teams) {
+	if (!commandConsole || !commandConsole.log) return;
+	
+	// 인증이 안 되어 있으면 읽기 모드로 전환
+	if (!commandConsole.authenticated && commandConsole.inputMode !== 'normal') {
+		commandConsole.inputMode = 'normal';
+		
+		// 확인/취소 버튼을 명령어 입력 필드로 복원
+		if (commandConsole.restoreInputField) {
+			commandConsole.restoreInputField();
+		}
+		
+		if (commandConsole.input) {
+			commandConsole.input.type = 'text';
+			commandConsole.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+		}
+		commandConsole.log('🔓 읽기 전용 모드로 전환되었습니다.', 'info');
+	}
+	
+	// 팀 생성 결과 출력
+	const teamResults = teams.map((team, index) => {
+		const teamNumber = index + 1;
+		const teamMembers = team.map(person => {
+			let parts = [];
+			
+			// 이름
+			parts.push(person.name);
+			
+			// 성별 정보 추가
+			if (state.genderBalanceEnabled && person.gender) {
+				const genderEmoji = person.gender === 'male' ? '♂️' : person.gender === 'female' ? '♀️' : '';
+				if (genderEmoji) parts.push(genderEmoji);
+			}
+			
+			// 가중치 정보 추가
+			if (state.weightBalanceEnabled && person.weight !== undefined) {
+				parts.push(person.weight);
+			}
+			
+			// 이름(성별/가중치) 형식으로 조합
+			if (parts.length > 1) {
+				return `${parts[0]}(${parts.slice(1).join('/')})`;
+			} else {
+				return parts[0];
+			}
+		}).join(', ');
+		
+		return `${teamNumber}팀: ${teamMembers}`;
+	}).join('<br>');
+	
+	// 적용된 규칙이 있을 경우 추가
+	let outputMessage = `[생성된 팀]<br>${teamResults}`;
+	
+	if (state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
+		const ruleResults = state.activeHiddenGroupChainInfo.map(info => {
+			return `- ${info.primaryName} → ${info.candidateName} (${info.probability}%)`;
+		}).join('<br>');
+		
+		outputMessage += `<br><br>[적용된 규칙]<br>${ruleResults}`;
+	}
+	
+	commandConsole.log(outputMessage);
+}
+
 // 검증 루프 시작
 async function startValidationLoop(initialTeams) {
 	let currentTeams = initialTeams.map(team => [...team]);
@@ -3914,6 +3971,9 @@ async function startValidationLoop(initialTeams) {
 	isValidated = true;
 	// 최종 팀으로 업데이트
 	window.currentTeams = currentTeams;
+	
+	// cmd 콘솔에 팀 생성 결과 출력
+	logTeamResultsToConsole(currentTeams);
 	
 	// 최종 검증된 팀을 결과창에 표시
 	await displayTeams(currentTeams);
