@@ -1210,11 +1210,11 @@ function resetAll(e) {
 	const isCompleteReset = e && e.shiftKey;
 	
 	if (isCompleteReset) {
-		if (!confirm('⚠️ 완전 초기화를 실행합니다!\n\n참가자와 미참가자를 포함한 모든 데이터가 삭제됩니다.\n(제약 설정은 유지됩니다)\n\n계속하시겠습니까?')) {
+		if (!confirm('⚠️ 완전 초기화를 실행합니다!\n\n참가자와 미참가자를 포함한 모든 데이터가 삭제됩니다.')) {
 			return;
 		}
 	} else {
-		if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 제약 설정(금지 제약)은 초기화되지 않습니다.')) {
+		if (!confirm('모든 데이터를 초기화하시겠습니까?')) {
 			return;
 		}
 	}
@@ -1258,7 +1258,7 @@ function resetAll(e) {
 	state.forbiddenPairs = []; // id 기반 제약 초기화(보류로 전환됨)
 	state.forbiddenMap = {};
 	state.hiddenGroups = []; // id 기반 히든 그룹 초기화
-	state.hiddenGroupChains = []; // id 기반 히든 그룹 체인 초기화
+	// state.hiddenGroupChains는 초기화하지 않음 (규칙은 cmd의 초기화로만 삭제 가능)
 	state.activeHiddenGroupMap = {};
 	elements.resultsSection.classList.remove('visible');
 	// 캡처 버튼 컨테이너 숨기기

@@ -1386,7 +1386,6 @@ const commandConsole = {
 		// 확률 규칙 체인 (hiddenGroupChains) - rowspan 사용
 		if (state.hiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">✅ 확률 규칙 체인 (${state.hiddenGroupChains.length}개):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
