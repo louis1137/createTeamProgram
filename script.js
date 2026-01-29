@@ -87,7 +87,7 @@ function init() {
 	if (elements.maxTeamSizeCheckbox) elements.maxTeamSizeCheckbox.addEventListener('change', handleMaxTeamSizeToggle);
 	if (elements.teamSizeInput) elements.teamSizeInput.addEventListener('change', handleTeamSizeChange);
 	if (elements.addPersonBtn) elements.addPersonBtn.addEventListener('click', addPerson);
-	if (elements.resetBtn) elements.resetBtn.addEventListener('click', resetAll);
+	if (elements.resetBtn) elements.resetBtn.addEventListener('click', (e) => resetAll(e));
 	if (elements.shuffleOrderBtn) elements.shuffleOrderBtn.addEventListener('click', shuffleOrder);
 	if (elements.nameInput) {
 		elements.nameInput.addEventListener('keypress', (e) => {
@@ -1093,9 +1093,18 @@ function triggerParticipantFlash() {
 	}, 600);
 }
 
-function resetAll() {
-	if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 제약 설정(금지 제약)은 초기화되지 않습니다.')) {
-		return;
+function resetAll(e) {
+	// Shift 키를 누른 상태로 클릭한 경우 완전 초기화
+	const isCompleteReset = e && e.shiftKey;
+	
+	if (isCompleteReset) {
+		if (!confirm('⚠️ 완전 초기화를 실행합니다!\n\n참가자와 미참가자를 포함한 모든 데이터가 삭제됩니다.\n(제약 설정은 유지됩니다)\n\n계속하시겠습니까?')) {
+			return;
+		}
+	} else {
+		if (!confirm('모든 데이터를 초기화하시겠습니까?\n참고: 제약 설정(금지 제약)은 초기화되지 않습니다.')) {
+			return;
+		}
 	}
 
 	// 적용된(id 기반) 제약을 이름 기반 보류 제약으로 변환하여 유지
@@ -1110,19 +1119,25 @@ function resetAll() {
 		safeOpenForbiddenWindow();
 	}
 	
-	// 모든 참가자를 미참가자 목록으로 이동
-	state.people.forEach(person => {
-		const normalized = normalizeName(person.name);
-		const existingInactive = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
-		if (!existingInactive) {
-			const inactivePerson = {
-				name: person.name,
-				gender: person.gender,
-				weight: person.weight
-			};
-			state.inactivePeople.push(inactivePerson);
-		}
-	});
+	// Shift 키를 누른 경우: 미참가자도 모두 삭제
+	if (isCompleteReset) {
+		state.inactivePeople = [];
+		console.log('완전 초기화: 참가자 및 미참가자 모두 삭제되었습니다.');
+	} else {
+		// 일반 초기화: 모든 참가자를 미참가자 목록으로 이동
+		state.people.forEach(person => {
+			const normalized = normalizeName(person.name);
+			const existingInactive = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+			if (!existingInactive) {
+				const inactivePerson = {
+					name: person.name,
+					gender: person.gender,
+					weight: person.weight
+				};
+				state.inactivePeople.push(inactivePerson);
+			}
+		});
+	}
 	
 	// 참가자 및 그룹 목록 초기화(보류 제약은 유지)
 	state.people = [];
@@ -1643,20 +1658,25 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 	}
 }
 
-function removePerson(id) {
+function removePerson(id, isCompleteDelete = false) {
 	const person = state.people.find(p => p.id === id);
 	if (person) {
-		// 미참가자 목록에 추가 (중복 확인)
-		const normalized = normalizeName(person.name);
-		const existingInactive = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
-		if (!existingInactive) {
-			// id 제거하고 미참가자 목록에 추가
-			const inactivePerson = {
-				name: person.name,
-				gender: person.gender,
-				weight: person.weight
-			};
-			state.inactivePeople.push(inactivePerson);
+		// isCompleteDelete가 true가 아닌 경우에만 미참가자 목록에 추가
+		if (!isCompleteDelete) {
+			// 미참가자 목록에 추가 (중복 확인)
+			const normalized = normalizeName(person.name);
+			const existingInactive = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+			if (!existingInactive) {
+				// id 제거하고 미참가자 목록에 추가
+				const inactivePerson = {
+					name: person.name,
+					gender: person.gender,
+					weight: person.weight
+				};
+				state.inactivePeople.push(inactivePerson);
+			}
+		} else {
+			console.log(`완전 삭제: ${person.name}이(가) 완전히 삭제되었습니다.`);
 		}
 	}
 	
@@ -2606,7 +2626,17 @@ function createPersonTag(person, potentialDuplicates = []) {
 	const removeBtn = document.createElement('button');
 	removeBtn.textContent = '×';
 	removeBtn.className = 'remove-btn';
-	removeBtn.addEventListener('click', () => removePerson(person.id));
+	removeBtn.addEventListener('click', (e) => {
+		// Shift 키를 누른 상태로 클릭한 경우 완전 삭제
+		const isCompleteDelete = e.shiftKey;
+		if (isCompleteDelete) {
+			if (confirm(`⚠️ ${person.name}을(를) 완전히 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 미참가자 목록에도 남지 않습니다.`)) {
+				removePerson(person.id, true);
+			}
+		} else {
+			removePerson(person.id, false);
+		}
+	});
 	
 	personTag.appendChild(removeBtn);
 	
