@@ -201,15 +201,47 @@ function checkDevToolsAndOpenConsole() {
 								if (password !== null) {
 									if (password === '') {
 										commandConsole.authenticated = true;
-										commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨`, 'success');
-										commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
-										commandConsole.log('콘솔이 준비되었습니다.', 'success');
+										
+										// 데이터 로드
+										database.ref(`rooms/${currentRoomKey}`).once('value')
+											.then((snapshot) => {
+												const data = snapshot.val();
+												if (data && (data.people || data.timestamp)) {
+													loadStateFromData(data);
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`, 'success');
+												} else {
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`, 'success');
+												}
+												commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+												commandConsole.log('콘솔이 준비되었습니다.', 'success');
+											})
+											.catch((error) => {
+												commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
+											});
+										
 										setTimeout(() => commandConsole.input.focus(), 100);
 									} else {
 										commandConsole.storedPassword = password;
 										commandConsole.authenticated = false;
-										commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견`, 'info');
-										commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+										
+										// 비밀번호 확인 전에 데이터 동기화 먼저 시작
+										database.ref(`rooms/${currentRoomKey}`).once('value')
+											.then((snapshot) => {
+												const data = snapshot.val();
+												if (data && (data.people || data.timestamp)) {
+													loadStateFromData(data);
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`, 'info');
+												} else {
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`, 'info');
+												}
+												commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+												commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+											})
+											.catch((error) => {
+												commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
+												commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+											});
+										
 										commandConsole.inputMode = 'auth';
 										commandConsole.input.type = 'password';
 										commandConsole.input.placeholder = '비밀번호 입력...';
@@ -1324,17 +1356,49 @@ function addPerson() {
 								if (password === '') {
 									// 비밀번호 없음 - 바로 사용 가능
 									commandConsole.authenticated = true;
-									commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨`, 'success');
-									commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
-									commandConsole.log('콘솔이 준비되었습니다.', 'success');
+									
+									// 데이터 로드
+									database.ref(`rooms/${currentRoomKey}`).once('value')
+										.then((snapshot) => {
+											const data = snapshot.val();
+											if (data && (data.people || data.timestamp)) {
+												loadStateFromData(data);
+												commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`, 'success');
+											} else {
+												commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`, 'success');
+											}
+											commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+											commandConsole.log('콘솔이 준비되었습니다.', 'success');
+										})
+										.catch((error) => {
+											commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
+										});
+									
 									// 입력 폼에 포커스
 									setTimeout(() => commandConsole.input.focus(), 100);
 								} else {
 									// 비밀번호가 설정되어 있음 - 인증 필요
 									commandConsole.storedPassword = password;
 									commandConsole.authenticated = false;
-									commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견`, 'info');
-									commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+									
+									// 비밀번호 확인 전에 데이터 동기화 먼저 시작
+									database.ref(`rooms/${currentRoomKey}`).once('value')
+										.then((snapshot) => {
+											const data = snapshot.val();
+											if (data && (data.people || data.timestamp)) {
+												loadStateFromData(data);
+												commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`, 'info');
+											} else {
+												commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`, 'info');
+											}
+											commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+											commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+										})
+										.catch((error) => {
+											commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
+											commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+										});
+									
 									commandConsole.inputMode = 'auth';
 									commandConsole.input.type = 'password';
 									commandConsole.input.placeholder = '비밀번호 입력...';
