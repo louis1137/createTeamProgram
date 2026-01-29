@@ -171,7 +171,8 @@ function checkDevToolsAndOpenConsole() {
 	const heightThreshold = window.outerHeight - window.innerHeight > threshold;
 	const isDevToolsOpen = widthThreshold || heightThreshold;
 	
-	if (isDevToolsOpen) {
+	// 로컬 환경이면서 개발자 도구가 열려있을 때만 콘솔 자동 열기
+	if (isLocalView() && isDevToolsOpen) {
 		// 개발자 도구가 열려있으면 콘솔 자동 열기
 		setTimeout(() => {
 			const consoleEl = document.getElementById('commandConsole');
