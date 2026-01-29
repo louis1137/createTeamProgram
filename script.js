@@ -1284,8 +1284,28 @@ function addPerson() {
 				const pb = findPersonByName(rightName);
 				if (pa && pb) {
 					console.log(`✅ 참가자 발견: ${leftName}(ID:${pa.id}), ${rightName}(ID:${pb.id})`);
-					const res = addHiddenGroupByNames(leftName, rightName, probability);
-					if (res.ok) constraintsTouched = true;
+					// 기존 체인에 추가할 수 있는지 확인
+					const existingChain = state.hiddenGroupChains.find(chain => chain.primary === pa.id);
+					if (existingChain) {
+						// 기존 체인에 후보 추가
+						const existingCandidate = existingChain.candidates.find(c => c.id === pb.id);
+						if (existingCandidate) {
+							// 이미 있는 후보면 확률 업데이트
+							existingCandidate.probability = probability;
+							console.log(`🔄 체인 후보 확률 갱신: ${leftName} → ${rightName}(${probability}%)`);
+						} else {
+							// 새 후보 추가
+							existingChain.candidates.push({ id: pb.id, probability: probability });
+							console.log(`➕ 체인에 후보 추가: ${leftName} → ${rightName}(${probability}%)`);
+						}
+						saveToLocalStorage();
+						try { printParticipantConsole(); } catch (_) { /* no-op */ }
+						constraintsTouched = true;
+					} else {
+						// 기존 체인이 없으면 단일 쌍으로 추가
+						const res = addHiddenGroupByNames(leftName, rightName, probability);
+						if (res.ok) constraintsTouched = true;
+					}
 				} else {
 					console.log(`⏳ 참가자 미발견 (보류): ${!pa ? leftName : ''}${!pa && !pb ? ', ' : ''}${!pb ? rightName : ''}`);
 					const pres = addPendingHiddenGroup(leftName, rightName, probability);
@@ -1951,7 +1971,41 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		return { ok: false, message: msg };
 	}
 	
-	// 기존 히든 그룹 찾기
+	// 이미 체인으로 등록되어 있는지 확인
+	const existingChainAsA = state.hiddenGroupChains.find(chain => chain.primary === pa.id);
+	const existingChainAsB = state.hiddenGroupChains.find(chain => chain.primary === pb.id);
+	
+	if (existingChainAsA) {
+		// pa가 primary인 체인이 있으면 pb를 후보로 추가
+		const existingCandidate = existingChainAsA.candidates.find(c => c.id === pb.id);
+		if (existingCandidate) {
+			existingCandidate.probability = probability;
+			console.log(`🔄 체인 후보 확률 갱신: ${pa.name} → ${pb.name}(${probability}%)`);
+		} else {
+			existingChainAsA.candidates.push({ id: pb.id, probability: probability });
+			console.log(`➕ 체인에 후보 추가: ${pa.name} → ${pb.name}(${probability}%)`);
+		}
+		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+		return { ok: true, added: true };
+	}
+	
+	if (existingChainAsB) {
+		// pb가 primary인 체인이 있으면 pa를 후보로 추가
+		const existingCandidate = existingChainAsB.candidates.find(c => c.id === pa.id);
+		if (existingCandidate) {
+			existingCandidate.probability = probability;
+			console.log(`🔄 체인 후보 확률 갱신: ${pb.name} → ${pa.name}(${probability}%)`);
+		} else {
+			existingChainAsB.candidates.push({ id: pa.id, probability: probability });
+			console.log(`➕ 체인에 후보 추가: ${pb.name} → ${pa.name}(${probability}%)`);
+		}
+		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+		return { ok: true, added: true };
+	}
+	
+	// 기존 단일 쌍 히든 그룹 찾기
 	const existingIndex = state.hiddenGroups.findIndex(
 		([a, b]) => (a === pa.id && b === pb.id) || (a === pb.id && b === pa.id)
 	);
@@ -1964,13 +2018,17 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		console.log(`✅ 히든 그룹 추가 (${probability}%): ${pa.name} ↔ ${pb.name}`);
 		return { ok: true, added: true };
 	} else {
-		// 기존 확률 업데이트
-		const oldProb = state.hiddenGroups[existingIndex][2];
-		state.hiddenGroups[existingIndex][2] = probability;
-		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
-		console.log(`🔄 히든 그룹 확률 갱신 (${oldProb}% → ${probability}%): ${pa.name} ↔ ${pb.name}`);
-		return { ok: true, added: false, updated: true };
+		// 기존 단일 쌍을 체인으로 변환
+		const [existingA, existingB, existingProb] = state.hiddenGroups[existingIndex];
+		state.hiddenGroups.splice(existingIndex, 1); // 단일 쌍 제거
+		
+		// 체인으로 변환 (pa를 primary로)
+		addHiddenGroupChain(pa.id, [
+			{ id: pb.id, probability: probability }
+		]);
+		
+		console.log(`🔗 단일 쌍을 체인으로 변환: ${pa.name} → ${pb.name}(${probability}%)`);
+		return { ok: true, added: true, converted: true };
 	}
 }
 
