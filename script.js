@@ -1255,7 +1255,30 @@ function addPerson() {
 					
 					if (allFound) {
 						console.log(`✅ 체인 참가자 모두 발견: ${firstPart} → ${parts.map(p => p.name).join(', ')}`);
-						addHiddenGroupChain(primaryPerson.id, candidateIds);
+						// 기존 체인이 있으면 후보를 병합
+						const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryPerson.id);
+						if (existingChain) {
+							// 기존 체인에 새 후보들 추가/갱신
+							candidateIds.forEach(newCandidate => {
+								const existing = existingChain.candidates.find(c => c.id === newCandidate.id);
+								if (existing) {
+									existing.probability = newCandidate.probability;
+									const candidatePerson = state.people.find(p => p.id === newCandidate.id);
+									const candidateName = candidatePerson ? candidatePerson.name : `ID ${newCandidate.id}`;
+									console.log(`🔄 체인 후보 확률 갱신: ${firstPart} → ${candidateName}(${newCandidate.probability}%)`);
+								} else {
+									existingChain.candidates.push(newCandidate);
+									const candidatePerson = state.people.find(p => p.id === newCandidate.id);
+									const candidateName = candidatePerson ? candidatePerson.name : `ID ${newCandidate.id}`;
+									console.log(`➕ 체인에 후보 추가: ${firstPart} → ${candidateName}(${newCandidate.probability}%)`);
+								}
+							});
+							saveToLocalStorage();
+							try { printParticipantConsole(); } catch (_) { /* no-op */ }
+						} else {
+							// 새 체인 생성
+							addHiddenGroupChain(primaryPerson.id, candidateIds);
+						}
 						constraintsTouched = true;
 					} else {
 						console.log(`⏳ 체인 참가자 일부 미발견 (보류)`);
