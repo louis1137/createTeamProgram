@@ -2,7 +2,7 @@ const teamDisplayDelay = isLocalView() ? 50 : 400;
 const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
 // 검증 비교창 표시 여부 (true: 표시, false: 숨김)
-const SHOW_VALIDATION_COMPARISON = isLocalView() ? true : false;
+const SHOW_VALIDATION_COMPARISON = isLocalView() ? false : false;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 
 // 파비콘 애니메이션
@@ -32,6 +32,12 @@ const state = {
 	forbiddenPairs: [], // [idA, idB] 형식의 배열
 	forbiddenMap: {},   // forbiddenPairs에서 만들어진 빠른 조회용 맵
 	pendingConstraints: [], // {left: 정규화, right: 정규화} 형식의 보류 제약 배열
+	hiddenGroups: [], // [idA, idB, probability] 형식의 배열 - 확률 기반 히든 그룹
+	hiddenGroupChains: [], // [{primary: id, candidates: [{id, probability}]}] 형식 - 체이닝 히든 그룹
+	activeHiddenGroupMap: {}, // 현재 팀 생성에서 활성화된 히든 그룹 맵 (임시)
+	activeHiddenGroupChainInfo: {}, // 체이닝 정보 맵 { primaryId: { partnerId: probability } }
+	pendingHiddenGroups: [], // {left: 정규화, right: 정규화, probability: 숫자} 형식의 보류 히든 그룹 배열
+	pendingHiddenGroupChains: [], // [{primary: 정규화, candidates: [{name, probability}]}] 형식 - 보류 체이닝
 	genderBalanceEnabled: false,
 	weightBalanceEnabled: false,
 	maxTeamSizeEnabled: false,
@@ -121,6 +127,8 @@ function init() {
 	buildForbiddenMap();
 	// 이전에 참가자가 추가되어 있다면 보류 중인 텍스트 제약을 해결 시도
 	tryResolvePendingConstraints();
+	// 이전에 참가자가 추가되어 있다면 보류 중인 히든 그룹을 해결 시도
+	tryResolveHiddenGroups();
 	
 	// 제약이 있으면 확인 레이어 띄우기 (모든 초기화 완료 후)
 	if (state.forbiddenPairs.length > 0 || state.pendingConstraints.length > 0) setTimeout(() => { showConstraintNotification(); }, 100);
@@ -633,6 +641,7 @@ function saveToLocalStorage() {
 			nextId: state.nextId,
 			forbiddenPairs: state.forbiddenPairs,
 			pendingConstraints: state.pendingConstraints,
+			// hiddenGroups와 pendingHiddenGroups는 저장하지 않음 (새로고침 시 초기화)
 			// 설정 값 저장
 			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 			genderBalanceEnabled: state.genderBalanceEnabled,
@@ -678,6 +687,11 @@ function loadFromLocalStorage() {
 			state.nextId = data.nextId || 1;
 			state.forbiddenPairs = data.forbiddenPairs || [];
 			state.pendingConstraints = data.pendingConstraints || [];
+			// hiddenGroups, pendingHiddenGroups, hiddenGroupChains, pendingHiddenGroupChains는 항상 빈 배열로 초기화 (저장하지 않음)
+			state.hiddenGroups = [];
+			state.pendingHiddenGroups = [];
+			state.hiddenGroupChains = [];
+			state.pendingHiddenGroupChains = [];
 			
 			// 설정 값 복원
 			if (typeof data.maxTeamSizeEnabled !== 'undefined') {
@@ -1108,6 +1122,9 @@ function resetAll() {
 	state.nextId = 1;
 	state.forbiddenPairs = []; // id 기반 제약 초기화(보류로 전환됨)
 	state.forbiddenMap = {};
+	state.hiddenGroups = []; // id 기반 히든 그룹 초기화
+	state.hiddenGroupChains = []; // id 기반 히든 그룹 체인 초기화
+	state.activeHiddenGroupMap = {};
 	elements.resultsSection.classList.remove('visible');
 	// 캡처 버튼 컨테이너 숨기기
 	if (elements.captureButtonContainer) elements.captureButtonContainer.style.display = 'none';
@@ -1191,6 +1208,93 @@ function addPerson() {
 	const allInputNames = []; // 입력된 모든 이름 (정규화된 형태)
 
 	tokens.forEach(token => {
+		// 히든 그룹 체이닝 체크: A(50)B(50)C(50)D 패턴
+		const chainPattern = /^([^(]+)(?:\((\d+)\)([^(]+))+$/;
+		if (chainPattern.test(token)) {
+			// 체인 파싱
+			const parts = [];
+			let current = token;
+			let firstPart = null;
+			
+			// 첫 번째 부분 추출
+			const firstMatch = current.match(/^([^(]+)\(/);
+			if (firstMatch) {
+				firstPart = firstMatch[1].trim();
+				current = current.substring(firstMatch[1].length);
+			}
+			
+			// 나머지 (확률)이름 패턴 반복 추출
+			const pairPattern = /\((\d+)\)([^(]+?)(?=\(|$)/g;
+			let match;
+			while ((match = pairPattern.exec(current)) !== null) {
+				const prob = parseInt(match[1]);
+				const name = match[2].trim();
+				if (name && prob >= 0 && prob <= 100) {
+					parts.push({ name, probability: prob });
+				}
+			}
+			
+			if (firstPart && parts.length > 0) {
+				console.log(`🔗 히든 그룹 체인 파싱: "${token}" → 주:"${firstPart}", 후보:${parts.map(p => `${p.name}(${p.probability}%)`).join(', ')}`);
+				
+				// 참가자 확인 및 추가
+				const primaryPerson = findPersonByName(firstPart);
+				if (primaryPerson) {
+					const candidateIds = [];
+					let allFound = true;
+					
+					for (const part of parts) {
+						const candidate = findPersonByName(part.name);
+						if (candidate) {
+							candidateIds.push({ id: candidate.id, probability: part.probability });
+						} else {
+							allFound = false;
+							break;
+						}
+					}
+					
+					if (allFound) {
+						console.log(`✅ 체인 참가자 모두 발견: ${firstPart} → ${parts.map(p => p.name).join(', ')}`);
+						addHiddenGroupChain(primaryPerson.id, candidateIds);
+						constraintsTouched = true;
+					} else {
+						console.log(`⏳ 체인 참가자 일부 미발견 (보류)`);
+						addPendingHiddenGroupChain(firstPart, parts);
+						constraintsTouched = true;
+					}
+				} else {
+					console.log(`⏳ 체인 주 참가자 미발견 (보류): ${firstPart}`);
+					addPendingHiddenGroupChain(firstPart, parts);
+					constraintsTouched = true;
+				}
+				return; // 체인 처리 완료
+			}
+		}
+		
+		// 히든 그룹 단일 쌍 체크: A(50)B 패턴 (체이닝이 아닌 경우)
+		const hiddenGroupMatch = token.match(/^([^(]+)\((\d+)\)([^(]+)$/);
+		if (hiddenGroupMatch) {
+			// 히든 그룹 처리
+			const leftName = hiddenGroupMatch[1].trim();
+			const probability = parseInt(hiddenGroupMatch[2]);
+			const rightName = hiddenGroupMatch[3].trim();
+			console.log(`🔍 히든 그룹 파싱: "${token}" → 왼쪽:"${leftName}", 확률:${probability}%, 오른쪽:"${rightName}"`);
+			if (leftName && rightName && probability >= 0 && probability <= 100) {
+				const pa = findPersonByName(leftName);
+				const pb = findPersonByName(rightName);
+				if (pa && pb) {
+					console.log(`✅ 참가자 발견: ${leftName}(ID:${pa.id}), ${rightName}(ID:${pb.id})`);
+					const res = addHiddenGroupByNames(leftName, rightName, probability);
+					if (res.ok) constraintsTouched = true;
+				} else {
+					console.log(`⏳ 참가자 미발견 (보류): ${!pa ? leftName : ''}${!pa && !pb ? ', ' : ''}${!pb ? rightName : ''}`);
+					const pres = addPendingHiddenGroup(leftName, rightName, probability);
+					if (pres.ok) constraintsTouched = true;
+				}
+			}
+			return; // 히든 그룹 처리 완료
+		}
+		
 		if (token.includes('!')) {
 			// 한 입력에서 여러 제약 처리: "A!B!C!D" 또는 "A!B,C!E"
 			// 먼저 쉼표로 분리하여 "A!B,C!E" -> ["A!B", "C!E"] 형태로 처리
@@ -1472,6 +1576,8 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 		renderPeople();
 		// 사람을 추가한 이후 보류 중인 텍스트 제약을 해결 시도
 		tryResolvePendingConstraints();
+		// 사람을 추가한 이후 보류 중인 히든 그룹을 해결 시도
+		tryResolveHiddenGroups();
 	}
 }
 
@@ -1504,6 +1610,24 @@ function removePerson(id) {
 		safeOpenForbiddenWindow();
 	}
 	buildForbiddenMap();
+	// 이 사람이 포함된 모든 히든 그룹 제거
+	const beforeHidden = state.hiddenGroups.length;
+	state.hiddenGroups = state.hiddenGroups.filter(([a, b]) => a !== id && b !== id);
+	const afterHidden = state.hiddenGroups.length;
+	if (beforeHidden !== afterHidden) {
+		console.log(`히든 그룹 제거: 삭제된 사람(id:${id})과 관련된 히든 그룹 ${beforeHidden - afterHidden}개가 제거되었습니다.`);
+	}
+	// 이 사람이 포함된 모든 히든 그룹 체인 제거
+	const beforeChain = state.hiddenGroupChains.length;
+	state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => {
+		if (chain.primary === id) return false;
+		if (chain.candidates.some(c => c.id === id)) return false;
+		return true;
+	});
+	const afterChain = state.hiddenGroupChains.length;
+	if (beforeChain !== afterChain) {
+		console.log(`히든 그룹 체인 제거: 삭제된 사람(id:${id})과 관련된 체인 ${beforeChain - afterChain}개가 제거되었습니다.`);
+	}
 	saveToLocalStorage();
 	renderPeople();
 }
@@ -1692,6 +1816,359 @@ function buildForbiddenMap() {
 		state.forbiddenMap[a].add(b);
 		state.forbiddenMap[b].add(a);
 	});
+}
+
+// 팀 생성 시 히든 그룹 활성화 (확률 기반)
+function activateHiddenGroupsForTeamGeneration() {
+	state.activeHiddenGroupMap = {};
+	state.activeHiddenGroupChainInfo = {};
+	console.log(`🎲 히든 그룹 활성화 시작 (단일: ${state.hiddenGroups.length}개, 체인: ${state.hiddenGroupChains.length}개)`);
+	
+	// 단일 쌍 히든 그룹 처리
+	state.hiddenGroups.forEach(([a, b, probability]) => {
+		// 확률에 따라 활성화 여부 결정
+		const random = Math.random() * 100;
+		// 참가자 이름 가져오기
+		const personA = state.people.find(p => p.id === a);
+		const personB = state.people.find(p => p.id === b);
+		const nameA = personA ? personA.name : `ID ${a}`;
+		const nameB = personB ? personB.name : `ID ${b}`;
+		
+		if (random < probability) {
+			if (!state.activeHiddenGroupMap[a]) state.activeHiddenGroupMap[a] = new Set();
+			if (!state.activeHiddenGroupMap[b]) state.activeHiddenGroupMap[b] = new Set();
+			state.activeHiddenGroupMap[a].add(b);
+			state.activeHiddenGroupMap[b].add(a);
+			console.log(`히든 그룹 생성 : ${nameA},${nameB}(${probability}%)`);
+		} else {
+			console.log(`❌ 히든 그룹 미활성화 : ${nameA},${nameB}(${probability}%) - 확률 실패 (${random.toFixed(1)} >= ${probability})`);
+		}
+	});
+	
+	// 체인 히든 그룹 처리
+	state.hiddenGroupChains.forEach(chain => {
+		const primaryPerson = state.people.find(p => p.id === chain.primary);
+		const primaryName = primaryPerson ? primaryPerson.name : `ID ${chain.primary}`;
+		
+		let activated = false;
+		for (const candidate of chain.candidates) {
+			const random = Math.random() * 100;
+			const candidatePerson = state.people.find(p => p.id === candidate.id);
+			const candidateName = candidatePerson ? candidatePerson.name : `ID ${candidate.id}`;
+			
+			if (random < candidate.probability) {
+				// 활성화 성공
+				if (!state.activeHiddenGroupMap[chain.primary]) state.activeHiddenGroupMap[chain.primary] = new Set();
+				if (!state.activeHiddenGroupMap[candidate.id]) state.activeHiddenGroupMap[candidate.id] = new Set();
+				state.activeHiddenGroupMap[chain.primary].add(candidate.id);
+				state.activeHiddenGroupMap[candidate.id].add(chain.primary);
+				
+				// 체이닝 정보 저장
+				if (!state.activeHiddenGroupChainInfo[chain.primary]) state.activeHiddenGroupChainInfo[chain.primary] = {};
+				state.activeHiddenGroupChainInfo[chain.primary][candidate.id] = candidate.probability;
+				
+				console.log(`히든 그룹 생성 (체인) : ${primaryName},${candidateName}(${candidate.probability}%)`);
+				activated = true;
+				break; // 체인에서 첫 번째 성공하면 중단
+			} else {
+				console.log(`❌ 체인 시도 실패 : ${primaryName} → ${candidateName}(${candidate.probability}%) - 다음 후보로...`);
+			}
+		}
+		
+		if (!activated) {
+			console.log(`❌ 체인 모두 실패 : ${primaryName}`);
+		}
+	});
+}
+
+// 팀 생성 후 히든 그룹 해제
+function deactivateHiddenGroups() {
+	// 활성화된 히든 그룹 정보 출력
+	const activatedPairs = new Set();
+	Object.keys(state.activeHiddenGroupMap).forEach(aId => {
+		state.activeHiddenGroupMap[aId].forEach(bId => {
+			// 중복 출력 방지 (a-b와 b-a는 같은 쌍)
+			const pairKey = [parseInt(aId), parseInt(bId)].sort((x, y) => x - y).join('-');
+			if (!activatedPairs.has(pairKey)) {
+				activatedPairs.add(pairKey);
+				
+				// 참가자 이름 가져오기
+				const personA = state.people.find(p => p.id === parseInt(aId));
+				const personB = state.people.find(p => p.id === parseInt(bId));
+				const nameA = personA ? personA.name : `ID ${aId}`;
+				const nameB = personB ? personB.name : `ID ${bId}`;
+				
+				// 체이닝으로 생성된 히든 그룹인지 확인
+				let isChain = false;
+				let primaryName = null;
+				let partnerName = null;
+				let probability = null;
+				
+				if (state.activeHiddenGroupChainInfo[aId] && state.activeHiddenGroupChainInfo[aId][bId]) {
+					// aId가 primary
+					isChain = true;
+					primaryName = nameA;
+					partnerName = nameB;
+					probability = state.activeHiddenGroupChainInfo[aId][bId];
+				} else if (state.activeHiddenGroupChainInfo[bId] && state.activeHiddenGroupChainInfo[bId][aId]) {
+					// bId가 primary
+					isChain = true;
+					primaryName = nameB;
+					partnerName = nameA;
+					probability = state.activeHiddenGroupChainInfo[bId][aId];
+				}
+				
+				if (isChain) {
+					// 체이닝 형식: "A(체이닝의 맨앞에 선언된 참가자) - B(히든그룹으로 묶인 멤버) (확률)"
+					console.log(`히든그룹매칭성공 : ${primaryName} - ${partnerName} (${probability}%)`);
+				} else {
+					// 일반 히든 그룹 형식
+					const hiddenGroup = state.hiddenGroups.find(([a, b]) => 
+						(a === parseInt(aId) && b === parseInt(bId)) || (a === parseInt(bId) && b === parseInt(aId))
+					);
+					probability = hiddenGroup ? hiddenGroup[2] : '?';
+					console.log(`히든그룹매칭성공 : ${nameA} - ${nameB} (${probability}%)`);
+				}
+			}
+		});
+	});
+	
+	state.activeHiddenGroupMap = {};
+	state.activeHiddenGroupChainInfo = {};
+}
+
+// 히든 그룹 추가 (이름 기반)
+function addHiddenGroupByNames(nameA, nameB, probability) {
+	const pa = findPersonByName(nameA);
+	const pb = findPersonByName(nameB);
+	if (!pa || !pb) {
+		const msg = `등록된 사용자 중에 ${!pa ? nameA : nameB}을(를) 찾을 수 없습니다.`;
+		return { ok: false, message: msg };
+	}
+	if (pa.id === pb.id) {
+		const msg = '동일인에 대한 히든 그룹은 불가능합니다.';
+		console.log('히든 그룹 추가 실패:', msg);
+		return { ok: false, message: msg };
+	}
+	
+	// 기존 히든 그룹 찾기
+	const existingIndex = state.hiddenGroups.findIndex(
+		([a, b]) => (a === pa.id && b === pb.id) || (a === pb.id && b === pa.id)
+	);
+	
+	if (existingIndex === -1) {
+		// 새로 추가
+		state.hiddenGroups.push([pa.id, pb.id, probability]);
+		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+		console.log(`✅ 히든 그룹 추가 (${probability}%): ${pa.name} ↔ ${pb.name}`);
+		return { ok: true, added: true };
+	} else {
+		// 기존 확률 업데이트
+		const oldProb = state.hiddenGroups[existingIndex][2];
+		state.hiddenGroups[existingIndex][2] = probability;
+		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+		console.log(`🔄 히든 그룹 확률 갱신 (${oldProb}% → ${probability}%): ${pa.name} ↔ ${pb.name}`);
+		return { ok: true, added: false, updated: true };
+	}
+}
+
+// 보류 히든 그룹 추가
+function addPendingHiddenGroup(leftName, rightName, probability) {
+	const l = normalizeName(leftName);
+	const r = normalizeName(rightName);
+	if (l === r) return { ok: false, message: '동일인 히든 그룹은 불가능합니다.' };
+	
+	// 기존 보류 히든 그룹 찾기 (양방향 체크)
+	const existingIndex = state.pendingHiddenGroups.findIndex(
+		pg => (pg.left === l && pg.right === r) || (pg.left === r && pg.right === l)
+	);
+	
+	if (existingIndex === -1) {
+		// 새로 추가
+		state.pendingHiddenGroups.push({ left: l, right: r, probability: probability });
+		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+		console.log(`⏳ 보류 히든 그룹 추가 (${probability}%): ${leftName} ↔ ${rightName}`);
+	} else {
+		// 확률 업데이트
+		const oldProb = state.pendingHiddenGroups[existingIndex].probability;
+		state.pendingHiddenGroups[existingIndex].probability = probability;
+		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+		console.log(`🔄 보류 히든 그룹 확률 갱신 (${oldProb}% → ${probability}%): ${leftName} ↔ ${rightName}`);
+	}
+	
+	return { ok: true };
+}
+
+// 보류 히든 그룹 해결
+function tryResolveHiddenGroups() {
+	if (!state.pendingHiddenGroups.length && !state.pendingHiddenGroupChains.length) return;
+	let changed = false;
+	
+	// 단일 쌍 해결
+	state.pendingHiddenGroups = state.pendingHiddenGroups.filter(pg => {
+		const pa = findPersonByName(pg.left);
+		const pb = findPersonByName(pg.right);
+		if (pa && pb) {
+			const res = addHiddenGroupByNames(pa.name, pb.name, pg.probability);
+			changed = true;
+			return false; // 보류 목록에서 제거
+		}
+		return true; // 보류 유지
+	});
+	
+	// 체인 해결
+	state.pendingHiddenGroupChains = state.pendingHiddenGroupChains.filter(chain => {
+		const primaryPerson = findPersonByName(chain.primary);
+		if (!primaryPerson) return true; // 주 참가자가 없으면 보류 유지
+		
+		const candidateIds = [];
+		let allFound = true;
+		
+		for (const cand of chain.candidates) {
+			const candidate = findPersonByName(cand.name);
+			if (candidate) {
+				candidateIds.push({ id: candidate.id, probability: cand.probability });
+			} else {
+				allFound = false;
+				break;
+			}
+		}
+		
+		if (allFound) {
+			addHiddenGroupChain(primaryPerson.id, candidateIds);
+			changed = true;
+			return false; // 보류 목록에서 제거
+		}
+		return true; // 보류 유지
+	});
+	
+	if (changed) {
+		saveToLocalStorage();
+		try { printParticipantConsole(); } catch (_) { /* no-op */ }
+	}
+}
+
+// 히든 그룹 체인 추가
+function addHiddenGroupChain(primaryId, candidates) {
+	// 기존 체인 제거 (같은 primary)
+	state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryId);
+	
+	// 새 체인 추가
+	state.hiddenGroupChains.push({
+		primary: primaryId,
+		candidates: candidates
+	});
+	
+	saveToLocalStorage();
+	try { printParticipantConsole(); } catch (_) { /* no-op */ }
+	
+	const primaryPerson = state.people.find(p => p.id === primaryId);
+	const primaryName = primaryPerson ? primaryPerson.name : `ID ${primaryId}`;
+	const candidateNames = candidates.map(c => {
+		const p = state.people.find(person => person.id === c.id);
+		return `${p ? p.name : 'ID ' + c.id}(${c.probability}%)`;
+	}).join(' → ');
+	console.log(`✅ 히든 그룹 체인 추가: ${primaryName} → ${candidateNames}`);
+}
+
+// 보류 히든 그룹 체인 추가
+function addPendingHiddenGroupChain(primaryName, candidates) {
+	const normalizedPrimary = normalizeName(primaryName);
+	
+	// 기존 보류 체인 제거 (같은 primary)
+	state.pendingHiddenGroupChains = state.pendingHiddenGroupChains.filter(
+		chain => chain.primary !== normalizedPrimary
+	);
+	
+	// 새 보류 체인 추가
+	state.pendingHiddenGroupChains.push({
+		primary: normalizedPrimary,
+		candidates: candidates.map(c => ({ name: normalizeName(c.name), probability: c.probability }))
+	});
+	
+	saveToLocalStorage();
+	try { printParticipantConsole(); } catch (_) { /* no-op */ }
+	console.log(`⏳ 보류 히든 그룹 체인 추가: ${primaryName} → ${candidates.map(c => `${c.name}(${c.probability}%)`).join(' → ')}`);
+}
+
+// 히든 그룹 확인 (현재 활성화된 것만)
+function isActiveHiddenGroup(aId, bId) {
+	return state.activeHiddenGroupMap[aId] && state.activeHiddenGroupMap[aId].has(bId);
+}
+
+// 정의된 히든 그룹 클러스터 찾기 (콘솔 표시용 - 활성화 여부 무관)
+function getDefinedHiddenGroupCluster(personId) {
+	const visited = new Set();
+	const cluster = new Set();
+	const queue = [personId];
+	
+	while (queue.length > 0) {
+		const current = queue.shift();
+		if (visited.has(current)) continue;
+		visited.add(current);
+		cluster.add(current);
+		
+		// 정의된 히든 그룹으로 연결된 모든 ID 찾기
+		state.hiddenGroups.forEach(([a, b, prob]) => {
+			if (a === current && !visited.has(b)) {
+				queue.push(b);
+			} else if (b === current && !visited.has(a)) {
+				queue.push(a);
+			}
+		});
+	}
+	
+	return cluster;
+}
+
+// 활성화된 히든 그룹 클러스터 찾기 (연결된 모든 블록 찾기)
+function getActiveHiddenGroupCluster(personId) {
+	const visited = new Set();
+	const cluster = new Set();
+	const queue = [personId];
+	
+	while (queue.length > 0) {
+		const current = queue.shift();
+		if (visited.has(current)) continue;
+		visited.add(current);
+		cluster.add(current);
+		
+		// 활성화된 히든 그룹으로 연결된 모든 ID 찾기
+		if (state.activeHiddenGroupMap[current]) {
+			state.activeHiddenGroupMap[current].forEach(connectedId => {
+				if (!visited.has(connectedId)) {
+					queue.push(connectedId);
+				}
+			});
+		}
+	}
+	
+	return cluster;
+}
+
+// 사람이 속한 활성화된 히든 그룹 클러스터의 모든 블록 ID 반환
+function getActiveHiddenGroupBlockIds(personId) {
+	const cluster = getActiveHiddenGroupCluster(personId);
+	const blockIds = new Set();
+	
+	cluster.forEach(id => {
+		// 그룹에 속한 경우 그룹의 모든 멤버 추가
+		const groupIndex = getPersonGroupIndex(id);
+		if (groupIndex !== -1) {
+			state.requiredGroups[groupIndex].forEach(memberId => {
+				blockIds.add(memberId);
+			});
+		} else {
+			// 개인인 경우 자신만 추가
+			blockIds.add(id);
+		}
+	});
+	
+	return Array.from(blockIds);
 }
 
 // --- 제약 연결 팝업 창 관련 헬퍼 ---
@@ -2071,6 +2548,62 @@ function printParticipantConsole() {
 			const label = groupLabelForIndex(gi);
 			group.forEach(pid => personGroupMap.set(pid, label));
 		});
+		
+		// 히든 그룹 정보 수집 (클러스터 번호, 확률, 그룹 레이블로 관리)
+		const hiddenGroupClusters = new Map(); // personId -> {clusterNum, probability, groupLabel}
+		const processedClusters = new Set();
+		let clusterNum = 0;
+		
+		state.people.forEach(p => {
+			if (processedClusters.has(p.id)) return;
+			
+			// 이 사람이 속한 히든 그룹 클러스터 찾기 (명령어 기준으로 표시)
+			const cluster = getDefinedHiddenGroupCluster(p.id);
+			if (cluster.size > 1) {
+				// 이 클러스터의 확률 찾기 (여러 개면 평균)
+				const probabilities = [];
+				state.hiddenGroups.forEach(([a, b, prob]) => {
+					if (cluster.has(a) && cluster.has(b)) {
+						probabilities.push(prob);
+					}
+				});
+				const avgProbability = probabilities.length > 0 
+					? Math.round(probabilities.reduce((a, b) => a + b, 0) / probabilities.length)
+					: 100;
+				
+				// 클러스터를 확장하여 각 멤버가 속한 그룹의 모든 멤버 포함
+				const expandedCluster = new Set();
+				let representativeGroupLabel = null; // 대표 그룹 레이블
+				
+				cluster.forEach(id => {
+					const groupIndex = getPersonGroupIndex(id);
+					if (groupIndex !== -1) {
+						// 이 사람이 그룹에 속해있으면 그룹의 모든 멤버 추가
+						state.requiredGroups[groupIndex].forEach(memberId => {
+							expandedCluster.add(memberId);
+						});
+						// 대표 그룹 레이블 저장
+						if (representativeGroupLabel === null) {
+							representativeGroupLabel = groupLabelForIndex(groupIndex);
+						}
+					} else {
+						// 개인이면 자신만 추가
+						expandedCluster.add(id);
+					}
+				});
+				
+				// 확장된 클러스터의 모든 사람에게 같은 클러스터 정보 할당
+				expandedCluster.forEach(id => {
+					hiddenGroupClusters.set(id, { 
+						clusterNum, 
+						probability: avgProbability,
+						groupLabel: representativeGroupLabel || ('C' + clusterNum)
+					});
+					processedClusters.add(id);
+				});
+				clusterNum++;
+			}
+		});
 
 		// 화면 표시 순서대로 정렬 (그룹 단위)
 		const groupMap = new Map();
@@ -2098,7 +2631,15 @@ function printParticipantConsole() {
 				'가중치': typeof p.weight !== 'undefined' ? p.weight : 0
 			};
 			const grp = personGroupMap.get(p.id);
-			if (grp) row['그룹'] = grp;
+			const hiddenInfo = hiddenGroupClusters.get(p.id);
+			
+			if (hiddenInfo !== undefined) {
+				// 히든 그룹이 있으면 대표 그룹 레이블 사용
+				row['그룹'] = hiddenInfo.groupLabel + '(' + hiddenInfo.probability + '%)';
+			} else if (grp) {
+				// 히든 그룹이 없고 일반 그룹만 있으면
+				row['그룹'] = grp;
+			}
 			return row;
 		});
 
@@ -2305,6 +2846,9 @@ function preShufflePeopleForGeneration(people) {
 
 function generateTeams(people) {
 	buildForbiddenMap();
+	
+	// 히든 그룹 확률 기반 활성화
+	activateHiddenGroupsForTeamGeneration();
 
 	// 팀 순서 배열에서 마지막 팀 인덱스를 항상 맨 뒤로 보낼지 결정하는 공통 로직
 	function pushLastTeamToEndIfNeeded(teamOrder, teams) {
@@ -2383,12 +2927,100 @@ function generateTeams(people) {
 		// 헬퍼 함수: 팀의 총 가중치 계산
 		const calcTeamWeight = (team) => team.reduce((sum, p) => sum + (p.weight || 0), 0);
 
-		// 일반 그룹들만 처리 (regularGroups 사용)
+		// 히든 그룹 처리 - 연결된 블록들을 하나의 단위로 배치
+		const processedHiddenClusters = new Set();
+		const hiddenGroupAffectedGroupIndices = new Set(); // 히든 그룹에 영향받은 requiredGroups 추적
+		let hiddenGroupFailed = false;
+		
+		for (const person of shuffledPeople) {
+			if (assigned.has(person.id)) continue;
+			
+			// 활성화된 히든 그룹 클러스터 확인
+			const cluster = getActiveHiddenGroupCluster(person.id);
+			if (cluster.size > 1) {
+				// 클러스터 대표 ID로 중복 처리 방지
+				const clusterKey = Math.min(...Array.from(cluster));
+				if (processedHiddenClusters.has(clusterKey)) continue;
+				processedHiddenClusters.add(clusterKey);
+				
+				// 히든 그룹 클러스터의 모든 블록 멤버 수집
+				const blockIds = getActiveHiddenGroupBlockIds(person.id);
+				const blockMembers = blockIds.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
+				
+				if (blockMembers.length === 0) continue;
+				
+				// 이 블록에 포함된 모든 requiredGroups를 추적
+				blockMembers.forEach(member => {
+					const gi = getPersonGroupIndex(member.id);
+					if (gi !== -1) hiddenGroupAffectedGroupIndices.add(gi);
+				});
+				
+				// 가중치 균등이 활성화된 경우 가중치 낮은 팀부터
+				let teamOrder;
+				if (state.weightBalanceEnabled) {
+					teamOrder = teams.map((team, idx) => ({
+						idx,
+						weight: team.reduce((sum, p) => sum + (p.weight || 0), 0)
+					})).sort((a, b) => {
+						if (a.weight !== b.weight) return a.weight - b.weight;
+						if (state.maxTeamSizeEnabled) return a.idx - b.idx;
+						return 0;
+					}).map(t => t.idx);
+					pushLastTeamToEndIfNeeded(teamOrder, teams);
+				} else {
+					teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
+				}
+				
+				let selectedTeam = -1;
+				
+				for (const i of teamOrder) {
+					// 인원 수 제약 체크
+					if (state.maxTeamSizeEnabled) {
+						if (i < teams.length - 1 && teams[i].length + blockMembers.length > state.membersPerTeam) continue;
+					} else {
+						if (teams[i].length + blockMembers.length > state.membersPerTeam) continue;
+					}
+					
+					// 충돌 체크
+					let hasConflict = false;
+					for (const bm of blockMembers) {
+						if (teams[i].some(tm => isForbidden(bm.id, tm.id))) {
+							hasConflict = true;
+							break;
+						}
+					}
+					if (hasConflict) continue;
+					
+					// 조건 만족하면 배치
+					selectedTeam = i;
+					break;
+				}
+				
+				if (selectedTeam === -1) {
+					// 히든 그룹 블록을 배치할 수 없으면 이 시도는 실패
+					hiddenGroupFailed = true;
+					break;
+				}
+				
+				// 블록 멤버들을 팀에 추가
+				teams[selectedTeam].push(...blockMembers);
+				blockMembers.forEach(m => assigned.add(m.id));
+			}
+		}
+
+		if (hiddenGroupFailed) continue;
+
+		// 일반 그룹들만 처리 - 히든 그룹에 영향받은 그룹은 제외
+		// (히든 그룹 블록에 이미 포함된 멤버들은 assigned되었으므로)
+		const unaffectedRegularGroups = regularGroups.filter((group, idx) => 
+			!hiddenGroupAffectedGroupIndices.has(idx)
+		);
+		
 		// 가중치 균등이 활성화된 경우 그룹을 가중치 순으로 정렬 (높은 순)
 		let processGroups;
 		if (state.weightBalanceEnabled) {
 			// 각 그룹의 평균 가중치 계산
-			const groupsWithWeight = regularGroups.map(group => {
+			const groupsWithWeight = unaffectedRegularGroups.map(group => {
 				const groupMembers = group.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
 				const totalWeight = groupMembers.reduce((sum, p) => sum + (p.weight || 0), 0);
 				const avgWeight = groupMembers.length > 0 ? totalWeight / groupMembers.length : 0;
@@ -2399,7 +3031,7 @@ function generateTeams(people) {
 			processGroups = groupsWithWeight.map(g => g.group);
 		} else {
 			// 가중치 균등이 없으면 셔플
-			processGroups = [...regularGroups].sort(() => Math.random() - 0.5);
+			processGroups = [...unaffectedRegularGroups].sort(() => Math.random() - 0.5);
 		}
 		
 		let groupFailed = false;
@@ -2945,6 +3577,9 @@ async function displayTeams(teams) {
 			if (!isLastStep) await new Promise(r => setTimeout(r, adjustedDelay));
 		}
 	}
+	
+	// 팀 표시 완료 후 히든 그룹 해제
+	deactivateHiddenGroups();
 }
 
 function showError(message) {
@@ -3625,10 +4260,14 @@ function swapToBalanceWeight(teams, teamWeights, minTeamIdx, maxTeamIdx) {
 		}
 	}
 	
-	// 1. 낮은 팀의 최고 점수 팀원 찾기 (그룹이 아닌 개인만)
+	// 1. 낮은 팀의 최고 점수 팀원 찾기 (그룹이 아닌 개인만, 히든 그룹 제외)
 	const minTeamIndividuals = minTeam.filter(person => {
 		const groupIndex = getPersonGroupIndex(person.id);
-		return groupIndex === -1;
+		if (groupIndex !== -1) return false;
+		// 히든 그룹 체크
+		const hiddenCluster = getActiveHiddenGroupCluster(person.id);
+		if (hiddenCluster.size > 1) return false;
+		return true;
 	});
 	
 	if (minTeamIndividuals.length === 0) {
@@ -3640,10 +4279,14 @@ function swapToBalanceWeight(teams, teamWeights, minTeamIdx, maxTeamIdx) {
 		(p.weight || 0) > (max.weight || 0) ? p : max
 	);
 	
-	// 2. 높은 팀에서 최고 가중치 팀원 찾기 (그룹이 아닌 개인만)
+	// 2. 높은 팀에서 최고 가중치 팀원 찾기 (그룹이 아닌 개인만, 히든 그룹 제외)
 	const maxTeamIndividuals = maxTeam.filter(person => {
 		const groupIndex = getPersonGroupIndex(person.id);
-		return groupIndex === -1;
+		if (groupIndex !== -1) return false;
+		// 히든 그룹 체크
+		const hiddenCluster = getActiveHiddenGroupCluster(person.id);
+		if (hiddenCluster.size > 1) return false;
+		return true;
 	});
 	
 	if (maxTeamIndividuals.length === 0) {
@@ -3756,10 +4399,14 @@ function validateAndFixTeamSizeBalance(teams) {
 						continue;
 					}
 					
-					// 이 팀의 개인 멤버들 (그룹이 아닌)
+					// 이 팀의 개인 멤버들 (그룹이 아닌, 히든 그룹 제외)
 					const individuals = sourceTeam.filter(person => {
 						const groupIndex = getPersonGroupIndex(person.id);
-						return groupIndex === -1;
+						if (groupIndex !== -1) return false;
+						// 히든 그룹 체크
+						const hiddenCluster = getActiveHiddenGroupCluster(person.id);
+						if (hiddenCluster.size > 1) return false;
+						return true;
 					});
 					
 					// 각 후보에 대해 검증
@@ -3796,10 +4443,14 @@ function validateAndFixTeamSizeBalance(teams) {
 						continue;
 					}
 					
-					// 이 팀의 개인 멤버들 (그룹이 아닌)
+					// 이 팀의 개인 멤버들 (그룹이 아닌, 히든 그룹 제외)
 					const individuals = sourceTeam.filter(person => {
 						const groupIndex = getPersonGroupIndex(person.id);
-						return groupIndex === -1;
+						if (groupIndex !== -1) return false;
+						// 히든 그룹 체크
+						const hiddenCluster = getActiveHiddenGroupCluster(person.id);
+						if (hiddenCluster.size > 1) return false;
+						return true;
 					});
 					
 					// 각 후보에 대해 검증
@@ -3993,10 +4644,15 @@ function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 	const maxTeam = teams[maxTeamIdx];
 	const minTeam = teams[minTeamIdx];
 	
-	// 1. 최대 블록 팀에서 소수성별 개인 찾기
+	// 1. 최대 블록 팀에서 소수성별 개인 찾기 (히든 그룹 제외)
 	const maxTeamIndividuals = maxTeam.filter(person => {
 		const groupIndex = getPersonGroupIndex(person.id);
-		return groupIndex === -1 && person.gender === minorityGender;
+		if (groupIndex !== -1) return false;
+		if (person.gender !== minorityGender) return false;
+		// 히든 그룹 체크
+		const hiddenCluster = getActiveHiddenGroupCluster(person.id);
+		if (hiddenCluster.size > 1) return false;
+		return true;
 	});
 	
 	if (maxTeamIndividuals.length === 0) {
@@ -4012,9 +4668,12 @@ function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 		
 		maxTeamIndividuals.forEach(maxPerson => {
 			minTeam.forEach(minPerson => {
-				// 그룹이 아니고, 제약이 없는 경우만
+				// 그룹이 아니고, 히든 그룹이 아니고, 제약이 없는 경우만
 				const groupIndex = getPersonGroupIndex(minPerson.id);
 				if (groupIndex !== -1) return;
+				// 히든 그룹 체크
+				const hiddenCluster = getActiveHiddenGroupCluster(minPerson.id);
+				if (hiddenCluster.size > 1) return;
 				if (isForbidden(maxPerson.id, minPerson.id)) return;
 				
 				const weightDiff = Math.abs((maxPerson.weight || 0) - (minPerson.weight || 0));
@@ -4028,7 +4687,11 @@ function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 		// 랜덤 선택
 		const minTeamIndividuals = minTeam.filter(person => {
 			const groupIndex = getPersonGroupIndex(person.id);
-			return groupIndex === -1;
+			if (groupIndex !== -1) return false;
+			// 히든 그룹 체크
+			const hiddenCluster = getActiveHiddenGroupCluster(person.id);
+			if (hiddenCluster.size > 1) return false;
+			return true;
 		});
 		
 		if (minTeamIndividuals.length > 0) {
