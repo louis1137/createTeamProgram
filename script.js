@@ -119,8 +119,10 @@ function init() {
 	// 팀 표시 애니메이션 시간: teamDisplayDelay의 50%로 설정
 	setTeamAnimDurationFromDelay();
 
-	// localStorage에서 데이터 복원
-	loadFromLocalStorage();
+	// localStorage에서 데이터 복원 (프로필이 없을 경우에만)
+	if (!currentRoomKey) {
+		loadFromLocalStorage();
+	}
 
 	renderPeople();
 	// 제약(금지) 쌍 맵 준비
@@ -157,6 +159,82 @@ function init() {
 	const duplicateCancelBtn = document.getElementById('duplicateCancelBtn');
 	if (duplicateConfirmBtn) duplicateConfirmBtn.addEventListener('click', handleDuplicateConfirm);
 	if (duplicateCancelBtn) duplicateCancelBtn.addEventListener('click', handleDuplicateCancel);
+	
+	// 개발자 도구가 열려있으면 cmd 콘솔 자동으로 열기
+	checkDevToolsAndOpenConsole();
+}
+
+// 개발자 도구 감지 및 콘솔 자동 열기
+function checkDevToolsAndOpenConsole() {
+	const threshold = 160;
+	const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+	const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+	const isDevToolsOpen = widthThreshold || heightThreshold;
+	
+	if (isDevToolsOpen) {
+		// 개발자 도구가 열려있으면 콘솔 자동 열기
+		setTimeout(() => {
+			const consoleEl = document.getElementById('commandConsole');
+			if (consoleEl && consoleEl.style.display !== 'flex') {
+				consoleEl.style.display = 'flex';
+				consoleEl.style.transform = 'translate(0, 0)';
+				consoleEl.style.width = '450px';
+				consoleEl.style.height = '350px';
+				
+				const content = document.querySelector('.command-content');
+				if (content) content.style.display = 'flex';
+				const toggleBtn = document.getElementById('toggleConsoleBtn');
+				if (toggleBtn) toggleBtn.textContent = '−';
+				
+				if (commandConsole.output) {
+					if (currentRoomKey) {
+						// 프로필이 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
+						if (commandConsole.authenticated) {
+							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`, 'success');
+							commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+							commandConsole.log('콘솔이 준비되었습니다.', 'success');
+							setTimeout(() => commandConsole.input.focus(), 100);
+						} else if (database) {
+							// 아직 인증되지 않았다면 비밀번호 확인
+							database.ref(`rooms/${currentRoomKey}/password`).once('value', (snapshot) => {
+								const password = snapshot.val();
+								if (password !== null) {
+									if (password === '') {
+										commandConsole.authenticated = true;
+										commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨`, 'success');
+										commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+										commandConsole.log('콘솔이 준비되었습니다.', 'success');
+										setTimeout(() => commandConsole.input.focus(), 100);
+									} else {
+										commandConsole.storedPassword = password;
+										commandConsole.authenticated = false;
+										commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견`, 'info');
+										commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+										commandConsole.inputMode = 'auth';
+										commandConsole.input.type = 'password';
+										commandConsole.input.placeholder = '비밀번호 입력...';
+										setTimeout(() => commandConsole.input.focus(), 100);
+									}
+								} else {
+									commandConsole.tempProfile = currentRoomKey;
+									commandConsole.log(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`, 'warning');
+									commandConsole.log('신규 프로필로 등록하시겠습니까?', 'info');
+									commandConsole.inputMode = 'profile-create-confirm';
+									commandConsole.showConfirmButtons();
+								}
+							});
+						}
+					} else {
+						// 프로필이 없는 경우
+						commandConsole.log('프로필 이름을 입력하세요:', 'info');
+						commandConsole.inputMode = 'profile';
+						commandConsole.input.placeholder = '프로필 이름 입력...';
+						setTimeout(() => commandConsole.input.focus(), 100);
+					}
+				}
+			}
+		}, 500);
+	}
 }
 
 // 입력 내용에서 성별/가중치 패턴 감지하여 자동 체크
@@ -1211,6 +1289,91 @@ function addPerson() {
 	const input = elements.nameInput.value.trim();
 	if (input === '') {
 		alert('이름을 입력해주세요.');
+		return;
+	}
+
+	// 콘솔 열기 명령어 체크
+	if (input.toLowerCase() === 'command' || input.toLowerCase() === 'cmd') {
+		const consoleEl = document.getElementById('commandConsole');
+		if (consoleEl) {
+			consoleEl.style.display = 'flex';
+			consoleEl.style.transform = 'translate(0, 0)'; // 초기 위치로 리셋
+			consoleEl.style.width = '450px'; // 초기 크기로 리셋
+			consoleEl.style.height = '350px'; // 초기 크기로 리셋
+			// content 표시 (최소화 상태 해제)
+			const content = document.querySelector('.command-content');
+			if (content) content.style.display = 'flex';
+			const toggleBtn = document.getElementById('toggleConsoleBtn');
+			if (toggleBtn) toggleBtn.textContent = '−';
+			elements.nameInput.value = '';
+			
+			if (commandConsole.output) {
+				if (currentRoomKey) {
+					// 파라미터가 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
+					if (commandConsole.authenticated) {
+						commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`, 'success');
+						commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+						commandConsole.log('콘솔이 준비되었습니다.', 'success');
+						setTimeout(() => commandConsole.input.focus(), 100);
+					} else if (database) {
+						// 아직 인증되지 않았다면 비밀번호 확인
+						database.ref(`rooms/${currentRoomKey}/password`).once('value', (snapshot) => {
+							const password = snapshot.val();
+							if (password !== null) {
+								// 프로필이 존재함 (password는 ''이거나 값이 있음)
+								if (password === '') {
+									// 비밀번호 없음 - 바로 사용 가능
+									commandConsole.authenticated = true;
+									commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨`, 'success');
+									commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+									commandConsole.log('콘솔이 준비되었습니다.', 'success');
+									// 입력 폼에 포커스
+									setTimeout(() => commandConsole.input.focus(), 100);
+								} else {
+									// 비밀번호가 설정되어 있음 - 인증 필요
+									commandConsole.storedPassword = password;
+									commandConsole.authenticated = false;
+									commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견`, 'info');
+									commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+									commandConsole.inputMode = 'auth';
+									commandConsole.input.type = 'password';
+									commandConsole.input.placeholder = '비밀번호 입력...';
+									// 입력 폼에 포커스
+									setTimeout(() => commandConsole.input.focus(), 100);
+								}
+							} else {
+								// 존재하지 않는 프로필 - 생성 확인
+								commandConsole.tempProfile = currentRoomKey;
+								commandConsole.log(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`, 'warning');
+								commandConsole.log('신규 프로필로 등록하시겠습니까?', 'info');
+								commandConsole.inputMode = 'profile-create-confirm';
+								commandConsole.showConfirmButtons();
+							}
+						});
+					}
+				} else {
+					// 파라미터가 없는 경우 - 프로필 생성 플로우 시작
+					commandConsole.log('프로필 이름을 입력하세요:', 'info');
+					commandConsole.inputMode = 'profile';
+					commandConsole.input.placeholder = '프로필 이름 입력...';
+					// 입력 폼에 포커스
+					setTimeout(() => commandConsole.input.focus(), 100);
+				}
+			}
+			// 위치와 크기 상태 완전 초기화
+			commandConsole.savedPosition.x = 0;
+			commandConsole.savedPosition.y = 0;
+			commandConsole.savedPosition.width = '450px';
+			commandConsole.savedPosition.height = '350px';
+			if (commandConsole.dragState) {
+				commandConsole.dragState.xOffset = 0;
+				commandConsole.dragState.yOffset = 0;
+				commandConsole.dragState.currentX = 0;
+				commandConsole.dragState.currentY = 0;
+				commandConsole.dragState.initialX = 0;
+				commandConsole.dragState.initialY = 0;
+			}
+		}
 		return;
 	}
 
@@ -4858,6 +5021,8 @@ function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 let currentTeams = null;
 let isValidated = false;
 
+// ==================== 초기화 ====================
+
 // 초기화 실행
 init();
-
+commandConsole.init();

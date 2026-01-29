@@ -15,6 +15,11 @@
 	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌕</text></svg>">
 	<link rel="stylesheet" href="style.css">
 	<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+	
+	<!-- Firebase SDK -->
+	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+	
 	<script type="application/ld+json">
 	{
 		"@context": "https://schema.org",
@@ -215,6 +220,39 @@
 		</div>
 	</div>
 
+	<!-- 명령어 콘솔 -->
+	<div id="commandConsole" class="command-console">
+		<div class="command-header">
+			<span>🔧 Command Console</span>
+			<span id="roomKeyDisplay" class="room-key-display"></span>
+			<div class="console-buttons">
+				<button id="toggleConsoleBtn" class="toggle-console-btn">−</button>
+				<button id="closeConsoleBtn" class="close-console-btn">×</button>
+			</div>
+		</div>
+		<div class="command-content">
+			<div id="commandOutput" class="command-output"></div>
+			<div class="command-input-container">
+				<input type="text" id="commandInput" class="command-input" placeholder="명령어를 입력하세요... (예: save, load, clear)">
+				<button id="commandSendBtn" class="command-send-btn">전송</button>
+			</div>
+		</div>
+		<!-- 리사이즈 핸들 -->
+		<div class="resize-handle resize-n"></div>
+		<div class="resize-handle resize-s"></div>
+		<div class="resize-handle resize-e"></div>
+		<div class="resize-handle resize-w"></div>
+		<div class="resize-handle resize-ne"></div>
+		<div class="resize-handle resize-nw"></div>
+		<div class="resize-handle resize-se"></div>
+		<div class="resize-handle resize-sw"></div>
+	</div>
+
+	<!-- Firebase 동기화 시스템 -->
+	<script src="firebase-sync.js"></script>
+	<!-- 명령어 콘솔 -->
+	<script src="command-console.js"></script>
+	<!-- 메인 스크립트 -->
 	<script src="script.js"></script>
 </body>
 </html>
