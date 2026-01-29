@@ -388,59 +388,61 @@ function showDuplicateConfirmModal(duplicateNames) {
 					let parsedGender = 'male'; // 기본값: 남
 					let parsedWeight = 0; // 기본값: 0
 					
-					// 가중치 입력 필드 값 가져오기
-					if (state.weightBalanceEnabled) {
-						const weightInputEl = document.getElementById('weightInput');
-						if (weightInputEl) {
-							const inputWeight = parseInt(weightInputEl.value);
-							if (!isNaN(inputWeight)) parsedWeight = Math.max(0, inputWeight);
-						}
+				const match = name.match(/^(.+?)\(([^)]+)\)$/);
+				if (match) {
+					actualName = match[1].trim();
+					const content = match[2].trim();
+					const numberMatch = content.match(/\d+/);
+					const genderMatch = content.match(/[남여]/);
+					if (numberMatch) parsedWeight = parseInt(numberMatch[0]);
+					if (genderMatch) parsedGender = genderMatch[0] === '남' ? 'male' : 'female';
+				} else {
+					// 괄호가 없으면 기존 참가자나 inactivePeople에서 정보 가져오기
+					const normalized = normalizeName(actualName);
+					const existingPerson = state.people.find(p => normalizeName(p.name) === normalized);
+					const inactivePerson = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+					
+					if (existingPerson) {
+						parsedGender = existingPerson.gender;
+						parsedWeight = existingPerson.weight ?? 0;
+					} else if (inactivePerson) {
+						parsedGender = inactivePerson.gender;
+						parsedWeight = inactivePerson.weight ?? 0;
 					}
+			}
+			
+			const personTag = document.createElement('div');
+			personTag.className = 'person-tag';
+			
+			// 성별 배경색 (기본값 포함)
+			if (state.genderBalanceEnabled) {
+				personTag.style.backgroundColor = parsedGender === 'male' ? '#e0f2fe' : '#fce7f3';
+			}
+			
+			const nameSpan = document.createElement('span');
+			nameSpan.className = 'name';
+			nameSpan.textContent = actualName;
+			nameSpan.style.fontWeight = 'bold';
+			personTag.appendChild(nameSpan);
+			if (state.genderBalanceEnabled) {
+				const genderDisplay = document.createElement('span');
+				genderDisplay.className = 'gender-display';
+				genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
+				personTag.appendChild(genderDisplay);
+			}
 					
-					const match = name.match(/^(.+?)\(([^)]+)\)$/);
-					if (match) {
-						actualName = match[1].trim();
-						const content = match[2].trim();
-						const numberMatch = content.match(/\d+/);
-						const genderMatch = content.match(/[남여]/);
-						if (numberMatch) parsedWeight = parseInt(numberMatch[0]);
-						if (genderMatch) parsedGender = genderMatch[0] === '남' ? 'male' : 'female';
-					}
+			// 가중치 표시 (기본값 포함)
+			if (state.weightBalanceEnabled) {
+				const weightDisplay = document.createElement('span');
+				weightDisplay.className = 'weight-display';
+				weightDisplay.textContent = `${parsedWeight}`;
+				personTag.appendChild(weightDisplay);
+			}
 					
-					const personTag = document.createElement('div');
-					personTag.className = 'person-tag';
-					
-					// 성별 배경색 (기본값 포함)
-					if (state.genderBalanceEnabled) {
-						personTag.style.backgroundColor = parsedGender === 'male' ? '#e0f2fe' : '#fce7f3';
-					}
-					
-					const nameSpan = document.createElement('span');
-					nameSpan.className = 'name';
-					nameSpan.textContent = actualName;
-					nameSpan.style.fontWeight = 'bold';
-					personTag.appendChild(nameSpan);
-					
-					// 성별 아이콘 (기본값 포함)
-					if (state.genderBalanceEnabled) {
-						const genderDisplay = document.createElement('span');
-						genderDisplay.className = 'gender-display';
-						genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
-						personTag.appendChild(genderDisplay);
-					}
-					
-					// 가중치 표시 (기본값 포함)
-					if (state.weightBalanceEnabled) {
-						const weightDisplay = document.createElement('span');
-						weightDisplay.className = 'weight-display';
-						weightDisplay.textContent = `${parsedWeight}`;
-						personTag.appendChild(weightDisplay);
-					}
-					
-					// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
-					if (duplicatesInInput.includes(normalizeName(name))) {
-						personTag.classList.add('is-duplicate');
-					}
+			// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
+			if (duplicatesInInput.includes(normalizeName(name))) {
+				personTag.classList.add('is-duplicate');
+			}
 					
 					groupContainer.appendChild(personTag);
 				});
@@ -454,66 +456,70 @@ function showDuplicateConfirmModal(duplicateNames) {
 					let parsedGender = 'male'; // 기본값: 남
 					let parsedWeight = 0; // 기본값: 0
 					
-					// 가중치 입력 필드 값 가져오기
-					if (state.weightBalanceEnabled) {
-						const weightInputEl = document.getElementById('weightInput');
-						if (weightInputEl) {
-							const inputWeight = parseInt(weightInputEl.value);
-							if (!isNaN(inputWeight)) parsedWeight = Math.max(0, inputWeight);
-						}
+				const match = name.match(/^(.+?)\(([^)]+)\)$/);
+				if (match) {
+					actualName = match[1].trim();
+					const content = match[2].trim();
+					const numberMatch = content.match(/\d+/);
+					const genderMatch = content.match(/[남여]/);
+					if (numberMatch) parsedWeight = parseInt(numberMatch[0]);
+					if (genderMatch) parsedGender = genderMatch[0] === '남' ? 'male' : 'female';
+				} else {
+					// 괄호가 없으면 기존 참가자나 inactivePeople에서 정보 가져오기
+					const normalized = normalizeName(actualName);
+					const existingPerson = state.people.find(p => normalizeName(p.name) === normalized);
+					const inactivePerson = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+					
+					if (existingPerson) {
+						parsedGender = existingPerson.gender;
+						parsedWeight = existingPerson.weight ?? 0;
+					} else if (inactivePerson) {
+						parsedGender = inactivePerson.gender;
+						parsedWeight = inactivePerson.weight ?? 0;
 					}
-					
-					const match = name.match(/^(.+?)\(([^)]+)\)$/);
-					if (match) {
-						actualName = match[1].trim();
-						const content = match[2].trim();
-						const numberMatch = content.match(/\d+/);
-						const genderMatch = content.match(/[남여]/);
-						if (numberMatch) parsedWeight = parseInt(numberMatch[0]);
-						if (genderMatch) parsedGender = genderMatch[0] === '남' ? 'male' : 'female';
-					}
-					
-					const personTag = document.createElement('div');
-					personTag.className = 'person-tag';
-					
-					// 성별 배경색 (기본값 포함)
-					if (state.genderBalanceEnabled) {
-						personTag.style.backgroundColor = parsedGender === 'male' ? '#e0f2fe' : '#fce7f3';
-					}
-					
-					const nameSpan = document.createElement('span');
-					nameSpan.className = 'name';
-					nameSpan.textContent = actualName;
-					nameSpan.style.fontWeight = 'bold';
-					personTag.appendChild(nameSpan);
-					
-					// 성별 아이콘 (기본값 포함)
-					if (state.genderBalanceEnabled) {
-						const genderDisplay = document.createElement('span');
-						genderDisplay.className = 'gender-display';
-						genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
-						personTag.appendChild(genderDisplay);
-					}
-					
-					// 가중치 표시 (기본값 포함)
-					if (state.weightBalanceEnabled) {
-						const weightDisplay = document.createElement('span');
-						weightDisplay.className = 'weight-display';
-						weightDisplay.textContent = `${parsedWeight}`;
-						personTag.appendChild(weightDisplay);
-					}
-					
-					// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
-					if (duplicatesInInput.includes(normalizeName(name))) {
-						personTag.classList.add('is-duplicate');
-					}
-					
-					newListEl.appendChild(personTag);
-				});
 			}
-		});
-		// 미리보기에서 사용한 색상 배열 저장
-		pendingAddData.previewColors = previewColors;
+			
+			const personTag = document.createElement('div');
+			personTag.className = 'person-tag';
+			
+			// 성별 배경색 (기본값 포함)
+			if (state.genderBalanceEnabled) {
+				personTag.style.backgroundColor = parsedGender === 'male' ? '#e0f2fe' : '#fce7f3';
+			}
+			
+			const nameSpan = document.createElement('span');
+			nameSpan.className = 'name';
+			nameSpan.textContent = actualName;
+			nameSpan.style.fontWeight = 'bold';
+			personTag.appendChild(nameSpan);
+		
+		// 성별 아이콘 (기본값 포함)
+		if (state.genderBalanceEnabled) {
+			const genderDisplay = document.createElement('span');
+			genderDisplay.className = 'gender-display';
+			genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
+			personTag.appendChild(genderDisplay);
+		}
+		
+		// 가중치 표시 (기본값 포함)
+		if (state.weightBalanceEnabled) {
+			const weightDisplay = document.createElement('span');
+			weightDisplay.className = 'weight-display';
+			weightDisplay.textContent = `${parsedWeight}`;
+			personTag.appendChild(weightDisplay);
+		}
+		
+		// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
+		if (duplicatesInInput.includes(normalizeName(name))) {
+			personTag.classList.add('is-duplicate');
+		}
+		
+		newListEl.appendChild(personTag);
+	});
+}
+});
+// 미리보기에서 사용한 색상 배열 저장
+pendingAddData.previewColors = previewColors;
 	}
 	
 	// 메시지 업데이트 및 확인 버튼 상태 설정
@@ -1491,15 +1497,35 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 		});
 	});
 	
-	// 1단계: 중복된 사람들을 state.people에서 제거
+	// 1단계: 중복된 사람들을 미참가자 목록에 추가 (성별/가중치 보존)
+	duplicateIds.forEach(id => {
+		const person = state.people.find(p => p.id === id);
+		if (person) {
+			const normalized = normalizeName(person.name);
+			const existingInactive = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
+			if (!existingInactive) {
+				state.inactivePeople.push({
+					name: person.name,
+					gender: person.gender,
+					weight: person.weight
+				});
+			} else {
+				// 이미 미참가자 목록에 있으면 정보 갱신
+				existingInactive.gender = person.gender;
+				existingInactive.weight = person.weight;
+			}
+		}
+	});
+	
+	// 2단계: 중복된 사람들을 state.people에서 제거
 	state.people = state.people.filter(p => !duplicateIds.includes(p.id));
 	
-	// 2단계: 각 그룹에서 중복된 사람들 제거 (그룹은 유지, 1명 이하가 되면 그룹 해체)
+	// 3단계: 각 그룹에서 중복된 사람들 제거 (그룹은 유지, 1명 이하가 되면 그룹 해체)
 	state.requiredGroups = state.requiredGroups.map(group => {
 		return group.filter(pid => !duplicateIds.includes(pid));
 	}).filter(group => group.length > 1);
 	
-	// 3단계: 제약 조건에서도 중복된 사람들 제거
+	// 4단계: 제약 조건에서도 중복된 사람들 제거
 	duplicateIds.forEach(id => {
 		const before = state.forbiddenPairs.length;
 		state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => a !== id && b !== id);
@@ -1550,7 +1576,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 					
 					// 우선순위: 1. 명령어 입력값 (parsedGender/parsedWeight)
 					//          2. 미참가자 목록 값
-					//          3. 입력 필드 값 또는 기본값
+					//          3. 기본값만 (입력 필드 값 사용 안 함)
 					
 					// 성별 결정
 					if (parsedGender !== null) {
@@ -1569,17 +1595,8 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 					} else if (inactivePerson) {
 						// 2순위: 미참가자 목록의 가중치
 						weight = inactivePerson.weight;
-					} else if (state.weightBalanceEnabled) {
-						// 3순위: 입력 필드 값
-						let inputWeight = 0;
-						const weightInputEl = document.getElementById('weightInput');
-						if (weightInputEl) {
-							inputWeight = parseInt(weightInputEl.value);
-							if (isNaN(inputWeight)) inputWeight = 0;
-						}
-						weight = Math.max(0, inputWeight);
 					}
-					// else: 3순위 기본값 0 유지
+					// else: 3순위 기본값 0 유지 (입력 필드 값 사용 안 함)
 					
 					const person = {
 						id: state.nextId++,
