@@ -544,8 +544,23 @@ const commandConsole = {
 		if (this.inputMode === 'matching') {
 			// 규칙 모드: 히든 그룹 명령어 처리
 			this.log(`> ${cmd}`, 'command');
+			
+			// 규칙 제거 명령어 체크
+			const isRemoveCommand = /^([^()!]+)\(!\)/.test(cmd);
+			
 			// input 명령어를 통해 처리
 			this.inputCommand(cmd);
+			
+			// 결과 메시지 출력
+			if (isRemoveCommand) {
+				this.log('✅ 규칙 제거 완료', 'success');
+			} else {
+				this.log('✅ 규칙 추가 완료', 'success');
+			}
+			
+			// 확인하기 안내
+			this.log('확인하기 (명령어: <code data-cmd="확률">확률</code>)', 'info');
+			
 			// 규칙 등록 후 일반 모드로 복귀
 			this.inputMode = 'normal';
 			this.input.type = 'text';

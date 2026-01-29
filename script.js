@@ -1483,38 +1483,46 @@ function addPerson(fromConsole = false) {
 				
 				const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryName);
 				
+				if (!existingChain) {
+					console.log(`⚠️ 규칙 삭제 실패: '${primaryName}' 주최자의 규칙이 없습니다.`);
+					return;
+				}
+				
 				if (!rest) {
 					// A(!) - 모든 체이닝 제거
-					if (existingChain) {
-						// 체인 자체를 제거
-						state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
-						saveToLocalStorage();
-						constraintsTouched = true;
-					}
+					state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
+					saveToLocalStorage();
+					constraintsTouched = true;
+					console.log(`✅ 규칙 삭제 완료: '${primaryName}' 주최자의 모든 규칙이 삭제되었습니다.`);
 				} else {
 					// A(!)B 또는 A(!)B(!)C - 특정 후보 제거
 					const removeTargets = rest.split('(!)').map(n => n.trim()).filter(n => n);
 					
-					if (existingChain) {
-						let removedCount = 0;
-						removeTargets.forEach(targetName => {
-							const beforeLen = existingChain.candidates.length;
-							existingChain.candidates = existingChain.candidates.filter(c => c.name !== targetName);
-							const afterLen = existingChain.candidates.length;
-							if (beforeLen > afterLen) {
-								removedCount++;
-							}
-						});
-						
-						// 후보가 모두 제거되면 체인 자체를 제거
-						if (existingChain.candidates.length === 0) {
-							state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
+					let removedCount = 0;
+					const removedNames = [];
+					removeTargets.forEach(targetName => {
+						const beforeLen = existingChain.candidates.length;
+						existingChain.candidates = existingChain.candidates.filter(c => c.name !== targetName);
+						const afterLen = existingChain.candidates.length;
+						if (beforeLen > afterLen) {
+							removedCount++;
+							removedNames.push(targetName);
 						}
-						
-						if (removedCount > 0) {
-							saveToLocalStorage();
-							constraintsTouched = true;
-						}
+					});
+					
+					// 후보가 모두 제거되면 체인 자체를 제거
+					if (existingChain.candidates.length === 0) {
+						state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
+						console.log(`✅ 규칙 삭제 완료: '${primaryName}' 주최자의 모든 후보가 삭제되어 규칙이 제거되었습니다.`);
+					} else if (removedCount > 0) {
+						console.log(`✅ 규칙 삭제 완료: '${primaryName}' → ${removedNames.map(n => `'${n}'`).join(', ')} (${removedCount}개)`);
+					} else {
+						console.log(`⚠️ 규칙 삭제 실패: 삭제할 후보를 찾을 수 없습니다.`);
+					}
+					
+					if (removedCount > 0) {
+						saveToLocalStorage();
+						constraintsTouched = true;
 					}
 				}
 				return; // 체이닝 제거 처리 완료
