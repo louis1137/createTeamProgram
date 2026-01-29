@@ -542,11 +542,11 @@ const commandConsole = {
 		this.input.value = '';
 		
 		if (this.inputMode === 'matching') {
-			// 매칭 모드: 히든 그룹 명령어 처리
+			// 규칙 모드: 히든 그룹 명령어 처리
 			this.log(`> ${cmd}`, 'command');
 			// input 명령어를 통해 처리
 			this.inputCommand(cmd);
-			// 매칭 등록 후 일반 모드로 복귀
+			// 규칙 등록 후 일반 모드로 복귀
 			this.inputMode = 'normal';
 			this.input.type = 'text';
 			this.input.placeholder = '명령어를 입력하세요...';
@@ -941,7 +941,8 @@ const commandConsole = {
 			case '확률':
 				this.hiddenCommand();
 				break;
-			case '매칭':
+			case '규칙':
+			case 'rule':
 			case 'matching':
 				this.matchingCommand();
 				break;
@@ -1094,8 +1095,8 @@ const commandConsole = {
 			'👥 <code data-cmd="참가자">참가자</code><br>   현재 등록된 모든 참가자 목록을 표시합니다.<br>   각 참가자의 이름, 성별, 가중치 정보를 확인할 수 있습니다.<br><br>' +
 			'👻 <code data-cmd="미참가자">미참가자</code><br>   현재 미참가자로 설정된 목록을 표시합니다.<br>   미참가자는 팀 생성 시 제외됩니다.<br><br>' +
 			'🚫 <code data-cmd="제약">제약</code><br>   현재 설정된 제약 조건 목록을 표시합니다.<br>   특정 참가자들이 같은 팀에 배치되지 않도록 하는 규칙입니다.<br><br>' +
-			'� <code data-cmd="매칭">매칭</code> / <code data-cmd="matching">matching</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 기반 매칭 그룹을 등록합니다.<br>   예시: 매칭 → input A(40)B 형식으로 등록<br><br>' +
-			'�🎲 <code data-cmd="확률">확률</code><br>   확률 기반 그룹 목록을 표시합니다.<br>   특정 참가자들이 설정된 확률로 같은 팀에 배치되도록 하는 규칙입니다.<br><br>' +
+			'� <code data-cmd="규칙">규칙</code> / <code data-cmd="rule">rule</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록합니다.<br>   예시: 규칙 → input A(40)B 형식으로 등록<br><br>' +
+			'�🎲 <code data-cmd="확률">확률</code><br>   확률 규칙 목록을 표시합니다.<br>   특정 참가자들이 설정된 확률로 같은 팀에 배치되도록 하는 규칙입니다.<br><br>' +
 			'❓ <code data-cmd="help">help</code> / <code data-cmd="도움">도움</code><br>   이 도움말을 표시합니다.<br><br>' +
 			'💡 TIP: 콘솔을 닫으려면 우측 상단의 X 버튼을 클릭하세요.<br>' +
 			'💡 TIP: cmd 또는 command를 입력하면 언제든 콘솔을 다시 열 수 있습니다.', 'info');
@@ -1301,7 +1302,7 @@ const commandConsole = {
 	
 	matchingCommand() {
 		if (!this.authenticated) {
-			this.log('🚫 매칭 그룹 등록은 읽기 전용 모드에서 사용할 수 없습니다.', 'error');
+			this.log('🚫 확률 규칙 등록은 읽기 전용 모드에서 사용할 수 없습니다.', 'error');
 			this.log('💡 먼저 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 인증하세요.', 'info');
 			return;
 		}
@@ -1312,9 +1313,9 @@ const commandConsole = {
 		this.log('<code>기준 참가자(확률)매칭될 참가자1(확률)매칭될 참가자2</code>', 'info');
 		this.log('📊 설정된 매칭 그룹을 보려면 <code data-cmd="확률">확률</code> 명령어를 입력하세요.', 'info');
 		
-		// 매칭 입력 모드로 전환
+		// 규칙 입력 모드로 전환
 		this.inputMode = 'matching';
-		this.input.placeholder = '매칭 명령어를 입력하세요. 예) A(30)B';
+		this.input.placeholder = '확률 규칙을 입력하세요. 예) A(30)B';
 		setTimeout(() => this.input.focus(), 50);
 	},
 	
@@ -1323,17 +1324,17 @@ const commandConsole = {
 		                    state.pendingHiddenGroups.length + state.pendingHiddenGroupChains.length;
 		
 		if (totalHidden === 0) {
-			this.log('확률 기반 그룹이 없습니다.', 'info');
+			this.log('확률 규칙이 없습니다.', 'info');
 			return;
 		}
 		
 		let output = `<div style="margin: 10px 0;">
-			<div style="font-weight: bold; margin-bottom: 8px;">=== 🔗 확률 기반 그룹 (${totalHidden}개) ===</div>`;
+			<div style="font-weight: bold; margin-bottom: 8px;">=== 🔗 확률 규칙 (${totalHidden}개) ===</div>`;
 		
 		// 확률 기반 그룹 (hiddenGroups)
 		if (state.hiddenGroups.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">✅ 확률 기반 그룹 (${state.hiddenGroups.length}개):</div>
+				<div style="font-weight: bold; margin-bottom: 5px;">✅ 확률 규칙 (${state.hiddenGroups.length}개):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
@@ -1367,10 +1368,10 @@ const commandConsole = {
 			</div>`;
 		}
 		
-		// 확률 기반 그룹 체인 (hiddenGroupChains) - rowspan 사용
+		// 확률 규칙 체인 (hiddenGroupChains) - rowspan 사용
 		if (state.hiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">✅ 확률 기반 그룹 체인 (${state.hiddenGroupChains.length}개):</div>
+				<div style="font-weight: bold; margin-bottom: 5px;">✅ 확률 규칙 체인 (${state.hiddenGroupChains.length}개):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
@@ -1382,32 +1383,39 @@ const commandConsole = {
 					<tbody>`;
 			
 			state.hiddenGroupChains.forEach((chain) => {
-				const primaryPerson = state.people.find(p => p.id === chain.primary);
+				// 이름 기반으로 참가자 찾기
+				const primaryPerson = state.people.find(p => p.name === chain.primary);
 				const candidates = chain.candidates || [];
 				
-				if (primaryPerson && candidates.length > 0) {
+				// primary가 참가자 목록에 없어도 규칙은 표시
+				const primaryName = primaryPerson ? primaryPerson.name : chain.primary;
+				const primaryDisplay = primaryPerson ? `'${primaryName}'` : `<span style="color: #94a3b8;">'${primaryName}'</span>`;
+				
+				if (candidates.length > 0) {
 					candidates.forEach((candidate, idx) => {
-						const candidatePerson = state.people.find(p => p.id === candidate.id);
-						if (candidatePerson) {
-							// probability가 1보다 크면 이미 퍼센트 값, 아니면 0~1 범위
-							const displayPercent = candidate.probability > 1 ? Math.round(candidate.probability) : Math.round(candidate.probability * 100);
-							if (idx === 0) {
-								// 첫 번째 행: primary 표시
-								output += `
-									<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-										<td style="padding: 6px;">'${primaryPerson.name}'</td>
-										<td style="padding: 6px;">'${candidatePerson.name}'</td>
-										<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
-									</tr>`;
-							} else {
-								// 나머지 행: 멤버 A는 공백
-								output += `
-									<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-										<td style="padding: 6px;"></td>
-										<td style="padding: 6px;">'${candidatePerson.name}'</td>
-										<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
-									</tr>`;
-							}
+						// 이름 기반으로 후보 찾기
+						const candidatePerson = state.people.find(p => p.name === candidate.name);
+						const candidateName = candidatePerson ? candidatePerson.name : candidate.name;
+						const candidateDisplay = candidatePerson ? `'${candidateName}'` : `<span style="color: #94a3b8;">'${candidateName}'</span>`;
+						
+						// probability는 이미 퍼센트 값
+						const displayPercent = Math.round(candidate.probability);
+						if (idx === 0) {
+							// 첫 번째 행: primary 표시
+							output += `
+								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+									<td style="padding: 6px;">${primaryDisplay}</td>
+									<td style="padding: 6px;">${candidateDisplay}</td>
+									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
+								</tr>`;
+						} else {
+							// 나머지 행: 멤버 A는 공백
+							output += `
+								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+									<td style="padding: 6px;"></td>
+									<td style="padding: 6px;">${candidateDisplay}</td>
+									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
+								</tr>`;
 						}
 					});
 				}
@@ -1419,10 +1427,10 @@ const commandConsole = {
 			</div>`;
 		}
 		
-		// 보류 확률 기반 그룹 (pendingHiddenGroups)
+		// 보류 확률 규칙 (pendingHiddenGroups)
 		if (state.pendingHiddenGroups.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 확률 기반 그룹 (${state.pendingHiddenGroups.length}개):</div>`;
+				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 확률 규칙 (${state.pendingHiddenGroups.length}개):</div>`;
 			state.pendingHiddenGroups.forEach((group, index) => {
 				output += `<div style="padding: 4px 0;">${index + 1}. ${group.left} 🔗 ${group.right} (${Math.round(group.probability * 100)}%)</div>`;
 			});
@@ -1432,7 +1440,6 @@ const commandConsole = {
 		// 보류 확률 기반 그룹 체인 (pendingHiddenGroupChains)
 		if (state.pendingHiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 확률 기반 그룹 체인 (${state.pendingHiddenGroupChains.length}개):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
