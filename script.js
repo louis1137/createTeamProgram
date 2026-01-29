@@ -189,7 +189,6 @@ function checkDevToolsAndOpenConsole() {
 				
 				if (commandConsole.output) {
 					if (currentRoomKey) {
-						console.log(`📡 프로필 키 감지: ${currentRoomKey}`);
 						// 프로필이 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 						if (commandConsole.authenticated) {
 							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`, 'success');
@@ -1320,10 +1319,10 @@ function shuffleOrder() {
 // 중복 확인 모달을 위한 전역 변수
 let pendingAddData = null;
 
-function addPerson() {
+function addPerson(fromConsole = false) {
 	const input = elements.nameInput.value.trim();
 	if (input === '') {
-		alert('이름을 입력해주세요.');
+		if (!fromConsole) alert('이름을 입력해주세요.');
 		return;
 	}
 
@@ -1347,79 +1346,88 @@ function addPerson() {
 					// 파라미터가 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 					if (commandConsole.authenticated) {
 						commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`, 'success');
-						commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
-						setupRealtimeSync();
 						commandConsole.log('콘솔이 준비되었습니다.', 'success');
 						setTimeout(() => commandConsole.input.focus(), 100);
 					} else if (database) {
-						// 아직 인증되지 않았다면 비밀번호 확인
-						database.ref(`rooms/${currentRoomKey}/password`).once('value', (snapshot) => {
-							const password = snapshot.val();
-							if (password !== null) {
-								// 프로필이 존재함 (password는 ''이거나 값이 있음)
-								if (password === '') {
-									// 비밀번호 없음 - 바로 사용 가능
-									commandConsole.authenticated = true;
-									
-									// 데이터 로드
-									database.ref(`rooms/${currentRoomKey}`).once('value')
-										.then((snapshot) => {
-											const data = snapshot.val();
-											if (data && (data.people || data.timestamp)) {
-												loadStateFromData(data);
-												commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`, 'success');
-											} else {
-												commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`, 'success');
-											}
-											commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
-											setupRealtimeSync();
-											commandConsole.log('콘솔이 준비되었습니다.', 'success');
-										})
-										.catch((error) => {
-											commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
-										});
-									
-									// 입력 폼에 포커스
-									setTimeout(() => commandConsole.input.focus(), 100);
+						// 인증되지 않았고, 저장된 비밀번호가 이미 있다면 읽기 전용 모드로
+						if (commandConsole.storedPassword !== null && commandConsole.storedPassword !== undefined) {
+							// 읽기 전용 모드로 진입
+							commandConsole.authenticated = false;
+							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨 (읽기 전용 모드)`, 'info');
+							commandConsole.log(' 쓰기 권한이 필요하면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.', 'info');
+							commandConsole.log('콘솔이 준비되었습니다.', 'success');
+							setTimeout(() => commandConsole.input.focus(), 100);
+						} else {
+							// 최초 cmd 입력 시 - 비밀번호 확인
+							database.ref(`rooms/${currentRoomKey}/password`).once('value', (snapshot) => {
+								const password = snapshot.val();
+								if (password !== null) {
+									// 프로필이 존재함 (password는 ''이거나 값이 있음)
+									if (password === '') {
+										// 비밀번호 없음 - 바로 사용 가능
+										commandConsole.authenticated = true;
+										commandConsole.storedPassword = '';
+										
+										// 데이터 로드
+										database.ref(`rooms/${currentRoomKey}`).once('value')
+											.then((snapshot) => {
+												const data = snapshot.val();
+												if (data && (data.people || data.timestamp)) {
+													loadStateFromData(data);
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`, 'success');
+												} else {
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`, 'success');
+												}
+												commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+												setupRealtimeSync();
+												commandConsole.log('콘솔이 준비되었습니다.', 'success');
+											})
+											.catch((error) => {
+												commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
+											});
+										
+										// 입력 폼에 포커스
+										setTimeout(() => commandConsole.input.focus(), 100);
+									} else {
+										// 비밀번호가 설정되어 있음 - 인증 필요
+										commandConsole.storedPassword = password;
+										commandConsole.authenticated = false;
+										
+										// 비밀번호 확인 전에 데이터 동기화 먼저 시작
+										database.ref(`rooms/${currentRoomKey}`).once('value')
+											.then((snapshot) => {
+												const data = snapshot.val();
+												if (data && (data.people || data.timestamp)) {
+													loadStateFromData(data);
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`, 'info');
+												} else {
+													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`, 'info');
+												}
+												commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
+												setupRealtimeSync();
+												commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+											})
+											.catch((error) => {
+												commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
+												commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
+											});
+										
+										commandConsole.inputMode = 'auth';
+										commandConsole.input.type = 'password';
+										commandConsole.input.placeholder = '비밀번호 입력...';
+										// 입력 폼에 포커스
+										setTimeout(() => commandConsole.input.focus(), 100);
+									}
 								} else {
-									// 비밀번호가 설정되어 있음 - 인증 필요
-									commandConsole.storedPassword = password;
-									commandConsole.authenticated = false;
-									
-									// 비밀번호 확인 전에 데이터 동기화 먼저 시작
-									database.ref(`rooms/${currentRoomKey}`).once('value')
-										.then((snapshot) => {
-											const data = snapshot.val();
-											if (data && (data.people || data.timestamp)) {
-												loadStateFromData(data);
-												commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`, 'info');
-											} else {
-												commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`, 'info');
-											}
-											commandConsole.log('🔄 실시간 동기화 활성화됨', 'success');
-											setupRealtimeSync();
-											commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
-										})
-										.catch((error) => {
-											commandConsole.log(`데이터 로드 실패: ${error.message}`, 'error');
-											commandConsole.log('🔒 비밀번호를 입력하세요:', 'info');
-										});
-									
-									commandConsole.inputMode = 'auth';
-									commandConsole.input.type = 'password';
-									commandConsole.input.placeholder = '비밀번호 입력...';
-									// 입력 폼에 포커스
-									setTimeout(() => commandConsole.input.focus(), 100);
+									// 존재하지 않는 프로필 - 생성 확인
+									commandConsole.tempProfile = currentRoomKey;
+									commandConsole.log(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`, 'warning');
+									commandConsole.log('신규 프로필로 등록하시겠습니까?', 'info');
+									commandConsole.inputMode = 'profile-create-confirm';
+									commandConsole.showConfirmButtons();
 								}
-							} else {
-								// 존재하지 않는 프로필 - 생성 확인
-								commandConsole.tempProfile = currentRoomKey;
-								commandConsole.log(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`, 'warning');
-								commandConsole.log('신규 프로필로 등록하시겠습니까?', 'info');
-								commandConsole.inputMode = 'profile-create-confirm';
-								commandConsole.showConfirmButtons();
-							}
-						});
+							});
+						}
 					}
 				} else {
 					// 파라미터가 없는 경우 - 프로필 생성 플로우 시작
@@ -1454,7 +1462,7 @@ function addPerson() {
 	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
 
 	if (tokens.length === 0) {
-		alert('이름을 입력해주세요.');
+		if (!fromConsole) alert('이름을 입력해주세요.');
 		return;
 	}
 
@@ -1464,7 +1472,9 @@ function addPerson() {
 	const allInputNames = []; // 입력된 모든 이름 (정규화된 형태)
 
 	tokens.forEach(token => {
-		// 히든 그룹 체이닝 체크: A(50)B(50)C(50)D 패턴
+		// cmd 콘솔에서만 확률 기반 그룹 처리
+		if (fromConsole) {
+			// 히든 그룹 체이닝 체크: A(50)B(50)C(50)D 패턴
 		const chainPattern = /^([^(]+)(?:\((\d+)\)([^(]+))+$/;
 		if (chainPattern.test(token)) {
 			// 체인 파싱
@@ -1530,7 +1540,6 @@ function addPerson() {
 								}
 							});
 							saveToLocalStorage();
-							try { printParticipantConsole(); } catch (_) { /* no-op */ }
 						} else {
 							// 새 체인 생성
 							addHiddenGroupChain(primaryPerson.id, candidateIds);
@@ -1578,7 +1587,6 @@ function addPerson() {
 							console.log(`➕ 체인에 후보 추가: ${leftName} → ${rightName}(${probability}%)`);
 						}
 						saveToLocalStorage();
-						try { printParticipantConsole(); } catch (_) { /* no-op */ }
 						constraintsTouched = true;
 					} else {
 						// 기존 체인이 없으면 단일 쌍으로 추가
@@ -1593,6 +1601,7 @@ function addPerson() {
 			}
 			return; // 히든 그룹 처리 완료
 		}
+		} // fromConsole 블록 닫기
 		
 		if (token.includes('!')) {
 			// 한 입력에서 여러 제약 처리: "A!B!C!D" 또는 "A!B,C!E"
@@ -1952,7 +1961,6 @@ function updatePersonGender(id, gender) {
 	if (person) {
 		person.gender = gender;
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	}
 }
 
@@ -1961,7 +1969,6 @@ function updatePersonWeight(id, weight) {
 	if (person) {
 		person.weight = parseInt(weight) || 0;
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	}
 }
 
@@ -2001,8 +2008,6 @@ function addForbiddenPairByNames(nameA, nameB) {
 		state.forbiddenPairs.push([pa.id, pb.id]);
 		buildForbiddenMap();
 		saveToLocalStorage();
-		// 업데이트가 있으면 콘솔 관리 뷰를 갱신하고 팝업을 연다
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		safeOpenForbiddenWindow();
 	} else {
 		// 이미 존재할 때의 디버그 로그 제거
@@ -2022,10 +2027,8 @@ function addPendingConstraint(leftName, rightName) {
 	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
 	saveToLocalStorage();
-	// 갱신된 상태를 콘솔에 반영
-	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	// 팝업이 열려 있으면 갱신(또는 팝업 열기)
-		safeOpenForbiddenWindow();
+	safeOpenForbiddenWindow();
 	return { ok: true }; 
 }
 
@@ -2047,7 +2050,6 @@ function tryResolvePendingConstraints() {
 	if (changed) {
 		buildForbiddenMap();
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		safeOpenForbiddenWindow();
 	} 
 }
@@ -2106,7 +2108,6 @@ function removeForbiddenPairByNames(nameA, nameB) {
 		if (state.forbiddenPairs.length !== before) {
 			buildForbiddenMap();
 			saveToLocalStorage();
-			try { printParticipantConsole(); } catch (_) { /* no-op */ }
 			safeOpenForbiddenWindow();
 			return { ok: true };
 		}
@@ -2116,7 +2117,6 @@ function removeForbiddenPairByNames(nameA, nameB) {
 	state.pendingConstraints = state.pendingConstraints.filter(pc => !( (pc.left === na && pc.right === nb) || (pc.left === nb && pc.right === na) ));
 	if (state.pendingConstraints.length !== beforePending) {
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		safeOpenForbiddenWindow();
 		return { ok: true };
 	}
@@ -2281,7 +2281,6 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 			console.log(`➕ 체인에 후보 추가: ${pa.name} → ${pb.name}(${probability}%)`);
 		}
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		return { ok: true, added: true };
 	}
 	
@@ -2296,7 +2295,6 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 			console.log(`➕ 체인에 후보 추가: ${pb.name} → ${pa.name}(${probability}%)`);
 		}
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		return { ok: true, added: true };
 	}
 	
@@ -2309,7 +2307,6 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		// 새로 추가
 		state.hiddenGroups.push([pa.id, pb.id, probability]);
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		console.log(`✅ 히든 그룹 추가 (${probability}%): ${pa.name} ↔ ${pb.name}`);
 		return { ok: true, added: true };
 	} else {
@@ -2342,14 +2339,12 @@ function addPendingHiddenGroup(leftName, rightName, probability) {
 		// 새로 추가
 		state.pendingHiddenGroups.push({ left: l, right: r, probability: probability });
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		console.log(`⏳ 보류 히든 그룹 추가 (${probability}%): ${leftName} ↔ ${rightName}`);
 	} else {
 		// 확률 업데이트
 		const oldProb = state.pendingHiddenGroups[existingIndex].probability;
 		state.pendingHiddenGroups[existingIndex].probability = probability;
 		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
 		console.log(`🔄 보류 히든 그룹 확률 갱신 (${oldProb}% → ${probability}%): ${leftName} ↔ ${rightName}`);
 	}
 	
@@ -2399,10 +2394,7 @@ function tryResolveHiddenGroups() {
 		return true; // 보류 유지
 	});
 	
-	if (changed) {
-		saveToLocalStorage();
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
-	}
+	if (changed) saveToLocalStorage();
 }
 
 // 히든 그룹 체인 추가
@@ -2417,7 +2409,6 @@ function addHiddenGroupChain(primaryId, candidates) {
 	});
 	
 	saveToLocalStorage();
-	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	
 	const primaryPerson = state.people.find(p => p.id === primaryId);
 	const primaryName = primaryPerson ? primaryPerson.name : `ID ${primaryId}`;
@@ -2444,7 +2435,6 @@ function addPendingHiddenGroupChain(primaryName, candidates) {
 	});
 	
 	saveToLocalStorage();
-	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	console.log(`⏳ 보류 히든 그룹 체인 추가: ${primaryName} → ${candidates.map(c => `${c.name}(${c.probability}%)`).join(' → ')}`);
 }
 
@@ -2780,7 +2770,6 @@ function clearAllConstraints() {
 	state.pendingConstraints = [];
 	state.forbiddenMap = {};
 	saveToLocalStorage();
-	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 	renderForbiddenWindowContent();
 }
 
@@ -2889,169 +2878,6 @@ function updateParticipantCount() {
 	}
 }
 
-// 콘솔에 현재 참가자 목록을 그룹 표시 순서대로 출력
-function printParticipantConsole() {
-	try {
-		if (!console || !console.table) return;
-		try { console.clear(); } catch (_) { /* 일부 환경에서 clear가 제한될 수 있음 */ }
-		console.group('📋 참가자 관리 (실시간)');
-		if (!state.people || state.people.length === 0) {
-			console.log('%c👥 참가자: 없음', 'color: #999; font-style: italic;');
-			console.groupEnd();
-			return;
-		}
-
-		const groupLabelForIndex = (i) => {
-			const base = String.fromCharCode(65 + (i % 26));
-			return i < 26 ? base : base + Math.floor(i / 26).toString();
-		};
-
-		const personGroupMap = new Map();
-		state.requiredGroups.forEach((group, gi) => {
-			const label = groupLabelForIndex(gi);
-			group.forEach(pid => personGroupMap.set(pid, label));
-		});
-		
-		// 히든 그룹 정보 수집 (클러스터 번호, 확률, 그룹 레이블로 관리)
-		const hiddenGroupClusters = new Map(); // personId -> {clusterNum, probability, groupLabel}
-		const processedClusters = new Set();
-		let clusterNum = 0;
-		
-		state.people.forEach(p => {
-			if (processedClusters.has(p.id)) return;
-			
-			// 이 사람이 속한 히든 그룹 클러스터 찾기 (명령어 기준으로 표시)
-			const cluster = getDefinedHiddenGroupCluster(p.id);
-			if (cluster.size > 1) {
-				// 이 클러스터의 확률 찾기 (여러 개면 평균)
-				const probabilities = [];
-				state.hiddenGroups.forEach(([a, b, prob]) => {
-					if (cluster.has(a) && cluster.has(b)) {
-						probabilities.push(prob);
-					}
-				});
-				const avgProbability = probabilities.length > 0 
-					? Math.round(probabilities.reduce((a, b) => a + b, 0) / probabilities.length)
-					: 100;
-				
-				// 클러스터를 확장하여 각 멤버가 속한 그룹의 모든 멤버 포함
-				const expandedCluster = new Set();
-				let representativeGroupLabel = null; // 대표 그룹 레이블
-				
-				cluster.forEach(id => {
-					const groupIndex = getPersonGroupIndex(id);
-					if (groupIndex !== -1) {
-						// 이 사람이 그룹에 속해있으면 그룹의 모든 멤버 추가
-						state.requiredGroups[groupIndex].forEach(memberId => {
-							expandedCluster.add(memberId);
-						});
-						// 대표 그룹 레이블 저장
-						if (representativeGroupLabel === null) {
-							representativeGroupLabel = groupLabelForIndex(groupIndex);
-						}
-					} else {
-						// 개인이면 자신만 추가
-						expandedCluster.add(id);
-					}
-				});
-				
-				// 확장된 클러스터의 모든 사람에게 같은 클러스터 정보 할당
-				expandedCluster.forEach(id => {
-					hiddenGroupClusters.set(id, { 
-						clusterNum, 
-						probability: avgProbability,
-						groupLabel: representativeGroupLabel || ('C' + clusterNum)
-					});
-					processedClusters.add(id);
-				});
-				clusterNum++;
-			}
-		});
-
-		// 화면 표시 순서대로 정렬 (그룹 단위)
-		const groupMap = new Map();
-		state.requiredGroups.forEach((group, gi) => group.forEach(id => groupMap.set(id, gi)));
-		const processed = new Set();
-		const displaySeq = [];
-		state.people.forEach(p => {
-			const gi = groupMap.get(p.id);
-			if (gi !== undefined && !processed.has(gi)) {
-				processed.add(gi);
-				const g = state.requiredGroups[gi];
-				g.forEach(id => {
-					const pp = state.people.find(x => x.id === id);
-					if (pp) displaySeq.push(pp);
-				});
-			} else if (gi === undefined) {
-				displaySeq.push(p);
-			}
-		});
-
-		const peopleTable = displaySeq.map(p => {
-			const row = {
-				'이름': p.name,
-				'성별': p.gender === 'male' ? '♂️' : '♀️',
-				'가중치': typeof p.weight !== 'undefined' ? p.weight : 0
-			};
-			const grp = personGroupMap.get(p.id);
-			const hiddenInfo = hiddenGroupClusters.get(p.id);
-			
-			if (hiddenInfo !== undefined) {
-				// 히든 그룹이 있으면 대표 그룹 레이블 사용
-				row['그룹'] = hiddenInfo.groupLabel + '(' + hiddenInfo.probability + '%)';
-			} else if (grp) {
-				// 히든 그룹이 없고 일반 그룹만 있으면
-				row['그룹'] = grp;
-			}
-			return row;
-		});
-
-		console.table(peopleTable);
-
-		// 미참가자 목록 출력
-		if (state.inactivePeople && state.inactivePeople.length > 0) {
-			console.log('%c💤 미참가자 목록', 'color: #999; font-weight: bold; font-size: 14px;');
-			const inactiveTable = state.inactivePeople.map(p => ({
-				'이름': p.name,
-				'성별': p.gender === 'male' ? '♂️' : '♀️',
-				'가중치': typeof p.weight !== 'undefined' ? p.weight : 0
-			}));
-			console.table(inactiveTable);
-		} else {
-			console.log('%c💤 미참가자: 없음', 'color: #999; font-style: italic;');
-		}
-
-		// 적용된 제약과 보류 제약도 함께 출력
-		if (state.forbiddenPairs && state.forbiddenPairs.length > 0) {
-			console.log('%c🚫 적용된 제약', 'color: #ef4444; font-weight: bold; font-size: 14px;');
-			state.forbiddenPairs.forEach((pair, idx) => {
-				const pa = state.people.find(p => p.id === pair[0]);
-				const pb = state.people.find(p => p.id === pair[1]);
-				const left = pa ? pa.name : `id:${pair[0]}`;
-				const right = pb ? pb.name : `id:${pair[1]}`;
-				console.log(`  ${idx + 1}. ${left} ↔ ${right}`);
-			});
-		} else {
-			console.log('%c🚫 적용된 제약: 없음', 'color: #999; font-style: italic;');
-		}
-
-		if (state.pendingConstraints && state.pendingConstraints.length > 0) {
-			console.log('%c⏳ 대기 중인 제약', 'color: #f59e0b; font-weight: bold; font-size: 14px;');
-			state.pendingConstraints.forEach((pc, idx) => {
-				console.log(`  ${idx + 1}. ${pc.left} ↔ ${pc.right}`);
-			});
-		} else {
-			console.log('%c⏳ 대기 중인 제약: 없음', 'color: #999; font-style: italic;');
-		}
-
-		console.groupEnd();
-	} catch (e) {
-		try { console.error('printParticipantConsole 실패:', e); } catch (_) { /* no-op */ }
-	}
-}
-
-
-
 function renderPeople() {
 	updateParticipantCount();
 	elements.peopleList.innerHTML = '';
@@ -3102,8 +2928,6 @@ function renderPeople() {
 		}
 		// 이미 처리된 그룹의 멤버는 스킵
 	});
-		// 콘솔 업데이트
-		try { printParticipantConsole(); } catch (_) { /* no-op */ }
         
 }
 
@@ -3181,9 +3005,6 @@ function shuffleTeams() {
 	
 	// 검증 루프 실행 후 최종 결과만 표시
 	startValidationLoop(teams);
-	
-	// 팀 생성 시 콘솔의 참가자 관리 뷰도 갱신
-	try { printParticipantConsole(); } catch (_) { /* no-op */ }
 }
 // 팀 생성 전에 내부적으로 한 번 셔플: 그룹 내 인원은 제외(비그룹 인원만 무작위화)
 function preShufflePeopleForGeneration(people) {

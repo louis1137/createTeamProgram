@@ -1,4 +1,4 @@
-﻿// ==================== 명령어 콘솔 ====================
+// ==================== 명령어 콘솔 ====================
 
 const commandConsole = {
 	output: null,
@@ -33,6 +33,26 @@ const commandConsole = {
 		
 		// 드래그 기능 추가 (dragState를 commandConsole에 저장)
 		this.dragState = this.setupDragging(consoleEl);
+		
+		// 전역 ESC 키 이벤트 리스너 (비밀번호 모드 취소용)
+		document.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape' || e.keyCode === 27) {
+				// 비밀번호 입력 모드에서 ESC 키를 누르면 읽기 전용 모드로 전환
+				if (this.inputMode === 'auth' || this.inputMode === 'auth-switch' || 
+				    this.inputMode === 'password-change' || this.inputMode === 'delete-confirm' ||
+				    this.inputMode === 'matching') {
+					e.preventDefault();
+					e.stopPropagation();
+					this.log('❌ 취소되었습니다.', 'info');
+					this.inputMode = 'normal';
+					if (this.input) {
+						this.input.type = 'text';
+						this.input.value = '';
+						this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+					}
+				}
+			}
+		});
 		
 		// 엔터키로 명령어 전송
 		if (this.input) {
@@ -97,6 +117,27 @@ const commandConsole = {
 					// 출력 화면 클리어
 					if (this.output) {
 						this.output.innerHTML = '';
+					}
+				} else {
+					// 프로필이 있는 경우
+					// 비밀번호 입력 모드에서 닫으면 자동으로 읽기 모드로 전환
+					if (this.inputMode === 'auth' || this.inputMode === 'auth-switch' || 
+					    this.inputMode === 'password-change' || this.inputMode === 'delete-confirm' ||
+					    this.inputMode === 'password-ask-initial' || this.inputMode === 'password-ask-switch' ||
+					    this.inputMode === 'matching') {
+						this.log('❌ 취소되었습니다.', 'info');
+						this.inputMode = 'normal';
+						
+						// 확인 버튼이 표시되어 있다면 입력 필드로 복원
+						this.restoreInputField();
+						
+						this.input.type = 'text';
+						this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+					} else if (this.inputMode !== 'normal') {
+						// 다른 특수 모드에서는 normal로 복귀
+						this.inputMode = 'normal';
+						this.input.type = 'text';
+						this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
 					}
 				}
 			});
@@ -467,6 +508,19 @@ const commandConsole = {
 		entry.innerHTML = `<span class="log-time">[${timestamp}]</span><span class="log-content">${message}</span>`;
 		this.output.appendChild(entry);
 		this.output.scrollTop = this.output.scrollHeight;
+		
+		// <code> 태그에 클릭 이벤트 추가 (명령어 자동 입력)
+		entry.querySelectorAll('code[data-cmd]').forEach(code => {
+			code.style.cursor = 'pointer';
+			code.addEventListener('click', (e) => {
+				e.stopPropagation();
+				const cmdText = code.getAttribute('data-cmd');
+				if (this.input && cmdText) {
+					this.input.value = cmdText;
+					this.input.focus();
+				}
+			});
+		});
 	},
 	
 	executeCommand() {
@@ -480,10 +534,24 @@ const commandConsole = {
 		    this.inputMode !== 'password' && 
 		    this.inputMode !== 'password-confirm' && 
 		    this.inputMode !== 'password-change' && 
-		    this.inputMode !== 'password-change-confirm') {
+		    this.inputMode !== 'password-change-confirm' && 
+		    this.inputMode !== 'delete-confirm' &&
+		    this.inputMode !== 'matching') {
 			this.log(`> ${cmd}`, 'command');
 		}
 		this.input.value = '';
+		
+		if (this.inputMode === 'matching') {
+			// 매칭 모드: 히든 그룹 명령어 처리
+			this.log(`> ${cmd}`, 'command');
+			// input 명령어를 통해 처리
+			this.inputCommand(cmd);
+			// 매칭 등록 후 일반 모드로 복귀
+			this.inputMode = 'normal';
+			this.input.type = 'text';
+			this.input.placeholder = '명령어를 입력하세요...';
+			return;
+		}
 		
 		if (this.inputMode === 'profile' || this.inputMode === 'profile-switch') {
 			if (!database && !initFirebase()) {
@@ -533,11 +601,11 @@ const commandConsole = {
 									if (data && (data.people || data.timestamp)) {
 										// 저장된 데이터가 있으면 로드
 										loadStateFromData(data);
-										this.log(`✅ '${cmd}' 프로필로 전환 성공! (참가자: ${state.people.length}명)`, 'success');
+										this.log(`✅ '${cmd}' 프로필로 전환 성공!`, 'success');
 									} else {
 										// 데이터가 없으면 초기화
 										clearState();
-										this.log(`✅ '${cmd}' 프로필로 전환 성공! (초기 상태)`, 'success');
+										this.log(`✅ '${cmd}' 프로필로 전환 성공!`, 'success');
 									}
 								})
 								.catch((error) => {
@@ -550,9 +618,9 @@ const commandConsole = {
 									const data = snapshot.val();
 									if (data && (data.people || data.timestamp)) {
 										loadStateFromData(data);
-										this.log(`📡 프로필 '${cmd}' 발견 (참가자: ${state.people.length}명)`, 'info');
+										this.log(`📡 프로필 '${cmd}' 발견`, 'info');
 									} else {
-										this.log(`📡 프로필 '${cmd}' 발견 (초기 상태)`, 'info');
+										this.log(`📡 프로필 '${cmd}' 발견`, 'info');
 									}
 									this.log('🔄 실시간 동기화 활성화됨', 'success');
 									
@@ -580,9 +648,9 @@ const commandConsole = {
 								const data = snapshot.val();
 								if (data && (data.people || data.timestamp)) {
 									loadStateFromData(data);
-									this.log(`📡 프로필 '${cmd}' 발견 (참가자: ${state.people.length}명)`, 'info');
+									this.log(`📡 프로필 '${cmd}' 발견`, 'info');
 								} else {
-									this.log(`📡 프로필 '${cmd}' 발견 (초기 상태)`, 'info');
+									this.log(`📡 프로필 '${cmd}' 발견`, 'info');
 								}
 								this.log('🔄 실시간 동기화 활성화됨', 'success');
 								
@@ -632,20 +700,18 @@ const commandConsole = {
 					.then((snapshot) => {
 						const data = snapshot.val();
 						if (data && (data.people || data.timestamp)) {
-							// 저장된 데이터가 있으면 로드
-							loadStateFromData(data);
 							if (isSwitch) {
-								this.log(`✅ '${this.tempProfile}' 프로필로 전환 성공! (참가자: ${state.people.length}명)`, 'success');
+								this.log(`✅ '${this.tempProfile}' 프로필로 전환 성공!`, 'success');
 							} else {
-								this.log(`✅ 인증 성공! (참가자: ${state.people.length}명)<br>🔄 실시간 동기화 활성화됨<br>콘솔이 준비되었습니다.`, 'success');
+								this.log(`✅ 인증 성공!<br>콘솔이 준비되었습니다.`, 'success');
 							}
 						} else {
 							// 데이터가 없으면 초기화
 							clearState();
 							if (isSwitch) {
-								this.log(`✅ '${this.tempProfile}' 프로필로 전환 성공! (초기 상태)`, 'success');
+								this.log(`✅ '${this.tempProfile}' 프로필로 전환 성공!`, 'success');
 							} else {
-								this.log('✅ 인증 성공! (초기 상태)<br>🔄 실시간 동기화 활성화됨<br>콘솔이 준비되었습니다.', 'success');
+								this.log('✅ 인증 성공!<br>콘솔이 준비되었습니다.', 'success');
 							}
 						}
 					})
@@ -762,13 +828,64 @@ const commandConsole = {
 			return;
 		}
 		
+		if (this.inputMode === 'delete-confirm') {
+			// 삭제 전 비밀번호 확인
+			if (cmd === this.storedPassword) {
+				this.log('🔑 비밀번호가 확인되었습니다.', 'success');
+				this.log(`⚠️ 정말로 프로필 '${currentRoomKey}'를 삭제하시겠습니까?`, 'warning');
+				this.log('삭제하려면 프로필 이름을 정확히 입력하세요:', 'info');
+				this.inputMode = 'delete-final-confirm';
+				this.input.type = 'text';
+				this.input.placeholder = '프로필 이름 입력...';
+				setTimeout(() => this.input.focus(), 50);
+			} else {
+				this.log('비밀번호가 일치하지 않습니다. 삭제가 취소되었습니다.', 'error');
+				this.inputMode = 'normal';
+				this.input.type = 'text';
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			}
+			return;
+		}
+		
+		if (this.inputMode === 'delete-final-confirm') {
+			// 최종 확인: 프로필 이름 일치 확인
+			if (cmd === currentRoomKey) {
+				// Firebase에서 프로필 삭제
+				database.ref(`rooms/${currentRoomKey}`).remove()
+					.then(() => {
+						this.log(`🗑️ 프로필 '${currentRoomKey}'가 완전히 삭제되었습니다.`, 'success');
+						this.log('잠시 후 프로필 선택 화면으로 이동합니다...', 'info');
+						
+						// 로컬 상태 초기화
+						clearState();
+						currentRoomKey = null;
+						syncEnabled = false;
+						
+						// 2초 후 index.html로 리다이렉트
+						setTimeout(() => {
+							window.location.href = 'index.html';
+						}, 2000);
+					})
+					.catch((error) => {
+						this.log(`삭제 실패: ${error.message}`, 'error');
+						this.inputMode = 'normal';
+						this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+					});
+			} else {
+				this.log(`프로필 이름이 일치하지 않습니다. 삭제가 취소되었습니다.`, 'error');
+				this.inputMode = 'normal';
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			}
+			return;
+		}
+		
 		if (!this.authenticated && currentRoomKey) {
 			// 읽기 모드에서는 save와 입력 관련 명령어만 차단
 			const [command] = cmd.split(' ');
 			const writeCommands = ['save', '저장', 'input', '입력', 'clear', '초기화'];
 			if (writeCommands.includes(command.toLowerCase())) {
-				this.log('⚠️ 읽기 전용 모드입니다. 이 명령어를 사용하려면 비밀번호 인증이 필요합니다.', 'warning');
-				this.log('비밀번호를 입력하시려면 "비밀번호" 명령어를 사용하세요.', 'info');
+				this.log('⚠️ 읽기 전용 모드입니다. 이 명령어를 사용하려면 인증이 필요합니다.', 'warning');
+				this.log('인증하려면 <code data-cmd="로그인">로그인</code> 또는 <code data-cmd="login">login</code> 명령어를 사용하세요.', 'info');
 				return;
 			}
 		}
@@ -792,21 +909,20 @@ const commandConsole = {
 			case '상태':
 				this.statusCommand();
 				break;
+			case 'login':
+			case '로그인':
+				// 로그인 명령어 - 비밀번호 입력 모드로 전환
+				this.loginCommand();
+				break;
+			case 'logout':
+			case '종료':
+				// 로그아웃 명령어 - 쓰기 모드에서 읽기 모드로 전환
+				this.logoutCommand();
+				break;
 			case 'password':
 			case '비밀번호':
-				// "비밀번호"만 입력하면 입력 모드로 전환
-				if (args.length === 0) {
-					this.passwordInputCommand();
-				} else {
-					// "비밀번호 변경", "비밀번호 수정" 등은 변경 모드로
-					const subCommand = args[0];
-					if (subCommand === '변경' || subCommand === '수정' || subCommand === 'modify' || subCommand === 'change') {
-						this.passwordCommand(args.slice(1).join(' '));
-					} else {
-						// 나머지는 새 비밀번호로 간주
-						this.passwordCommand(args.join(' '));
-					}
-				}
+				// 비밀번호 변경 명령어
+				this.passwordCommand(args.join(' '));
 				break;
 			case 'profile':
 			case '프로필':
@@ -825,9 +941,19 @@ const commandConsole = {
 			case '확률':
 				this.hiddenCommand();
 				break;
+			case '매칭':
+			case 'matching':
+				this.matchingCommand();
+				break;
 			case 'input':
 			case '입력':
 				this.inputCommand(args.join(' '));
+				break;
+			case 'delete':
+			case '삭제':
+			case 'delete-profile':
+			case '프로필삭제':
+				this.deleteCommand();
 				break;
 			case 'help':
 			case '도움':
@@ -875,7 +1001,7 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}`).set(data);
 			})
 			.then(() => {
-				this.log(`💾 저장 완료! (참가자: ${state.people.length}명)`, 'success');
+				this.log(`💾 저장 완료!`, 'success');
 			})
 			.catch((error) => {
 				this.log(`저장 실패: ${error.message}`, 'error');
@@ -893,7 +1019,7 @@ const commandConsole = {
 				const data = snapshot.val();
 				if (data) {
 					loadStateFromData(data);
-					this.log(`📥 데이터 로드 완료! (참가자: ${state.people.length}명)`, 'success');
+					this.log(`📥 데이터 로드 완료!`, 'success');
 				} else {
 					this.log('저장된 데이터가 없습니다.', 'warning');
 				}
@@ -909,13 +1035,41 @@ const commandConsole = {
 			return;
 		}
 		
-		if (confirm('⚠️ 서버의 모든 데이터를 삭제하시겠습니까?')) {
-			database.ref(`rooms/${currentRoomKey}`).remove()
+		if (confirm('⚠️ 참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화하시겠습니까?\n(비밀번호와 프로필은 유지됩니다)')) {
+			// 비밀번호 백업
+			database.ref(`rooms/${currentRoomKey}/password`).once('value')
+				.then((snapshot) => {
+					const savedPassword = snapshot.val();
+					
+					// 초기화된 데이터 저장 (비밀번호는 유지)
+					const emptyData = {
+						people: [],
+						inactivePeople: [],
+						requiredGroups: [],
+						nextId: 1,
+						forbiddenPairs: [],
+						pendingConstraints: [],
+						hiddenGroups: [],
+						hiddenGroupChains: [],
+						pendingHiddenGroups: [],
+						pendingHiddenGroupChains: [],
+						maxTeamSizeEnabled: false,
+						genderBalanceEnabled: false,
+						weightBalanceEnabled: false,
+						membersPerTeam: 4,
+						password: savedPassword !== null ? savedPassword : '',
+						timestamp: Date.now()
+					};
+					
+					return database.ref(`rooms/${currentRoomKey}`).set(emptyData);
+				})
 				.then(() => {
-					this.log('🗑️ 서버 데이터 삭제 완료', 'success');
+					// 로컬 state 초기화
+					clearState();
+					this.log('🗑️ 데이터 초기화 완료 (비밀번호 유지)', 'success');
 				})
 				.catch((error) => {
-					this.log(`삭제 실패: ${error.message}`, 'error');
+					this.log(`초기화 실패: ${error.message}`, 'error');
 				});
 		}
 	},
@@ -924,9 +1078,29 @@ const commandConsole = {
 		this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개', 'info');
 	},
 	
+	
 	helpCommand() {
-		this.log('=== 📋 명령어 도움말 ===<br><br>💾 save / 저장<br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>📥 load / 불러오기<br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>🗑️ clear / 초기화<br>   서버에 저장된 현재 Room의 모든 데이터를 삭제합니다.<br>   ⚠️ 삭제된 데이터는 복구할 수 없으니 주의하세요!<br><br>📊 status / 상태<br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>🔑 password / 비밀번호 [새 비밀번호]<br>   현재 프로필의 비밀번호를 변경합니다.<br>   새 비밀번호를 입력하지 않으면 입력 모드로 전환됩니다.<br>   입력 모드에서는 비밀번호를 두 번 입력하여 확인합니다.<br><br>👤 profile / 프로필<br>   다른 프로필로 전환합니다.<br>   프로필 이름을 입력하면 해당 프로필로 전환하고 데이터를 불러옵니다.<br>   존재하지 않는 프로필이면 생성 여부를 묻습니다.<br><br>✏️ input / 입력 [참가자 데이터]<br>   참가자 추가 폼과 동일한 방식으로 참가자를 추가합니다.<br>   예시: 입력 홍길동,김철수 / 이영희(남)50 / A!B / C(80)D<br>   쉼표로 그룹 구분, / 로 토큰 구분, ! 로 제약, () 로 확률/가중치 설정<br><br>👥 참가자<br>   현재 등록된 모든 참가자 목록을 표시합니다.<br>   각 참가자의 이름, 성별, 가중치 정보를 확인할 수 있습니다.<br><br>👻 미참가자<br>   현재 미참가자로 설정된 목록을 표시합니다.<br>   미참가자는 팀 생성 시 제외됩니다.<br><br>🚫 제약<br>   현재 설정된 제약 조건 목록을 표시합니다.<br>   특정 참가자들이 같은 팀에 배치되지 않도록 하는 규칙입니다.<br><br>🎲 확률<br>   확률 기반 그룹 목록을 표시합니다.<br>   특정 참가자들이 설정된 확률로 같은 팀에 배치되도록 하는 규칙입니다.<br><br>❓ help / 도움<br>   이 도움말을 표시합니다.<br><br>💡 TIP: 콘솔을 닫으려면 우측 상단의 X 버튼을 클릭하세요.<br>💡 TIP: cmd 또는 command를 입력하면 언제든 콘솔을 다시 열 수 있습니다.', 'info');
+		this.log('=== 📋 명령어 도움말 ===<br><br>' +
+			'💾 <code data-cmd="save">save</code> / <code data-cmd="저장">저장</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>' +
+			'📥 <code data-cmd="load">load</code> / <code data-cmd="불러오기">불러오기</code><br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>' +
+			'🗑️ <code data-cmd="clear">clear</code> / <code data-cmd="초기화">초기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화합니다.<br>   ⚠️ 비밀번호와 프로필은 유지되며, 초기화된 데이터는 복구할 수 없습니다.<br><br>' +
+			'🗑️ <code data-cmd="delete">delete</code> / <code data-cmd="삭제">삭제</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 프로필을 완전히 삭제합니다.<br>   ⚠️ 비밀번호 확인과 프로필 이름 확인 후 삭제되며 복구할 수 없습니다.<br>   삭제 후 프로필 선택 화면으로 이동합니다.<br><br>' +
+			'📊 <code data-cmd="status">status</code> / <code data-cmd="상태">상태</code><br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>' +
+			'🔓 <code data-cmd="login">login</code> / <code data-cmd="로그인">로그인</code><br>   읽기 전용 모드에서 쓰기 모드로 전환합니다.<br>   비밀번호를 입력하여 인증하면 데이터 수정이 가능합니다.<br><br>' +
+			'🚪 <code data-cmd="logout">logout</code> / <code data-cmd="종료">종료</code><br>   쓰기 모드에서 읽기 전용 모드로 전환합니다.<br>   다시 로그인하려면 login 명령어를 사용하세요.<br><br>' +
+			'🔑 <code data-cmd="password">password</code> / <code data-cmd="비밀번호">비밀번호</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 프로필의 비밀번호를 변경합니다.<br>   현재 비밀번호를 확인한 후 새 비밀번호를 두 번 입력하여 변경합니다.<br><br>' +
+			'👤 <code data-cmd="profile">profile</code> / <code data-cmd="프로필">프로필</code><br>   다른 프로필로 전환합니다.<br>   프로필 이름을 입력하면 해당 프로필로 전환하고 데이터를 불러옵니다.<br>   존재하지 않는 프로필이면 생성 여부를 묻습니다.<br><br>' +
+			'✏️ <code data-cmd="input ">input</code> / <code data-cmd="입력 ">입력</code> [참가자 데이터] <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 추가 폼과 동일한 방식으로 참가자를 추가합니다.<br>   예시: 입력 홍길동,김철수 / 이영희(남)50 / A!B / C(80)D<br>   쉼표로 그룹 구분, / 로 토큰 구분, ! 로 제약, () 로 확률/가중치 설정<br><br>' +
+			'👥 <code data-cmd="참가자">참가자</code><br>   현재 등록된 모든 참가자 목록을 표시합니다.<br>   각 참가자의 이름, 성별, 가중치 정보를 확인할 수 있습니다.<br><br>' +
+			'👻 <code data-cmd="미참가자">미참가자</code><br>   현재 미참가자로 설정된 목록을 표시합니다.<br>   미참가자는 팀 생성 시 제외됩니다.<br><br>' +
+			'🚫 <code data-cmd="제약">제약</code><br>   현재 설정된 제약 조건 목록을 표시합니다.<br>   특정 참가자들이 같은 팀에 배치되지 않도록 하는 규칙입니다.<br><br>' +
+			'� <code data-cmd="매칭">매칭</code> / <code data-cmd="matching">matching</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 기반 매칭 그룹을 등록합니다.<br>   예시: 매칭 → input A(40)B 형식으로 등록<br><br>' +
+			'�🎲 <code data-cmd="확률">확률</code><br>   확률 기반 그룹 목록을 표시합니다.<br>   특정 참가자들이 설정된 확률로 같은 팀에 배치되도록 하는 규칙입니다.<br><br>' +
+			'❓ <code data-cmd="help">help</code> / <code data-cmd="도움">도움</code><br>   이 도움말을 표시합니다.<br><br>' +
+			'💡 TIP: 콘솔을 닫으려면 우측 상단의 X 버튼을 클릭하세요.<br>' +
+			'💡 TIP: cmd 또는 command를 입력하면 언제든 콘솔을 다시 열 수 있습니다.', 'info');
 	},
+
 	
 	profileCommand() {
 		this.log('🔄 프로필 이름을 입력하세요:', 'info');
@@ -959,18 +1133,40 @@ const commandConsole = {
 		}
 	},
 	
-	passwordInputCommand() {
+	loginCommand() {
 		if (!syncEnabled || !currentRoomKey) {
 			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
 			return;
 		}
 		
-		// 비밀번호 입력 모드로 전환 (현재 비밀번호 확인용)
-		this.log('🔒 비밀번호를 입력하세요:', 'info');
+		if (this.authenticated) {
+			this.log('✅ 이미 로그인되어 있습니다.', 'info');
+			return;
+		}
+		
+		// 비밀번호 입력 모드로 전환
+		this.log('🔐 비밀번호를 입력하세요:', 'info');
 		this.inputMode = 'auth';
 		this.input.type = 'password';
 		this.input.placeholder = '비밀번호 입력...';
 		setTimeout(() => this.input.focus(), 50);
+	},
+	
+	logoutCommand() {
+		if (!syncEnabled || !currentRoomKey) {
+			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			return;
+		}
+		
+		if (!this.authenticated) {
+			this.log('ℹ️ 이미 읽기 전용 모드입니다.', 'info');
+			return;
+		}
+		
+		// 쓰기 모드에서 읽기 모드로 전환
+		this.authenticated = false;
+		this.log('🚪 로그아웃되었습니다. 읽기 전용 모드로 전환합니다.', 'success');
+		this.log('💡 다시 로그인하려면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.', 'info');
 	},
 	
 	participantsCommand() {
@@ -1103,22 +1299,41 @@ const commandConsole = {
 		this.log(output, 'info');
 	},
 	
+	matchingCommand() {
+		if (!this.authenticated) {
+			this.log('🚫 매칭 그룹 등록은 읽기 전용 모드에서 사용할 수 없습니다.', 'error');
+			this.log('💡 먼저 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 인증하세요.', 'info');
+			return;
+		}
+		
+		this.log('📝 <strong>매칭될 확률을 설정합니다.</strong>', 'info');
+		this.log('<code>기준 참가자(확률)매칭될 참가자</code>', 'info');
+		this.log('예) A(40)B(30)C(20)D', 'info');
+		this.log('<code>기준 참가자(확률)매칭될 참가자1(확률)매칭될 참가자2</code>', 'info');
+		this.log('📊 설정된 매칭 그룹을 보려면 <code data-cmd="확률">확률</code> 명령어를 입력하세요.', 'info');
+		
+		// 매칭 입력 모드로 전환
+		this.inputMode = 'matching';
+		this.input.placeholder = '매칭 명령어를 입력하세요. 예) A(30)B';
+		setTimeout(() => this.input.focus(), 50);
+	},
+	
 	hiddenCommand() {
 		const totalHidden = state.hiddenGroups.length + state.hiddenGroupChains.length + 
 		                    state.pendingHiddenGroups.length + state.pendingHiddenGroupChains.length;
 		
 		if (totalHidden === 0) {
-			this.log('설정된 히든 그룹이 없습니다.', 'info');
+			this.log('확률 기반 그룹이 없습니다.', 'info');
 			return;
 		}
 		
 		let output = `<div style="margin: 10px 0;">
-			<div style="font-weight: bold; margin-bottom: 8px;">=== 🔗 히든 그룹 (${totalHidden}개) ===</div>`;
+			<div style="font-weight: bold; margin-bottom: 8px;">=== 🔗 확률 기반 그룹 (${totalHidden}개) ===</div>`;
 		
-		// 활성 히든 그룹 (hiddenGroups)
+		// 확률 기반 그룹 (hiddenGroups)
 		if (state.hiddenGroups.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">✅ 활성 히든 그룹 (${state.hiddenGroups.length}개):</div>
+				<div style="font-weight: bold; margin-bottom: 5px;">✅ 확률 기반 그룹 (${state.hiddenGroups.length}개):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
@@ -1152,10 +1367,10 @@ const commandConsole = {
 			</div>`;
 		}
 		
-		// 활성 히든 그룹 체인 (hiddenGroupChains) - rowspan 사용
+		// 확률 기반 그룹 체인 (hiddenGroupChains) - rowspan 사용
 		if (state.hiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">✅ 활성 히든 그룹 체인 (${state.hiddenGroupChains.length}개):</div>
+				<div style="font-weight: bold; margin-bottom: 5px;">✅ 확률 기반 그룹 체인 (${state.hiddenGroupChains.length}개):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
@@ -1204,20 +1419,20 @@ const commandConsole = {
 			</div>`;
 		}
 		
-		// 보류 히든 그룹 (pendingHiddenGroups)
+		// 보류 확률 기반 그룹 (pendingHiddenGroups)
 		if (state.pendingHiddenGroups.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 히든 그룹 (${state.pendingHiddenGroups.length}개):</div>`;
+				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 확률 기반 그룹 (${state.pendingHiddenGroups.length}개):</div>`;
 			state.pendingHiddenGroups.forEach((group, index) => {
 				output += `<div style="padding: 4px 0;">${index + 1}. ${group.left} 🔗 ${group.right} (${Math.round(group.probability * 100)}%)</div>`;
 			});
 			output += `</div>`;
 		}
 		
-		// 보류 히든 그룹 체인 (pendingHiddenGroupChains)
+		// 보류 확률 기반 그룹 체인 (pendingHiddenGroupChains)
 		if (state.pendingHiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 히든 그룹 체인 (${state.pendingHiddenGroupChains.length}개):</div>
+				<div style="font-weight: bold; margin-bottom: 5px;">⏳ 보류 확률 기반 그룹 체인 (${state.pendingHiddenGroupChains.length}개):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
@@ -1283,12 +1498,33 @@ const commandConsole = {
 			const originalValue = elements.nameInput.value;
 			elements.nameInput.value = data;
 			
-			// addPerson 함수 실행
-			addPerson();
+			// addPerson 함수 실행 (fromConsole=true 전달)
+			addPerson(true);
 			
 			this.log(`참가자 추가 처리 완료: ${data}`, 'success');
 		} else {
 			this.log('참가자 추가 기능을 사용할 수 없습니다.', 'error');
 		}
+	},
+	
+	deleteCommand() {
+		if (!syncEnabled || !currentRoomKey) {
+			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			return;
+		}
+		
+		if (!this.authenticated) {
+			this.log('🚫 프로필 삭제는 읽기 전용 모드에서 사용할 수 없습니다.', 'error');
+			this.log('💡 먼저 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 인증하세요.', 'info');
+			return;
+		}
+		
+		this.log(`🔥 프로필 '${currentRoomKey}'를 삭제하려고 합니다.`, 'warning');
+		this.log('⚠️ 이 작업은 되돌릴 수 없습니다!', 'warning');
+		this.log('비밀번호를 입력하여 확인하세요:', 'info');
+		this.inputMode = 'delete-confirm';
+		this.input.type = 'password';
+		this.input.placeholder = '비밀번호 입력...';
+		setTimeout(() => this.input.focus(), 50);
 	}
 };

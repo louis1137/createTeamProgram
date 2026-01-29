@@ -26,6 +26,9 @@ function getRoomKeyFromURL() {
 // Firebase 초기화
 function initFirebase() {
 	try {
+		// 이미 초기화되었는지 확인
+		if (database) return true;
+		
 		if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
 			firebaseApp = firebase.initializeApp(firebaseConfig);
 			database = firebase.database();
@@ -33,9 +36,6 @@ function initFirebase() {
 			
 			// URL에서 프로필 키 읽기
 			currentRoomKey = getRoomKeyFromURL();
-			if (currentRoomKey) {
-				console.log(`📡 프로필 키 감지: ${currentRoomKey}`);
-			}
 			
 			return true;
 		} else {
@@ -48,10 +48,15 @@ function initFirebase() {
 	}
 }
 
+// 실시간 동기화 활성화 상태
+let realtimeSyncActive = false;
+
 // 실시간 동기화 설정
 function setupRealtimeSync() {
 	if (!database || !currentRoomKey) return;
+	if (realtimeSyncActive) return; // 이미 활성화되어 있으면 다시 설정하지 않음
 	
+	realtimeSyncActive = true;
 	database.ref(`rooms/${currentRoomKey}`).on('value', (snapshot) => {
 		const data = snapshot.val();
 		if (data && data.timestamp) {
