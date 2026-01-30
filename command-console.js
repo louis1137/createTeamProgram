@@ -24,6 +24,12 @@ const commandConsole = {
 		currentRoomKey = getRoomKeyFromURL();
 		if (currentRoomKey) {
 			roomKeyDisplay.textContent = `Profile: ${currentRoomKey}`;
+			// 인증 상태면 초록색 배경
+			if (authenticatedPassword) {
+				roomKeyDisplay.classList.add('authenticated');
+			} else {
+				roomKeyDisplay.classList.remove('authenticated');
+			}
 			
 			// Firebase 초기화 시도
 			if (initFirebase()) {
@@ -464,6 +470,8 @@ const commandConsole = {
 				const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 				if (roomKeyDisplay) {
 					roomKeyDisplay.textContent = `Profile: ${this.tempProfile}`;
+					// 신규 생성 시에는 인증됨
+					roomKeyDisplay.classList.add('authenticated');
 				}
 				
 				this.log(`프로필 '${this.tempProfile}' 생성됨`, 'success');
@@ -530,6 +538,7 @@ const commandConsole = {
 					const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 					if (roomKeyDisplay) {
 						roomKeyDisplay.textContent = 'Profile: -';
+						roomKeyDisplay.classList.remove('authenticated');
 					}
 					
 					currentRoomKey = null;
@@ -748,6 +757,7 @@ const commandConsole = {
 					currentRoomKey = cmd;
 					this.storedPassword = password;
 					this.authenticated = false;
+					authenticatedPassword = ''; // 프로필 전환 시 인증 초기화
 					
 					const url = new URL(window.location);
 					url.searchParams.set('key', cmd);
@@ -756,6 +766,8 @@ const commandConsole = {
 					const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 					if (roomKeyDisplay) {
 						roomKeyDisplay.textContent = `Profile: ${cmd}`;
+						// 프로필 전환 시에는 항상 인증되지 않은 상태
+						roomKeyDisplay.classList.remove('authenticated');
 					}
 					
 					if (isProfileSwitch) {
@@ -868,10 +880,17 @@ const commandConsole = {
 			
 			if (cmd === this.storedPassword) {
 				this.authenticated = true;
+				authenticatedPassword = cmd; // 인증된 비밀번호 저장
 				this.inputMode = 'normal';
 				this.input.type = 'text';
 				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
 				this.removeCancelButton();
+				
+				// 프로필 배경색 업데이트
+				const roomKeyDisplay = document.getElementById('roomKeyDisplay');
+				if (roomKeyDisplay) {
+					roomKeyDisplay.classList.add('authenticated');
+				}
 				
 				// 프로필 전환 모드든 초기 접속 모드든 데이터 로드
 				database.ref(`rooms/${currentRoomKey}`).once('value')
@@ -1448,6 +1467,14 @@ const commandConsole = {
 		
 		// 쓰기 모드에서 읽기 모드로 전환
 		this.authenticated = false;
+		authenticatedPassword = ''; // 인증 해제
+		
+		// 프로필 배경색 업데이트
+		const roomKeyDisplay = document.getElementById('roomKeyDisplay');
+		if (roomKeyDisplay) {
+			roomKeyDisplay.classList.remove('authenticated');
+		}
+		
 		this.log('🚪 로그아웃되었습니다. 읽기 전용 모드로 전환합니다.', 'success');
 		this.log('💡 다시 로그인하려면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.', 'info');
 	},

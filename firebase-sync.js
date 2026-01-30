@@ -16,6 +16,7 @@ let firebaseApp = null;
 let database = null;
 let currentRoomKey = null;
 let syncEnabled = false;
+let authenticatedPassword = ''; // 인증된 비밀번호 저장
 
 // URL 파라미터에서 key 읽기
 function getRoomKeyFromURL() {
