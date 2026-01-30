@@ -50,11 +50,11 @@ function initFirebase() {
 
 // 실시간 동기화 활성화 상태
 let realtimeSyncActive = false;
+let lastSyncTrigger = 0;
 
 // 실시간 동기화 설정
 function setupRealtimeSync() {
 	if (!database || !currentRoomKey) return;
-	if (realtimeSyncActive) return; // 이미 활성화되어 있으면 다시 설정하지 않음
 	
 	// 실시간 동기화 시작 전에 현재 UI 초기화
 	clearState();
@@ -69,6 +69,35 @@ function setupRealtimeSync() {
 				loadStateFromData(data);
 			}
 		}
+	});
+	
+	// syncTrigger 감시 - 다른 창에서 동기화 명령어를 실행했을 때 감지
+	database.ref(`rooms/${currentRoomKey}/syncTrigger`).on('value', (snapshot) => {
+		const syncTrigger = snapshot.val();
+		if (syncTrigger && syncTrigger !== lastSyncTrigger && lastSyncTrigger !== 0) {
+			// 새로운 동기화 트리거 감지
+			if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+				commandConsole.log('🔄 동기화 중...', 'info');
+			}
+			
+			// 데이터 로드
+			database.ref(`rooms/${currentRoomKey}`).once('value')
+				.then((snapshot) => {
+					const data = snapshot.val();
+					if (data) {
+						loadStateFromData(data);
+						if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+							commandConsole.log('✅ 동기화가 완료되었습니다.', 'success');
+						}
+					}
+				})
+				.catch((error) => {
+					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+						commandConsole.log(`동기화 실패: ${error.message}`, 'error');
+					}
+				});
+		}
+		lastSyncTrigger = syncTrigger;
 	});
 }
 

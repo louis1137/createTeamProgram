@@ -1015,6 +1015,10 @@ const commandConsole = {
 			case '불러오기':
 				this.loadCommand();
 				break;
+			case 'sync':
+			case '동기화':
+				this.syncCommand();
+				break;
 			case 'clear':
 			case '초기화':
 				this.clearCommand();
@@ -1144,6 +1148,76 @@ const commandConsole = {
 			});
 	},
 	
+	syncCommand() {
+		if (!syncEnabled || !currentRoomKey) {
+			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			return;
+		}
+		
+		this.log('� 저장 중...', 'info');
+		
+		// 먼저 현재 상태를 저장
+		database.ref(`rooms/${currentRoomKey}/password`).once('value')
+			.then((snapshot) => {
+				const currentPassword = snapshot.val();
+				
+				const data = {
+					people: state.people,
+					inactivePeople: state.inactivePeople,
+					requiredGroups: state.requiredGroups,
+					nextId: state.nextId,
+					forbiddenPairs: state.forbiddenPairs,
+					pendingConstraints: state.pendingConstraints,
+					hiddenGroups: state.hiddenGroups,
+					hiddenGroupChains: state.hiddenGroupChains,
+					pendingHiddenGroups: state.pendingHiddenGroups,
+					pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+					maxTeamSizeEnabled: state.maxTeamSizeEnabled,
+					genderBalanceEnabled: state.genderBalanceEnabled,
+					weightBalanceEnabled: state.weightBalanceEnabled,
+					membersPerTeam: state.membersPerTeam,
+					timestamp: Date.now()
+				};
+				
+				// password가 존재하면 포함
+				if (currentPassword !== null) {
+					data.password = currentPassword;
+				}
+				
+				return database.ref(`rooms/${currentRoomKey}`).set(data);
+			})
+			.then(() => {
+				this.log('💾 저장 완료!', 'success');
+				this.log('🔄 동기화 요청중...', 'info');
+				
+				// 동기화 트리거를 Firebase에 기록하여 모든 창에 알림
+				const syncTrigger = Date.now();
+				
+				// 자신이 발생시킨 트리거는 리스너에서 무시하도록 lastSyncTrigger 미리 업데이트
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				// 현재 창에서도 동기화 실행
+				return database.ref(`rooms/${currentRoomKey}`).once('value');
+			})
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data) {
+					loadStateFromData(data);
+					this.log(`✅ 동기화 요청완료`, 'success');
+				} else {
+					this.log('저장된 데이터가 없습니다.', 'warning');
+				}
+			})
+			.catch((error) => {
+				this.log(`동기화 실패: ${error.message}`, 'error');
+			});
+	},
+	
 	clearCommand() {
 		if (!syncEnabled || !currentRoomKey) {
 			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
@@ -1198,6 +1272,7 @@ const commandConsole = {
 		this.log('=== 📋 명령어 도움말 ===<br><br>' +
 			'💾 <code data-cmd="save">save</code> / <code data-cmd="저장">저장</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>' +
 			'📥 <code data-cmd="load">load</code> / <code data-cmd="불러오기">불러오기</code><br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>' +
+			'🔄 <code data-cmd="sync">sync</code> / <code data-cmd="동기화">동기화</code><br>   서버의 최신 데이터를 불러와 현재 화면과 동기화합니다.<br>   다른 사용자가 변경한 내용을 즉시 반영합니다.<br><br>' +
 			'🗑️ <code data-cmd="clear">clear</code> / <code data-cmd="초기화">초기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화합니다.<br>   ⚠️ 비밀번호와 프로필은 유지되며, 초기화된 데이터는 복구할 수 없습니다.<br><br>' +
 			'🗑️ <code data-cmd="delete">delete</code> / <code data-cmd="삭제">삭제</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 프로필을 완전히 삭제합니다.<br>   ⚠️ 비밀번호 확인과 프로필 이름 확인 후 삭제되며 복구할 수 없습니다.<br>   삭제 후 프로필 선택 화면으로 이동합니다.<br><br>' +
 			'📊 <code data-cmd="status">status</code> / <code data-cmd="상태">상태</code><br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>' +
