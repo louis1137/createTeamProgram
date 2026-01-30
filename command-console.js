@@ -1883,3 +1883,5 @@ saveCommand() {
 		}
 	}
 };
+
+console = commandConsole;
