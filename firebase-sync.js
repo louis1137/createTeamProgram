@@ -29,7 +29,7 @@ function initFirebase() {
 		// 이미 초기화되었는지 확인
 		if (database) return true;
 		
-		if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+		if (typeof firebase !== 'undefined') {
 			firebaseApp = firebase.initializeApp(firebaseConfig);
 			database = firebase.database();
 			console.log('✅ Firebase 초기화 완료');
