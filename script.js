@@ -195,7 +195,7 @@ function checkDevToolsAndOpenConsole() {
 						if (commandConsole.authenticated) {
 							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`);
 							commandConsole.log('🔄 실시간 동기화 활성화됨');
-							commandConsole.log('콘솔이 준비되었습니다.');
+							commandConsole.log(commandConsoleMessages.comments.consoleReady);
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else if (database) {
 							// 아직 인증되지 않았다면 비밀번호 확인
@@ -217,7 +217,7 @@ function checkDevToolsAndOpenConsole() {
 												}
 												commandConsole.log('🔄 실시간 동기화 활성화됨');
 												setupRealtimeSync();
-												commandConsole.log('콘솔이 준비되었습니다.');
+												commandConsole.log(commandConsoleMessages.comments.consoleReady);
 											})
 											.catch((error) => {
 												commandConsole.error(`데이터 로드 실패: ${error.message}`);
@@ -253,8 +253,8 @@ function checkDevToolsAndOpenConsole() {
 									}
 								} else {
 									commandConsole.tempProfile = currentRoomKey;
-									commandConsole.warn(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`);
-									commandConsole.log('신규 프로필로 등록하시겠습니까?');
+									commandConsole.warn(`⚠️ '${currentRoomKey}'${commandConsoleMessages.comments.profileNotFoundInitial}`);
+									commandConsole.log(commandConsoleMessages.comments.profileRegisterNew);
 									commandConsole.inputMode = 'profile-create-confirm';
 									commandConsole.showConfirmButtons();
 								}
@@ -645,7 +645,7 @@ pendingAddData.previewColors = previewColors;
 		messageEl.style.display = 'none';
 	} else {
 		// 질문 메시지 표시
-		messageEl.textContent = duplicateNames.length === 1 ? '기존 참가자를 제거하고 새로 등록하시겠습니까?' : '기존 참가자들을 제거하고 새로 등록하시겠습니까?';
+		messageEl.textContent = duplicateNames.length === 1 ? commandConsoleMessages.comments.removeDuplicateSingle : commandConsoleMessages.comments.removeDuplicateMultiple;
 		messageEl.style.display = 'block';
 	}
 	// 경고 메시지 및 확인 버튼 상태를 삼항으로 설정
@@ -868,7 +868,7 @@ function loadFromLocalStorage() {
 function captureResultsSection() {
 	const section = elements.resultsSection;
 	if (!section || !section.classList.contains('visible')) {
-		alert('팀 생성 결과가 없습니다.');
+		alert(commandConsoleMessages.comments.noTeamResults);
 		return;
 	}
 	
@@ -881,7 +881,7 @@ function captureResultsSection() {
 	// 캡처할 실제 영역 (::after 효과 제외)
 	const captureArea = section.querySelector('.results-capture-area');
 	if (!captureArea) {
-		alert('캡처 영역을 찾을 수 없습니다.');
+		alert(commandConsoleMessages.comments.captureAreaNotFound);
 		return;
 	}
 	
@@ -906,7 +906,7 @@ function captureResultsSection() {
 	const btn = elements.captureBtn;
 	const originalHTML = btn ? btn.innerHTML : '';
 	if (btn) {
-		btn.textContent = '캡처 중...';
+		btn.textContent = commandConsoleMessages.comments.capturingInProgress;
 		btn.disabled = true;
 	}
 	
@@ -940,7 +940,7 @@ function captureResultsSection() {
 			const item = new ClipboardItem({ 'image/png': blob });
 			navigator.clipboard.write([item]).then(() => {
 				// 성공 메시지
-				btn.textContent = '복사 완료!';
+				btn.textContent = commandConsoleMessages.comments.copyComplete;
 				captureSuccessTimer = setTimeout(() => {
 					btn.innerHTML = originalHTML;
 					captureSuccessTimer = null;
@@ -948,7 +948,7 @@ function captureResultsSection() {
 				btn.disabled = false;
 			}).catch(err => {
 				console.error('클립보드 복사 실패:', err);
-				alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');
+				alert(commandConsoleMessages.comments.clipboardCopyFailed);
 				btn.innerHTML = originalHTML;
 				btn.disabled = false;
 			});
@@ -1097,7 +1097,7 @@ function formatPersonString(person) {
 	
 	// 성별 추가 (체크되어 있을 때)
 	if (genderEnabled) {
-		const genderStr = person.gender === 'female' ? '여' : '남';
+		const genderStr = person.gender === 'female' ? commandConsoleMessages.comments.genderFemale : commandConsoleMessages.comments.genderMale;
 		bracketContent += genderStr;
 	}
 	
@@ -1171,7 +1171,7 @@ function resetAll(e) {
 			return;
 		}
 	} else {
-		if (!confirm('모든 데이터를 초기화하시겠습니까?')) {
+		if (!confirm(commandConsoleMessages.comments.resetAllConfirm)) {
 			return;
 		}
 	}
@@ -1184,14 +1184,14 @@ function resetAll(e) {
 		if (pa && pb) if (addPendingConstraint(pa.name, pb.name).ok) converted++;
 	});
 	if (converted > 0) {
-		console.log(`초기화: 기존 제약 ${converted}개가 보류 제약으로 변환되어 유지됩니다.`);
+		console.log(commandConsoleMessages.comments.resetConstraintsConverted.replace('{count}', converted));
 		safeOpenForbiddenWindow();
 	}
 	
 	// Shift 키를 누른 경우: 미참가자도 모두 삭제
 	if (isCompleteReset) {
 		state.inactivePeople = [];
-		console.log('완전 초기화: 참가자 및 미참가자 모두 삭제되었습니다.');
+		console.log(commandConsoleMessages.comments.resetComplete);
 	} else {
 		// 일반 초기화: 모든 참가자를 미참가자 목록으로 이동
 		state.people.forEach(person => {
@@ -1251,7 +1251,7 @@ function handleTeamSizeChange(e) {
 
 function shuffleOrder() {
 	if (state.people.length === 0) {
-		alert('참가자가 없습니다.');
+		alert(commandConsoleMessages.comments.noParticipantsAlert);
 		return;
 	}
 	
@@ -1279,7 +1279,7 @@ let pendingAddData = null;
 function addPerson(fromConsole = false) {
 	const input = elements.nameInput.value.trim();
 	if (input === '') {
-		if (!fromConsole) alert('이름을 입력해주세요.');
+		if (!fromConsole) alert(commandConsoleMessages.comments.nameRequired);
 		return;
 	}
 
@@ -1303,7 +1303,7 @@ function addPerson(fromConsole = false) {
 					// 파라미터가 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 					if (commandConsole.authenticated) {
 						commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`);
-						commandConsole.log('콘솔이 준비되었습니다.');
+						commandConsole.log(commandConsoleMessages.comments.consoleReady);
 						setTimeout(() => commandConsole.input.focus(), 100);
 					} else if (database) {
 						// 인증되지 않았고, 저장된 비밀번호가 이미 있다면 읽기 전용 모드로
@@ -1312,7 +1312,7 @@ function addPerson(fromConsole = false) {
 							commandConsole.authenticated = false;
 							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨 (읽기 전용 모드)`);
 							commandConsole.log(' 쓰기 권한이 필요하면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.');
-							commandConsole.log('콘솔이 준비되었습니다.');
+							commandConsole.log(commandConsoleMessages.comments.consoleReady);
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else {
 							// 최초 cmd 입력 시 - 비밀번호 확인
@@ -1337,7 +1337,7 @@ function addPerson(fromConsole = false) {
 												}
 												commandConsole.log('🔄 실시간 동기화 활성화됨');
 												setupRealtimeSync();
-												commandConsole.log('콘솔이 준비되었습니다.');
+												commandConsole.log(commandConsoleMessages.comments.consoleReady);
 											})
 											.catch((error) => {
 												commandConsole.error(`데이터 로드 실패: ${error.message}`);
@@ -1388,9 +1388,9 @@ function addPerson(fromConsole = false) {
 					}
 				} else {
 					// 파라미터가 없는 경우 - 프로필 생성 플로우 시작
-					commandConsole.log('프로필 이름을 입력하세요:');
+					commandConsole.log(commandConsoleMessages.comments.profileInput);
 					commandConsole.inputMode = 'profile';
-					commandConsole.input.placeholder = '프로필 이름 입력...';
+					commandConsole.input.placeholder = commandConsoleMessages.placeholders.profile;
 					// 입력 폼에 포커스
 					setTimeout(() => commandConsole.input.focus(), 100);
 				}

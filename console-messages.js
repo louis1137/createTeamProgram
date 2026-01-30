@@ -145,6 +145,36 @@ const commandConsoleMessages = {
 		profileSwitchCanceled: '프로필 전환이 취소되었습니다.<br>현재 프로필({currentRoomKey})을 유지합니다.',
 		passwordCreatePrompt: '비밀번호를 생성하세요:',
 		passwordDeleteFailed: '비밀번호 삭제 실패: {error}',
-		profileCreateFailed: '프로필 생성 실패'
+		profileCreateFailed: '프로필 생성 실패',
+		profileNotFoundInitial: '는 존재하지 않는 프로필입니다.',
+		profileNotFoundSwitch: '는 존재하지 않는 프로필입니다.',
+		profileCheckFailed: '프로필 확인 실패: {error}',
+		
+		// script.js 메시지들
+		constraintsCleared: '제약 목록이 모두 초기화되었습니다.',
+		writeLoginRequired: '💡 쓰기 권한이 필요하면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.',
+		removeDuplicateSingle: '기존 참가자를 제거하고 새로 등록하시겠습니까?',
+		removeDuplicateMultiple: '기존 참가자들을 제거하고 새로 등록하시겠습니까?',
+		noTeamResults: '팀 생성 결과가 없습니다.',
+		captureAreaNotFound: '캡처 영역을 찾을 수 없습니다.',
+		capturingInProgress: '캡처 중...',
+		imageGenerationFailed: '이미지 생성에 실패했습니다.',
+		clipboardHttpsRequired: '클립보드 기능을 사용할 수 없습니다. HTTPS 환경이 필요합니다.',
+		copyComplete: '복사 완료!',
+		clipboardCopyFailed: '클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.',
+		captureImageFailed: '화면 캐처에 실패했습니다.',
+		resetAllConfirm: '모든 데이터를 초기화하시겠습니까?',
+		resetConstraintsConverted: '초기화: 기존 제약 {count}개가 보류 제약으로 변환되어 유지됩니다.',
+		resetComplete: '완전 초기화: 참가자 및 미참가자 모두 삭제되었습니다.',
+		noParticipantsAlert: '참가자가 없습니다.',
+		nameRequired: '이름을 입력해주세요.',
+		genderMale: '남',
+		genderFemale: '여',
+		
+		// 프로필 연결 메시지들
+		profileConnected: '📡 프로필 \'{profile}\' 연결됨',
+		profileConnectedReadOnly: '📡 프로필 \'{profile}\' 연결됨 (읽기 전용 모드)',
+		profileLoaded: '📡 프로필 \'{profile}\' 로드됨 (참가자: {count}명)',
+		profileLoadedInitial: '📡 프로필 \'{profile}\' 로드됨 (초기 상태)'
 	}
 };
