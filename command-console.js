@@ -1,4 +1,4 @@
-// ==================== 명령어 콘솔 ====================
+﻿// ==================== 명령어 콘솔 ====================
 
 const commandConsole = {
 	output: null,
@@ -40,6 +40,7 @@ const commandConsole = {
 				// 비밀번호 입력 모드에서 ESC 키를 누르면 읽기 전용 모드로 전환
 				if (this.inputMode === 'auth' || this.inputMode === 'auth-switch' || 
 				    this.inputMode === 'password-change' || this.inputMode === 'delete-confirm' ||
+				    this.inputMode === 'delete-password-confirm' || this.inputMode === 'password-delete-confirm' ||
 				    this.inputMode === 'matching') {
 					e.preventDefault();
 					e.stopPropagation();
@@ -123,6 +124,7 @@ const commandConsole = {
 					// 비밀번호 입력 모드에서 닫으면 자동으로 읽기 모드로 전환
 					if (this.inputMode === 'auth' || this.inputMode === 'auth-switch' || 
 					    this.inputMode === 'password-change' || this.inputMode === 'delete-confirm' ||
+					    this.inputMode === 'delete-password-confirm' || this.inputMode === 'password-delete-confirm' ||
 					    this.inputMode === 'password-ask-initial' || this.inputMode === 'password-ask-switch' ||
 					    this.inputMode === 'matching') {
 						this.log('❌ 취소되었습니다.', 'info');
@@ -406,14 +408,51 @@ const commandConsole = {
 				}
 				
 				this.log(`프로필 '${this.tempProfile}' 생성됨`, 'success');
-				this.log('비밀번호를 생성하시겠습니까?', 'info');
 				
-				this.inputMode = 'password-ask';
-				this.showConfirmButtons();
-				
+				// 동기화 활성화
 				if (!syncEnabled) {
 					syncEnabled = true;
 					setupRealtimeSync();
+				}
+				
+				// 신규 프로필 생성 시 바로 빈 데이터로 초기화하여 동기화 시작
+				const initialData = {
+					people: state.people || [],
+					inactivePeople: state.inactivePeople || [],
+					requiredGroups: state.requiredGroups || [],
+					nextId: state.nextId || 1,
+					forbiddenPairs: state.forbiddenPairs || [],
+					pendingConstraints: state.pendingConstraints || [],
+					hiddenGroups: state.hiddenGroups || [],
+					hiddenGroupChains: state.hiddenGroupChains || [],
+					pendingHiddenGroups: state.pendingHiddenGroups || [],
+					pendingHiddenGroupChains: state.pendingHiddenGroupChains || [],
+					maxTeamSizeEnabled: state.maxTeamSizeEnabled || false,
+					genderBalanceEnabled: state.genderBalanceEnabled || false,
+					weightBalanceEnabled: state.weightBalanceEnabled || false,
+					membersPerTeam: state.membersPerTeam || 4,
+					password: '', // 비밀번호 없음
+					timestamp: Date.now()
+				};
+				
+				if (database && currentRoomKey) {
+					database.ref(`rooms/${currentRoomKey}`).set(initialData)
+						.then(() => {
+							this.log('🔄 실시간 동기화 활성화됨', 'success');
+							this.log('비밀번호를 생성하시겠습니까?', 'info');
+							this.inputMode = 'password-ask';
+							this.showConfirmButtons();
+						})
+						.catch((error) => {
+							this.log(`초기화 실패: ${error.message}`, 'error');
+							this.log('비밀번호를 생성하시겠습니까?', 'info');
+							this.inputMode = 'password-ask';
+							this.showConfirmButtons();
+						});
+				} else {
+					this.log('비밀번호를 생성하시겠습니까?', 'info');
+					this.inputMode = 'password-ask';
+					this.showConfirmButtons();
 				}
 			} else {
 				// 프로필 생성 취소: 현재 프로필 유지 또는 초기 모드로 돌아가기
@@ -496,6 +535,47 @@ const commandConsole = {
 				this.restoreInputField();
 				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
 			}
+		} else if (this.inputMode === 'delete-confirm') {
+			// 비밀번호 없을 때 삭제 확인
+			if (confirmed) {
+				this.log(`⚠️ 정말로 프로필 '${currentRoomKey}'를 삭제하시겠습니까?`, 'warning');
+				this.log('삭제하려면 프로필 이름을 정확히 입력하세요:', 'info');
+				this.inputMode = 'delete-final-confirm';
+				this.restoreInputField();
+				this.input.type = 'text';
+				this.input.placeholder = '프로필 이름 입력...';
+				setTimeout(() => this.input.focus(), 50);
+			} else {
+				this.log('삭제가 취소되었습니다.', 'info');
+				this.inputMode = 'normal';
+				this.restoreInputField();
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			}
+		} else if (this.inputMode === 'password-delete-confirm') {
+			// 비밀번호 삭제 확인
+			if (confirmed) {
+				if (database && currentRoomKey) {
+					database.ref(`rooms/${currentRoomKey}/password`).set('')
+						.then(() => {
+							this.log('🗑️ 비밀번호가 삭제되었습니다.', 'success');
+							this.storedPassword = ''; // 저장된 비밀번호 초기화
+						})
+						.catch((error) => {
+							this.log(`비밀번호 삭제 실패: ${error.message}`, 'error');
+						});
+				}
+				this.inputMode = 'normal';
+				this.restoreInputField();
+				this.input.type = 'text';
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			} else {
+				this.log('비밀번호 삭제가 취소되었습니다.<br>새 비밀번호를 입력하세요:', 'info');
+				this.inputMode = 'password-change-new';
+				this.restoreInputField();
+				this.input.type = 'password';
+				this.input.placeholder = '새 비밀번호 입력...';
+				setTimeout(() => this.input.focus(), 50);
+			}
 		}
 	},
 	
@@ -526,7 +606,9 @@ const commandConsole = {
 	executeCommand() {
 		if (!this.input) return;
 		const cmd = this.input.value.trim();
-		if (!cmd) return;
+		
+		// password-change-new 모드에서는 빈 값도 처리해야 함 (비밀번호 삭제 기능)
+		if (!cmd && this.inputMode !== 'password-change-new') return;
 		
 		// 비밀번호 관련 입력 모드에서는 로그 출력하지 않음
 		if (this.inputMode !== 'auth' && 
@@ -535,7 +617,7 @@ const commandConsole = {
 		    this.inputMode !== 'password-confirm' && 
 		    this.inputMode !== 'password-change' && 
 		    this.inputMode !== 'password-change-confirm' && 
-		    this.inputMode !== 'delete-confirm' &&
+		    this.inputMode !== 'delete-password-confirm' &&
 		    this.inputMode !== 'matching') {
 			this.log(`> ${cmd}`, 'command');
 		}
@@ -571,6 +653,16 @@ const commandConsole = {
 		if (this.inputMode === 'profile' || this.inputMode === 'profile-switch') {
 			if (!database && !initFirebase()) {
 				this.log('Firebase 초기화에 실패했습니다.', 'error');
+				return;
+			}
+			
+			// 현재 프로필과 동일한 이름을 입력한 경우
+			if (cmd === currentRoomKey) {
+				this.log(`ℹ️ 이미 '${cmd}' 프로필을 사용 중입니다.`, 'info');
+				this.log('현재 프로필을 유지합니다.', 'success');
+				this.inputMode = 'normal';
+				this.input.type = 'text';
+				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
 				return;
 			}
 			
@@ -793,6 +885,13 @@ const commandConsole = {
 		
 		if (this.inputMode === 'password-change-new') {
 			// 2단계: 새 비밀번호 입력
+			if (!cmd || cmd.trim() === '') {
+				// 빈 값이면 비밀번호 삭제 확인
+				this.log('⚠️ 비밀번호를 삭제하시겠습니까?', 'warning');
+				this.inputMode = 'password-delete-confirm';
+				this.showConfirmButtons();
+				return;
+			}
 			this.tempPassword = cmd;
 			this.log('새 비밀번호를 다시 한번 입력해주세요:', 'info');
 			this.inputMode = 'password-change-confirm';
@@ -843,7 +942,7 @@ const commandConsole = {
 			return;
 		}
 		
-		if (this.inputMode === 'delete-confirm') {
+		if (this.inputMode === 'delete-password-confirm') {
 			// 삭제 전 비밀번호 확인
 			if (cmd === this.storedPassword) {
 				this.log('🔑 비밀번호가 확인되었습니다.', 'success');
@@ -1128,6 +1227,17 @@ const commandConsole = {
 	passwordCommand(newPassword) {
 		if (!syncEnabled || !currentRoomKey) {
 			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			return;
+		}
+		
+		// 현재 비밀번호가 없는지 확인
+		if (!this.storedPassword || this.storedPassword === '') {
+			// 비밀번호가 없으면 바로 새 비밀번호 입력 모드로
+			this.log('새 비밀번호를 입력하세요:', 'info');
+			this.inputMode = 'password-change-new';
+			this.input.type = 'password';
+			this.input.placeholder = '새 비밀번호 입력...';
+			setTimeout(() => this.input.focus(), 50);
 			return;
 		}
 		
@@ -1542,10 +1652,20 @@ const commandConsole = {
 		
 		this.log(`🔥 프로필 '${currentRoomKey}'를 삭제하려고 합니다.`, 'warning');
 		this.log('⚠️ 이 작업은 되돌릴 수 없습니다!', 'warning');
-		this.log('비밀번호를 입력하여 확인하세요:', 'info');
-		this.inputMode = 'delete-confirm';
-		this.input.type = 'password';
-		this.input.placeholder = '비밀번호 입력...';
-		setTimeout(() => this.input.focus(), 50);
+		
+		// 비밀번호가 있는지 확인
+		if (this.storedPassword && this.storedPassword !== '') {
+			// 비밀번호가 있으면 비밀번호 입력 모드
+			this.log('비밀번호를 입력하여 확인하세요:', 'info');
+			this.inputMode = 'delete-password-confirm';
+			this.input.type = 'password';
+			this.input.placeholder = '비밀번호 입력...';
+			setTimeout(() => this.input.focus(), 50);
+		} else {
+			// 비밀번호가 없으면 확인/취소 버튼 표시
+			this.log('삭제하시겠습니까?', 'warning');
+			this.inputMode = 'delete-confirm';
+			this.showConfirmButtons();
+		}
 	}
 };

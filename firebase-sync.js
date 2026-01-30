@@ -56,6 +56,9 @@ function setupRealtimeSync() {
 	if (!database || !currentRoomKey) return;
 	if (realtimeSyncActive) return; // 이미 활성화되어 있으면 다시 설정하지 않음
 	
+	// 실시간 동기화 시작 전에 현재 UI 초기화
+	clearState();
+	
 	realtimeSyncActive = true;
 	database.ref(`rooms/${currentRoomKey}`).on('value', (snapshot) => {
 		const data = snapshot.val();
