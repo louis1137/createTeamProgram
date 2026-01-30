@@ -3,7 +3,7 @@
 const commandConsole = {
 	output: null,
 	input: null,
-	savedPosition: { x: 0, y: 0, width: '450px', height: '350px' }, // 최소화 전 위치와 크기 저장
+	savedPosition: { x: 0, y: 0, width: '900px', height: '600px' }, // 최소화 전 위치와 크기 저장
 	dragState: null, // 드래그 상태 저장
 	inputMode: 'normal', // 입력 모드: 'normal', 'auth', 'profile', 'password', 'password-confirm', 'password-ask'
 	tempProfile: '', // 임시 프로필 이름 저장
@@ -77,8 +77,8 @@ const commandConsole = {
 				if (isHidden) {
 					// 펼치기: 저장된 위치와 크기 복원
 					content.style.display = 'flex';
-					consoleEl.style.width = this.savedPosition.width || '450px';
-					consoleEl.style.height = this.savedPosition.height || '350px';
+					consoleEl.style.width = this.savedPosition.width || '900px';
+					consoleEl.style.height = this.savedPosition.height || '600px';
 					consoleEl.style.transform = `translate(${this.savedPosition.x}px, ${this.savedPosition.y}px)`;
 					this.dragState.xOffset = this.savedPosition.x;
 					this.dragState.yOffset = this.savedPosition.y;

@@ -179,8 +179,8 @@ function checkDevToolsAndOpenConsole() {
 			if (consoleEl && consoleEl.style.display !== 'flex') {
 				consoleEl.style.display = 'flex';
 				consoleEl.style.transform = 'translate(0, 0)';
-				consoleEl.style.width = '450px';
-				consoleEl.style.height = '350px';
+				consoleEl.style.width = '900px';
+				consoleEl.style.height = '600px';
 				
 				const content = document.querySelector('.command-content');
 				if (content) content.style.display = 'flex';
@@ -1332,8 +1332,8 @@ function addPerson(fromConsole = false) {
 		if (consoleEl) {
 			consoleEl.style.display = 'flex';
 			consoleEl.style.transform = 'translate(0, 0)'; // 초기 위치로 리셋
-			consoleEl.style.width = '450px'; // 초기 크기로 리셋
-			consoleEl.style.height = '350px'; // 초기 크기로 리셋
+			consoleEl.style.width = '900px'; // 초기 크기로 리셋
+			consoleEl.style.height = '600px'; // 초기 크기로 리셋
 			// content 표시 (최소화 상태 해제)
 			const content = document.querySelector('.command-content');
 			if (content) content.style.display = 'flex';
@@ -3889,10 +3889,10 @@ function logTeamResultsToConsole(teams) {
 		return `${teamNumber}팀: ${teamMembers}`;
 	}).join('<br>');
 	
-	// 적용된 규칙이 있을 경우 추가
+	// 적용된 규칙이 있을 경우 추가 (인증된 사용자만)
 	let outputMessage = `[생성된 팀]<br>${teamResults}`;
 	
-	if (state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
+	if (commandConsole.authenticated && state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
 		const ruleResults = state.activeHiddenGroupChainInfo.map(info => {
 			return `- ${info.primaryName} → ${info.candidateName} (${info.probability}%)`;
 		}).join('<br>');
