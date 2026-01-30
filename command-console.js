@@ -52,12 +52,12 @@ const commandConsole = {
 				    this.inputMode === 'profile-switch') {
 					e.preventDefault();
 					e.stopPropagation();
-					this.log('❌ 취소되었습니다.', 'info');
+					this.log('❌ 취소되었습니다.');
 					this.inputMode = 'normal';
 					if (this.input) {
 						this.input.type = 'text';
 						this.input.value = '';
-						this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+						this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 					}
 					this.removeCancelButton();
 					this.showFirstTimeHelp();
@@ -128,19 +128,19 @@ const commandConsole = {
 					    this.inputMode === 'delete-password-confirm' || this.inputMode === 'password-delete-confirm' ||
 					    this.inputMode === 'password-ask-initial' || this.inputMode === 'password-ask-switch' ||
 					    this.inputMode === 'matching' || this.inputMode === 'input-data') {
-						this.log('❌ 취소되었습니다.', 'info');
+						this.log('❌ 취소되었습니다.');
 						this.inputMode = 'normal';
 						
 						// 확인 버튼이 표시되어 있다면 입력 필드로 복원
 						this.restoreInputField();
 						
 						this.input.type = 'text';
-						this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+						this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 					} else if (this.inputMode !== 'normal') {
 						// 다른 특수 모드에서는 normal로 복귀
 						this.inputMode = 'normal';
 						this.input.type = 'text';
-						this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+						this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 					}
 				}
 			});
@@ -381,12 +381,12 @@ const commandConsole = {
 		cancelBtn.style.cssText = 'background: #ef4444; margin-left: 5px;';
 		
 		cancelBtn.addEventListener('click', () => {
-			this.log('❌ 취소되었습니다.', 'info');
+			this.log('❌ 취소되었습니다.');
 			this.inputMode = 'normal';
 			if (this.input) {
 				this.input.type = 'text';
 				this.input.value = '';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 			}
 			this.removeCancelButton();
 		});
@@ -403,7 +403,7 @@ const commandConsole = {
 	
 	showFirstTimeHelp() {
 		if (!this.firstTimeHelpShown) {
-			this.log('💡 명령어 목록을 보려면 <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code> 명령어를 입력하세요.', 'info');
+			this.log('💡 명령어 목록을 보려면 <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code> 명령어를 입력하세요.');
 			this.firstTimeHelpShown = true;
 		}
 	},
@@ -417,13 +417,13 @@ const commandConsole = {
 		
 		if (showCancelButton) {
 			container.innerHTML = `
-				<input type="text" id="commandInput" class="command-input" placeholder="명령어를 입력하세요... (예: save, load, clear)">
+				<input type="text" id="commandInput" class="command-input" placeholder="명령어를 입력하세요... (예: help, save, load, clear)">
 				<button id="commandSendBtn" class="command-send-btn">전송</button>
 				<button id="commandCancelBtn" class="command-send-btn" style="background: #ef4444; margin-left: 5px;">취소</button>
 			`;
 		} else {
 			container.innerHTML = `
-				<input type="text" id="commandInput" class="command-input" placeholder="명령어를 입력하세요... (예: save, load, clear)">
+				<input type="text" id="commandInput" class="command-input" placeholder="명령어를 입력하세요... (예: help, save, load, clear)">
 				<button id="commandSendBtn" class="command-send-btn">전송</button>
 			`;
 		}
@@ -448,11 +448,11 @@ const commandConsole = {
 		
 		if (cancelBtn) {
 			cancelBtn.addEventListener('click', () => {
-				this.log('❌ 취소되었습니다.', 'info');
+				this.log('❌ 취소되었습니다.');
 				this.inputMode = 'normal';
 				this.input.type = 'text';
 				this.input.value = '';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				this.restoreInputField(false);
 			});
 		}
@@ -474,7 +474,7 @@ const commandConsole = {
 					roomKeyDisplay.classList.add('authenticated');
 				}
 				
-				this.log(`프로필 '${this.tempProfile}' 생성됨`, 'success');
+				this.success(`프로필 '${this.tempProfile}' 생성됨`);
 				
 				// 동기화 활성화
 				if (!syncEnabled) {
@@ -505,19 +505,19 @@ const commandConsole = {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}`).set(initialData)
 						.then(() => {
-							this.log('🔄 실시간 동기화 활성화됨', 'success');
-							this.log('비밀번호를 생성하시겠습니까?', 'info');
+							this.success('🔄 실시간 동기화 활성화됨');
+							this.log('비밀번호를 생성하시겠습니까?');
 							this.inputMode = 'password-ask';
 							this.showConfirmButtons();
 						})
 						.catch((error) => {
-							this.log(`초기화 실패: ${error.message}`, 'error');
-							this.log('비밀번호를 생성하시겠습니까?', 'info');
+							this.error(`초기화 실패: ${error.message}`);
+							this.log('비밀번호를 생성하시겠습니까?');
 							this.inputMode = 'password-ask';
 							this.showConfirmButtons();
 						});
 				} else {
-					this.log('비밀번호를 생성하시겠습니까?', 'info');
+					this.log('비밀번호를 생성하시겠습니까?');
 					this.inputMode = 'password-ask';
 					this.showConfirmButtons();
 				}
@@ -525,10 +525,10 @@ const commandConsole = {
 				// 프로필 생성 취소: 현재 프로필 유지 또는 초기 모드로 돌아가기
 				if (currentRoomKey) {
 					// 이미 프로필이 있으면 현재 프로필 유지
-					this.log(`'전환이 취소되었습니다. 현재 프로필: ${currentRoomKey}`, 'info');
+					this.log(`'전환이 취소되었습니다. 현재 프로필: ${currentRoomKey}`);
 					this.inputMode = 'normal';
 					this.restoreInputField();
-					this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+					this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				} else {
 					// 프로필이 없으면 초기 상태로
 					const url = new URL(window.location);
@@ -542,7 +542,7 @@ const commandConsole = {
 					}
 					
 					currentRoomKey = null;
-					this.log('프로필 생성이 취소되었습니다.<br>프로필 이름을 입력하세요:', 'info');
+					this.log('프로필 생성이 취소되었습니다.<br>프로필 이름을 입력하세요:');
 					this.inputMode = 'profile';
 					this.restoreInputField();
 					this.input.placeholder = '프로필 이름 입력...';
@@ -550,7 +550,7 @@ const commandConsole = {
 			}
 		} else if (this.inputMode === 'password-ask') {
 			if (confirmed) {
-				this.log('비밀번호를 생성하세요:', 'info');
+				this.log('비밀번호를 생성하세요:');
 				this.inputMode = 'password';
 				this.restoreInputField();
 				this.input.placeholder = '비밀번호를 생성하세요...';
@@ -560,20 +560,20 @@ const commandConsole = {
 			} else {
 				if (database && this.tempProfile) {
 					database.ref(`rooms/${this.tempProfile}/password`).set('').then(() => {
-						this.log('비밀번호 설정을 건너뛰었습니다.<br>프로필이 생성되었습니다.<br>콘솔이 준비되었습니다.', 'success');
+						this.success('비밀번호 설정을 건너뛰었습니다.<br>프로필이 생성되었습니다.<br>콘솔이 준비되었습니다.');
 					}).catch((error) => {
-						this.log(`프로필 생성 실패: ${error.message}`, 'error');
+						this.error(`프로필 생성 실패: ${error.message}`);
 					});
 				}
 				this.inputMode = 'normal';
 				this.authenticated = true;
 				this.restoreInputField();
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 			}
 		} else if (this.inputMode === 'password-ask-switch') {
 			// 프로필 전환 시 비밀번호 입력 확인
 			if (confirmed) {
-				this.log('🔒 비밀번호를 입력하세요:', 'info');
+				this.log('🔒 비밀번호를 입력하세요:');
 				this.inputMode = 'auth-switch';
 				this.restoreInputField();
 				this.input.type = 'password';
@@ -582,17 +582,17 @@ const commandConsole = {
 				setTimeout(() => this.input.focus(), 50);
 			} else {
 				// 비밀번호 입력 취소 - 읽기 전용 모드로 사용
-				this.log('비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.', 'info');
+				this.log('비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.');
 				this.inputMode = 'normal';
 				this.authenticated = false; // 인증되지 않음
 				this.restoreInputField();
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				this.showFirstTimeHelp();
 			}
 		} else if (this.inputMode === 'password-ask-initial') {
 			// 초기 접속 시 비밀번호 입력 확인
 			if (confirmed) {
-				this.log('🔒 비밀번호를 입력하세요:', 'info');
+				this.log('🔒 비밀번호를 입력하세요:');
 				this.inputMode = 'auth';
 				this.restoreInputField();
 				this.input.type = 'password';
@@ -601,28 +601,28 @@ const commandConsole = {
 				setTimeout(() => this.input.focus(), 50);
 			} else {
 				// 비밀번호 입력 취소 - 읽기 전용 모드로 사용
-				this.log('비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.', 'info');
+				this.log('비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.');
 				this.inputMode = 'normal';
 				this.authenticated = false; // 인증되지 않음
 				this.restoreInputField();
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				this.showFirstTimeHelp();
 			}
 		} else if (this.inputMode === 'delete-confirm') {
 			// 비밀번호 없을 때 삭제 확인
 			if (confirmed) {
-				this.log(`⚠️ 정말로 프로필 '${currentRoomKey}'를 삭제하시겠습니까?`, 'warning');
-				this.log('삭제하려면 프로필 이름을 정확히 입력하세요:', 'info');
+				this.warn(`⚠️ 정말로 프로필 '${currentRoomKey}'를 삭제하시겠습니까?`);
+				this.log('삭제하려면 프로필 이름을 정확히 입력하세요:');
 				this.inputMode = 'delete-final-confirm';
 				this.restoreInputField();
 				this.input.type = 'text';
 				this.input.placeholder = '프로필 이름 입력...';
 				setTimeout(() => this.input.focus(), 50);
 			} else {
-				this.log('삭제가 취소되었습니다.', 'info');
+				this.log('삭제가 취소되었습니다.');
 				this.inputMode = 'normal';
 				this.restoreInputField();
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 			}
 		} else if (this.inputMode === 'password-delete-confirm') {
 			// 비밀번호 삭제 확인
@@ -630,19 +630,19 @@ const commandConsole = {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}/password`).set('')
 						.then(() => {
-							this.log('🗑️ 비밀번호가 삭제되었습니다.', 'success');
+							this.success('🗑️ 비밀번호가 삭제되었습니다.');
 							this.storedPassword = ''; // 저장된 비밀번호 초기화
 						})
 						.catch((error) => {
-							this.log(`비밀번호 삭제 실패: ${error.message}`, 'error');
+							this.error(`비밀번호 삭제 실패: ${error.message}`);
 						});
 				}
 				this.inputMode = 'normal';
 				this.restoreInputField();
 				this.input.type = 'text';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 			} else {
-				this.log('비밀번호 삭제가 취소되었습니다.<br>새 비밀번호를 입력하세요:', 'info');
+				this.log('비밀번호 삭제가 취소되었습니다.<br>새 비밀번호를 입력하세요:');
 				this.inputMode = 'password-change-new';
 				this.restoreInputField();
 				this.input.type = 'password';
@@ -672,7 +672,7 @@ const commandConsole = {
 					// 모든 특수 모드를 해제하고 normal 모드로 전환
 					this.inputMode = 'normal';
 					this.input.type = 'text';
-					this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+					this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 					this.removeCancelButton();
 					
 					// 명령어 자동 입력
@@ -681,6 +681,18 @@ const commandConsole = {
 				}
 			});
 		});
+	},
+
+	error(message) {
+		this.log(message, 'error');
+	},
+
+	warn(message) {
+		this.log(message, 'warn');
+	},
+
+	success(message) {
+		this.log(message, 'success');
 	},
 	
 	executeCommand() {
@@ -715,13 +727,13 @@ const commandConsole = {
 			
 			// 결과 메시지 출력
 			if (isRemoveCommand) {
-				this.log('✅ 규칙 제거 완료', 'success');
+				this.success('✅ 규칙 제거 완료');
 			} else {
-				this.log('✅ 규칙 추가 완료', 'success');
+				this.success('✅ 규칙 추가 완료');
 			}
 			
 			// 확인하기 안내
-			this.log('확인하기 (명령어: <code data-cmd="확률">확률</code>)', 'info');
+			this.log('확인하기 (명령어: <code data-cmd="확률">확률</code>)');
 			
 			// 규칙 모드 유지 (취소 또는 ESC로만 종료 가능)
 			this.input.placeholder = '규칙 입력 (예: A(100)B, 취소: ESC)';
@@ -731,17 +743,17 @@ const commandConsole = {
 		
 		if (this.inputMode === 'profile' || this.inputMode === 'profile-switch') {
 			if (!database && !initFirebase()) {
-				this.log('Firebase 초기화에 실패했습니다.', 'error');
+				this.error('Firebase 초기화에 실패했습니다.');
 				return;
 			}
 			
 			// 현재 프로필과 동일한 이름을 입력한 경우
 			if (cmd === currentRoomKey) {
-				this.log(`ℹ️ 이미 '${cmd}' 프로필을 사용 중입니다.`, 'info');
-				this.log('현재 프로필을 유지합니다.', 'success');
+				this.log(`ℹ️ 이미 '${cmd}' 프로필을 사용 중입니다.`);
+				this.success('현재 프로필을 유지합니다.');
 				this.inputMode = 'normal';
 				this.input.type = 'text';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				return;
 			}
 			
@@ -776,7 +788,7 @@ const commandConsole = {
 							this.authenticated = true;
 							this.inputMode = 'normal';
 							this.input.type = 'text';
-							this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+							this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 							
 							if (!syncEnabled) {
 								syncEnabled = true;
@@ -790,15 +802,15 @@ const commandConsole = {
 									if (data && (data.people || data.timestamp)) {
 										// 저장된 데이터가 있으면 로드
 										loadStateFromData(data);
-										this.log(`✅ '${cmd}' 프로필로 전환 성공!`, 'success');
+										this.success(`✅ '${cmd}' 프로필로 전환 성공!`);
 									} else {
 										// 데이터가 없으면 초기화
 										clearState();
-										this.log(`✅ '${cmd}' 프로필로 전환 성공!`, 'success');
+										this.success(`✅ '${cmd}' 프로필로 전환 성공!`);
 									}
 								})
 								.catch((error) => {
-									this.log(`데이터 로드 실패: ${error.message}`, 'error');
+									this.error(`데이터 로드 실패: ${error.message}`);
 								});
 						} else {
 							// 데이터 먼저 로드
@@ -807,24 +819,24 @@ const commandConsole = {
 									const data = snapshot.val();
 									if (data && (data.people || data.timestamp)) {
 										loadStateFromData(data);
-										this.log(`📡 프로필 '${cmd}' 발견`, 'info');
+										this.log(`📡 프로필 '${cmd}' 발견`);
 									} else {
-										this.log(`📡 프로필 '${cmd}' 발견`, 'info');
+										this.log(`📡 프로필 '${cmd}' 발견`);
 									}
-									this.log('🔄 실시간 동기화 활성화됨', 'success');
+									this.success('🔄 실시간 동기화 활성화됨');
 									
 									if (!syncEnabled) {
 										syncEnabled = true;
 										setupRealtimeSync();
 									}
 									
-									this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+									this.log('🔒 비밀번호를 입력하시겠습니까?');
 									this.inputMode = 'password-ask-switch';
 									this.showConfirmButtons();
 								})
 								.catch((error) => {
-									this.log(`데이터 로드 실패: ${error.message}`, 'error');
-									this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+									this.error(`데이터 로드 실패: ${error.message}`);
+									this.log('🔒 비밀번호를 입력하시겠습니까?');
 									this.inputMode = 'password-ask-switch';
 									this.showConfirmButtons();
 								});
@@ -837,24 +849,24 @@ const commandConsole = {
 								const data = snapshot.val();
 								if (data && (data.people || data.timestamp)) {
 									loadStateFromData(data);
-									this.log(`📡 프로필 '${cmd}' 발견`, 'info');
+									this.log(`📡 프로필 '${cmd}' 발견`);
 								} else {
-									this.log(`📡 프로필 '${cmd}' 발견`, 'info');
+									this.log(`📡 프로필 '${cmd}' 발견`);
 								}
-								this.log('🔄 실시간 동기화 활성화됨', 'success');
+								this.success('🔄 실시간 동기화 활성화됨');
 								
 								if (!syncEnabled) {
 									syncEnabled = true;
 									setupRealtimeSync();
 								}
 								
-								this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+								this.log('🔒 비밀번호를 입력하시겠습니까?');
 								this.inputMode = 'password-ask-initial';
 								this.showConfirmButtons();
 							})
 							.catch((error) => {
-								this.log(`데이터 로드 실패: ${error.message}`, 'error');
-								this.log('🔒 비밀번호를 입력하시겠습니까?', 'info');
+								this.error(`데이터 로드 실패: ${error.message}`);
+								this.log('🔒 비밀번호를 입력하시겠습니까?');
 								this.inputMode = 'password-ask-initial';
 								this.showConfirmButtons();
 							});
@@ -862,15 +874,15 @@ const commandConsole = {
 				} else {
 					this.tempProfile = cmd;
 					if (isProfileSwitch) {
-						this.log(`⚠️ '${cmd}'는 존재하지 않는 프로필입니다.<br>신규 프로필로 생성하시겠습니까?`, 'warning');
+						this.warn(`⚠️ '${cmd}'는 존재하지 않는 프로필입니다.<br>신규 프로필로 생성하시겠습니까?`);
 					} else {
-						this.log(`⚠️ '${cmd}'는 존재하지 않는 프로필입니다.<br>신규 프로필로 등록하시겠습니까?`, 'warning');
+						this.warn(`⚠️ '${cmd}'는 존재하지 않는 프로필입니다.<br>신규 프로필로 등록하시겠습니까?`);
 					}
 					this.inputMode = 'profile-create-confirm';
 					this.showConfirmButtons();
 				}
 			}).catch((error) => {
-				this.log(`프로필 확인 실패: ${error.message}`, 'error');
+				this.error(`프로필 확인 실패: ${error.message}`);
 			});
 			return;
 		}
@@ -883,7 +895,7 @@ const commandConsole = {
 				authenticatedPassword = cmd; // 인증된 비밀번호 저장
 				this.inputMode = 'normal';
 				this.input.type = 'text';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				this.removeCancelButton();
 				
 				// 프로필 배경색 업데이트
@@ -898,34 +910,34 @@ const commandConsole = {
 						const data = snapshot.val();
 						if (data && (data.people || data.timestamp)) {
 							if (isSwitch) {
-								this.log(`✅ '${this.tempProfile}' 프로필로 전환 성공!`, 'success');
+								this.success(`✅ '${this.tempProfile}' 프로필로 전환 성공!`);
 							} else {
-								this.log(`✅ 인증 성공!<br>콘솔이 준비되었습니다.`, 'success');
+								this.success(`✅ 인증 성공!<br>콘솔이 준비되었습니다.`);
 								this.showFirstTimeHelp();
 							}
 						} else {
 							// 데이터가 없으면 초기화
 							clearState();
 							if (isSwitch) {
-								this.log(`✅ '${this.tempProfile}' 프로필로 전환 성공!`, 'success');
+								this.success(`✅ '${this.tempProfile}' 프로필로 전환 성공!`);
 							} else {
-								this.log('✅ 인증 성공!<br>콘솔이 준비되었습니다.', 'success');
+								this.success('✅ 인증 성공!<br>콘솔이 준비되었습니다.');
 								this.showFirstTimeHelp();
 							}
 						}
 					})
 					.catch((error) => {
-						this.log(`데이터 로드 실패: ${error.message}`, 'error');
+						this.error(`데이터 로드 실패: ${error.message}`);
 					});
 			} else {
-				this.log('비밀번호가 일치하지 않습니다. 다시 시도해주세요.', 'error');
+				this.error('비밀번호가 일치하지 않습니다. 다시 시도해주세요.');
 			}
 			return;
 		}
 		
 		if (this.inputMode === 'password') {
 			this.tempPassword = cmd;
-			this.log('비밀번호를 다시 한번 입력해주세요:', 'info');
+			this.log('비밀번호를 다시 한번 입력해주세요:');
 			this.inputMode = 'password-confirm';
 			this.input.placeholder = '비밀번호를 다시 한번 입력해주세요...';
 		// 취소 버튼 유지 (이미 있음)
@@ -933,21 +945,21 @@ const commandConsole = {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}/password`).set(this.tempPassword)
 						.then(() => {
-						this.log('✅ 비밀번호가 설정되었습니다.<br>콘솔이 준비되었습니다.', 'success');
+						this.success('✅ 비밀번호가 설정되었습니다.<br>콘솔이 준비되었습니다.');
 							this.authenticated = true;
 							this.removeCancelButton();
 							this.showFirstTimeHelp();
 						})
 						.catch((error) => {
-							this.log(`비밀번호 설정 실패: ${error.message}`, 'error');
+							this.error(`비밀번호 설정 실패: ${error.message}`);
 						});
 				}
 				this.inputMode = 'normal';
 				this.input.type = 'text';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				this.tempPassword = '';
 			} else {
-			this.log('비밀번호가 일치하지 않습니다. 다시 시도해주세요.<br>비밀번호를 생성하세요:', 'error');
+			this.error('비밀번호가 일치하지 않습니다. 다시 시도해주세요.<br>비밀번호를 생성하세요:');
 			this.inputMode = 'password';
 			this.input.placeholder = '비밀번호를 생성하세요...';
 			this.tempPassword = '';
@@ -959,18 +971,18 @@ const commandConsole = {
 		if (this.inputMode === 'password-change') {
 			// 1단계: 현재 비밀번호 확인
 			if (cmd === this.storedPassword) {
-				this.log('현재 비밀번호가 확인되었습니다.', 'success');
+				this.success('현재 비밀번호가 확인되었습니다.');
 				this.removeCancelButton();
-				this.log('새 비밀번호를 입력하세요:', 'info');
+				this.log('새 비밀번호를 입력하세요:');
 				this.inputMode = 'password-change-new';
 				this.input.placeholder = '새 비밀번호 입력...';
 				this.addCancelButton();
 				setTimeout(() => this.input.focus(), 50);
 			} else {
-				this.log('현재 비밀번호가 일치하지 않습니다. 다시 시도해주세요.', 'error');
+				this.error('현재 비밀번호가 일치하지 않습니다. 다시 시도해주세요.');
 				this.inputMode = 'normal';
 				this.input.type = 'text';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				this.removeCancelButton();
 			}
 			return;
@@ -980,13 +992,13 @@ const commandConsole = {
 			// 2단계: 새 비밀번호 입력
 			if (!cmd || cmd.trim() === '') {
 				// 빈 값이면 비밀번호 삭제 확인
-				this.log('⚠️ 비밀번호를 삭제하시겠습니까?', 'warning');
+				this.warn('⚠️ 비밀번호를 삭제하시겠습니까?');
 				this.inputMode = 'password-delete-confirm';
 				this.showConfirmButtons();
 				return;
 			}
 			this.tempPassword = cmd;
-			this.log('새 비밀번호를 다시 한번 입력해주세요:', 'info');
+			this.log('새 비밀번호를 다시 한번 입력해주세요:');
 			this.inputMode = 'password-change-confirm';
 			this.input.placeholder = '비밀번호 확인...';
 			setTimeout(() => this.input.focus(), 50);
@@ -999,20 +1011,20 @@ const commandConsole = {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}/password`).set(this.tempPassword)
 						.then(() => {
-							this.log('🔑 비밀번호가 변경되었습니다.', 'success');
+							this.success('🔑 비밀번호가 변경되었습니다.');
 							this.storedPassword = this.tempPassword; // 저장된 비밀번호 업데이트
 							this.removeCancelButton();
 						})
 						.catch((error) => {
-							this.log(`비밀번호 변경 실패: ${error.message}`, 'error');
+							this.error(`비밀번호 변경 실패: ${error.message}`);
 						});
 				}
 				this.inputMode = 'normal';
 				this.input.type = 'text';
-				this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+				this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				this.tempPassword = '';
 			} else {
-				this.log('비밀번호가 일치하지 않습니다. 다시 시도해주세요.<br>새 비밀번호를 입력하세요:', 'error');
+				this.error('비밀번호가 일치하지 않습니다. 다시 시도해주세요.<br>새 비밀번호를 입력하세요:');
 				this.inputMode = 'password-change-new';
 				this.input.placeholder = '새 비밀번호 입력...';
 				this.tempPassword = '';
@@ -1026,9 +1038,9 @@ const commandConsole = {
 			if (typeof addPerson === 'function' && elements.nameInput) {
 				elements.nameInput.value = cmd;
 				addPerson();
-				this.log(`참가자 추가 처리 완료: ${cmd}`, 'success');
+				this.success(`참가자 추가 처리 완료: ${cmd}`);
 			} else {
-				this.log('참가자 추가 기능을 사용할 수 없습니다.', 'error');
+				this.error('참가자 추가 기능을 사용할 수 없습니다.');
 			}
 			
 		// 입력 모드 유지 (취소 또는 ESC로만 종료 가능)
@@ -1040,18 +1052,18 @@ const commandConsole = {
 	if (this.inputMode === 'delete-password-confirm') {
 		// 삭제 전 비밀번호 확인
 		if (cmd === this.storedPassword) {
-			this.log('🔑 비밀번호가 확인되었습니다.', 'success');
-			this.log(`⚠️ 정말로 프로필 '${currentRoomKey}'를 삭제하시겠습니까?`, 'warning');
-			this.log('삭제하려면 프로필 이름을 정확히 입력하세요:', 'info');
+			this.success('🔑 비밀번호가 확인되었습니다.');
+			this.warn(`⚠️ 정말로 프로필 '${currentRoomKey}'를 삭제하시겠습니까?`);
+			this.log('삭제하려면 프로필 이름을 정확히 입력하세요:');
 			this.inputMode = 'delete-final-confirm';
 			this.input.type = 'text';
 			this.input.placeholder = '프로필 이름 입력...';
 			setTimeout(() => this.input.focus(), 50);
 		} else {
-			this.log('비밀번호가 일치하지 않습니다. 삭제가 취소되었습니다.', 'error');
+			this.error('비밀번호가 일치하지 않습니다. 삭제가 취소되었습니다.');
 			this.inputMode = 'normal';
 			this.input.type = 'text';
-			this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 			this.removeCancelButton();
 		}
 		return;
@@ -1063,8 +1075,8 @@ const commandConsole = {
 			// Firebase에서 프로필 삭제
 			database.ref(`rooms/${currentRoomKey}`).remove()
 				.then(() => {
-					this.log(`🗑️ 프로필 '${currentRoomKey}'가 완전히 삭제되었습니다.`, 'success');
-					this.log('잠시 후 프로필 선택 화면으로 이동합니다...', 'info');
+					this.success(`🗑️ 프로필 '${currentRoomKey}'가 완전히 삭제되었습니다.`);
+					this.log('잠시 후 프로필 선택 화면으로 이동합니다...');
 					
 					// 로컬 상태 초기화
 					clearState();
@@ -1077,14 +1089,14 @@ const commandConsole = {
 					}, 2000);
 				})
 				.catch((error) => {
-					this.log(`삭제 실패: ${error.message}`, 'error');
+					this.error(`삭제 실패: ${error.message}`);
 					this.inputMode = 'normal';
-					this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+					this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 				});
 		} else {
-			this.log(`프로필 이름이 일치하지 않습니다. 삭제가 취소되었습니다.`, 'error');
+			this.error(`프로필 이름이 일치하지 않습니다. 삭제가 취소되었습니다.`);
 			this.inputMode = 'normal';
-			this.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
+			this.input.placeholder = '명령어를 입력하세요... (예: help, save, load, clear)';
 		}
 		return;
 	}
@@ -1094,8 +1106,8 @@ const commandConsole = {
 			const [command] = cmd.split(' ');
 			const writeCommands = ['save', '저장', 'input', '입력', 'clear', '초기화'];
 			if (writeCommands.includes(command.toLowerCase())) {
-				this.log('⚠️ 읽기 전용 모드입니다. 이 명령어를 사용하려면 인증이 필요합니다.', 'warning');
-				this.log('인증하려면 <code data-cmd="로그인">로그인</code> 또는 <code data-cmd="login">login</code> 명령어를 사용하세요.', 'info');
+				this.warn('⚠️ 읽기 전용 모드입니다. 이 명령어를 사용하려면 인증이 필요합니다.');
+				this.log('인증하려면 <code data-cmd="로그인">로그인</code> 또는 <code data-cmd="login">login</code> 명령어를 사용하세요.');
 				return;
 			}
 		}
@@ -1179,13 +1191,13 @@ const commandConsole = {
 				this.helpCommand();
 				break;
 			default:
-			this.log(`알 수 없는 명령어: <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code>를 입력하여 도움말을 확인하세요.`, 'error');
+			this.error(`알 수 없는 명령어: <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code>를 입력하여 도움말을 확인하세요.`);
 	}
 },
 
 saveCommand() {
 	if (!syncEnabled || !currentRoomKey) {
-		this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+		this.error('Firebase가 설정되지 않았거나 Room Key가 없습니다.');
 		return;
 	}
 	
@@ -1209,16 +1221,16 @@ saveCommand() {
 				return database.ref(`rooms/${currentRoomKey}`).set(data);
 			})
 			.then(() => {
-				this.log(`💾 저장 완료!`, 'success');
+				this.success(`💾 저장 완료!`);
 			})
 			.catch((error) => {
-				this.log(`저장 실패: ${error.message}`, 'error');
+				this.error(`저장 실패: ${error.message}`);
 			});
 	},
 	
 	loadCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			this.error('Firebase가 설정되지 않았거나 Room Key가 없습니다.');
 			return;
 		}
 		
@@ -1227,23 +1239,23 @@ saveCommand() {
 				const data = snapshot.val();
 				if (data) {
 					loadStateFromData(data);
-					this.log(`📥 데이터 로드 완료!`, 'success');
+					this.success(`📥 데이터 로드 완료!`);
 				} else {
-					this.log('저장된 데이터가 없습니다.', 'warning');
+					this.warn('저장된 데이터가 없습니다.');
 				}
 			})
 			.catch((error) => {
-				this.log(`로드 실패: ${error.message}`, 'error');
+				this.error(`로드 실패: ${error.message}`);
 			});
 	},
 	
 	syncCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			this.error('Firebase가 설정되지 않았거나 Room Key가 없습니다.');
 			return;
 		}
 		
-		this.log('� 저장 중...', 'info');
+		this.log('💾 저장 중...');
 		
 		// 먼저 현재 상태를 저장
 		database.ref(`rooms/${currentRoomKey}/password`).once('value')
@@ -1276,8 +1288,8 @@ saveCommand() {
 				return database.ref(`rooms/${currentRoomKey}`).set(data);
 			})
 			.then(() => {
-				this.log('💾 저장 완료!', 'success');
-				this.log('🔄 동기화 요청중...', 'info');
+				this.success('💾 저장 완료!');
+				this.log('🔄 동기화 요청중...');
 				
 				// 동기화 트리거를 Firebase에 기록하여 모든 창에 알림
 				const syncTrigger = Date.now();
@@ -1297,19 +1309,19 @@ saveCommand() {
 				const data = snapshot.val();
 				if (data) {
 					loadStateFromData(data);
-					this.log(`✅ 동기화 요청완료`, 'success');
+					this.success(`✅ 동기화 요청완료`);
 				} else {
-					this.log('저장된 데이터가 없습니다.', 'warning');
+					this.warn('저장된 데이터가 없습니다.');
 				}
 			})
 			.catch((error) => {
-				this.log(`동기화 실패: ${error.message}`, 'error');
+				this.error(`동기화 실패: ${error.message}`);
 			});
 	},
 	
 	clearCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			this.error('Firebase가 설정되지 않았거나 Room Key가 없습니다.');
 			return;
 		}
 		
@@ -1344,16 +1356,16 @@ saveCommand() {
 				.then(() => {
 					// 로컬 state 초기화
 					clearState();
-					this.log('🗑️ 데이터 초기화 완료 (비밀번호 유지)', 'success');
+					this.success('🗑️ 데이터 초기화 완료 (비밀번호 유지)');
 				})
 				.catch((error) => {
-					this.log(`초기화 실패: ${error.message}`, 'error');
+					this.error(`초기화 실패: ${error.message}`);
 				});
 		}
 	},
 	
 	statusCommand() {
-		this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개', 'info');
+		this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개');
 	},
 	
 	
@@ -1378,12 +1390,12 @@ saveCommand() {
 			'🎲 <code data-cmd="확률">확률</code><br>   확률 규칙 목록을 표시합니다.<br>   특정 참가자들이 설정된 확률로 같은 팀에 배치되도록 하는 규칙입니다.<br><br>' +
 			'❓ <code data-cmd="help">help</code> / <code data-cmd="도움">도움</code><br>   이 도움말을 표시합니다.<br><br>' +
 			'💡 TIP: 콘솔을 닫으려면 우측 상단의 X 버튼을 클릭하세요.<br>' +
-			'💡 TIP: cmd 또는 command를 입력하면 언제든 콘솔을 다시 열 수 있습니다.', 'info');
+			'💡 TIP: cmd 또는 command를 입력하면 언제든 콘솔을 다시 열 수 있습니다.');
 	},
 
 	
 	profileCommand() {
-		this.log('🔄 프로필 이름을 입력하세요:', 'info');
+		this.log('🔄 프로필 이름을 입력하세요:');
 		this.inputMode = 'profile-switch';
 		this.input.placeholder = '프로필 이름 입력...';
 		this.addCancelButton();
@@ -1395,7 +1407,7 @@ saveCommand() {
 		// 현재 비밀번호가 없는지 확인
 		if (!this.storedPassword || this.storedPassword === '') {
 			// 비밀번호가 없으면 바로 새 비밀번호 입력 모드로
-			this.log('새 비밀번호를 입력하세요:', 'info');
+			this.log('새 비밀번호를 입력하세요:');
 			this.inputMode = 'password-change-new';
 			this.input.type = 'password';
 			this.input.placeholder = '새 비밀번호 입력...';
@@ -1406,8 +1418,8 @@ saveCommand() {
 		
 		// 인자가 제공된 경우 - 비밀번호 변경 플로우 시작
 		if (newPassword && newPassword.trim()) {
-			this.log('⚠️ 보안을 위해 비밀번호 변경은 대화형 모드로만 가능합니다.', 'warning');
-			this.log('현재 비밀번호를 입력하세요:', 'info');
+			this.warn('⚠️ 보안을 위해 비밀번호 변경은 대화형 모드로만 가능합니다.');
+			this.log('현재 비밀번호를 입력하세요:');
 			this.inputMode = 'password-change';
 			this.input.type = 'password';
 			this.input.placeholder = '현재 비밀번호 입력...';
@@ -1415,7 +1427,7 @@ saveCommand() {
 			setTimeout(() => this.input.focus(), 50);
 		} else {
 			// 인자가 없으면 비밀번호 변경 모드로 전환
-			this.log('현재 비밀번호를 입력하세요:', 'info');
+			this.log('현재 비밀번호를 입력하세요:');
 			this.inputMode = 'password-change';
 			this.input.type = 'password';
 			this.input.placeholder = '현재 비밀번호 입력...';
@@ -1426,17 +1438,17 @@ saveCommand() {
 	
 	loginCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			this.error('Firebase가 설정되지 않았거나 Room Key가 없습니다.');
 			return;
 		}
 		
 		if (this.authenticated) {
-			this.log('✅ 이미 로그인되어 있습니다.', 'info');
+			this.log('✅ 이미 로그인되어 있습니다.');
 			return;
 		}
 		
 		// 비밀번호 입력 모드로 전환
-		this.log('🔐 비밀번호를 입력하세요:', 'info');
+		this.log('🔐 비밀번호를 입력하세요:');
 		this.inputMode = 'auth';
 		this.input.type = 'password';
 		this.input.placeholder = '비밀번호 입력...';
@@ -1446,12 +1458,12 @@ saveCommand() {
 	
 	logoutCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			this.error('Firebase가 설정되지 않았거나 Room Key가 없습니다.');
 			return;
 		}
 		
 		if (!this.authenticated) {
-			this.log('ℹ️ 이미 읽기 전용 모드입니다.', 'info');
+			this.log('ℹ️ 이미 읽기 전용 모드입니다.');
 			return;
 		}
 		
@@ -1465,13 +1477,13 @@ saveCommand() {
 			roomKeyDisplay.classList.remove('authenticated');
 		}
 		
-		this.log('🚪 로그아웃되었습니다. 읽기 전용 모드로 전환합니다.', 'success');
-		this.log('💡 다시 로그인하려면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.', 'info');
+		this.success('🚪 로그아웃되었습니다. 읽기 전용 모드로 전환합니다.');
+		this.log('💡 다시 로그인하려면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.');
 	},
 	
 	participantsCommand() {
 		if (state.people.length === 0) {
-			this.log('등록된 참가자가 없습니다.', 'info');
+			this.log('등록된 참가자가 없습니다.');
 			return;
 		}
 		
@@ -1522,12 +1534,12 @@ saveCommand() {
 			</table>
 		</div>`;
 		
-		this.log(output, 'info');
+		this.log(output);
 	},
 	
 	nonParticipantsCommand() {
 		if (state.inactivePeople.length === 0) {
-			this.log('미참가자가 없습니다.', 'info');
+			this.log('미참가자가 없습니다.');
 			return;
 		}
 		
@@ -1562,14 +1574,14 @@ saveCommand() {
 			</table>
 		</div>`;
 		
-		this.log(output, 'info');
+		this.log(output);
 	},
 	
 	constraintsCommand() {
 		const totalConstraints = state.forbiddenPairs.length + state.pendingConstraints.length;
 		
 		if (totalConstraints === 0) {
-			this.log('설정된 제약 조건이 없습니다.', 'info');
+			this.log('설정된 제약 조건이 없습니다.');
 			return;
 		}
 		
@@ -1596,13 +1608,13 @@ saveCommand() {
 			});
 		}
 		
-		this.log(output, 'info');
+		this.log(output);
 	},
 	
 	matchingCommand(ruleInput) {
 		if (!this.authenticated) {
-			this.log('🚫 확률 규칙 등록은 읽기 전용 모드에서 사용할 수 없습니다.', 'error');
-			this.log('💡 먼저 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 인증하세요.', 'info');
+			this.error('🚫 확률 규칙 등록은 읽기 전용 모드에서 사용할 수 없습니다.');
+			this.log('💡 먼저 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 인증하세요.');
 			return;
 		}
 		
@@ -1618,22 +1630,22 @@ saveCommand() {
 			
 			// 결과 메시지 출력
 			if (isRemoveCommand) {
-				this.log('✅ 규칙 제거 완료', 'success');
+				this.success('✅ 규칙 제거 완료');
 			} else {
-				this.log('✅ 규칙 추가 완료', 'success');
+				this.success('✅ 규칙 추가 완료');
 			}
 			
 			// 확인하기 안내
-			this.log('확인하기 (명령어: <code data-cmd="확률">확률</code>)', 'info');
+			this.log('확인하기 (명령어: <code data-cmd="확률">확률</code>)');
 			return;
 		}
 		
 		// 인자가 없으면 입력 모드로 전환
-		this.log('📝 <strong>매칭될 확률을 설정합니다.</strong>', 'info');
-		this.log('<code>기준 참가자(확률)매칭될 참가자</code>', 'info');
-		this.log('예) A(40)B(30)C(20)D', 'info');
-		this.log('<code>기준 참가자(확률)매칭될 참가자1(확률)매칭될 참가자2</code>', 'info');
-		this.log('📊 설정된 매칭 그룹을 보려면 <code data-cmd="확률">확률</code> 명령어를 입력하세요.', 'info');
+		this.log('📝 <strong>매칭될 확률을 설정합니다.</strong>');
+		this.log('<code>기준 참가자(확률)매칭될 참가자</code>');
+		this.log('예) A(40)B(30)C(20)D');
+		this.log('<code>기준 참가자(확률)매칭될 참가자1(확률)매칭될 참가자2</code>');
+		this.log('📊 설정된 매칭 그룹을 보려면 <code data-cmd="확률">확률</code> 명령어를 입력하세요.');
 		
 		// 규칙 입력 모드로 전환
 		this.inputMode = 'matching';
@@ -1644,15 +1656,15 @@ saveCommand() {
 	
 	generateCommand() {
 		if (typeof shuffleTeams === 'function') {
-			this.log('🎲 팀 생성 중...', 'info');
+			this.log('🎲 팀 생성 중...');
 			try {
 				shuffleTeams();
 				// shuffleTeams가 성공하면 cmd 콘솔에 결과가 출력됨
 			} catch (error) {
-				this.log(`팀 생성 실패: ${error.message}`, 'error');
+				this.error(`팀 생성 실패: ${error.message}`);
 			}
 		} else {
-			this.log('shuffleTeams 함수를 찾을 수 없습니다.', 'error');
+			this.error('shuffleTeams 함수를 찾을 수 없습니다.');
 		}
 	},
 	
@@ -1661,7 +1673,7 @@ saveCommand() {
 		                    state.pendingHiddenGroups.length + state.pendingHiddenGroupChains.length;
 		
 		if (totalHidden === 0) {
-			this.log('확률 규칙이 없습니다.', 'info');
+			this.log('확률 규칙이 없습니다.');
 			return;
 		}
 		
@@ -1821,15 +1833,15 @@ saveCommand() {
 		
 		output += `</div>`;
 		
-		this.log(output, 'info');
+		this.log(output);
 	},
 	
 	inputCommand(data) {
 		// 참가자 추가 폼에 입력하는 것과 동일하게 처리
 		if (!data || data.trim() === '') {
 			// 데이터가 없으면 입력 모드로 전환
-			this.log('참가자 데이터를 입력하세요:', 'info');
-			this.log('예시: 홍길동,김철수 / 이영희(남)50 / A!B / C(80)D', 'info');
+			this.log('참가자 데이터를 입력하세요:');
+			this.log('예시: 홍길동,김철수 / 이영희(남)50 / A!B / C(80)D');
 			this.inputMode = 'input-data';
 			this.input.placeholder = '참가자 데이터 입력...';
 			this.addCancelButton();
@@ -1845,31 +1857,31 @@ saveCommand() {
 			// addPerson 함수 실행 (fromConsole=true 전달)
 			addPerson(true);
 			
-			this.log(`참가자 추가 처리 완료: ${data}`, 'success');
+			this.success(`참가자 추가 처리 완료: ${data}`);
 		} else {
-			this.log('참가자 추가 기능을 사용할 수 없습니다.', 'error');
+			this.error('참가자 추가 기능을 사용할 수 없습니다.');
 		}
 	},
 	
 	deleteCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+			this.error('Firebase가 설정되지 않았거나 Room Key가 없습니다.');
 			return;
 		}
 		
 		if (!this.authenticated) {
-			this.log('🚫 프로필 삭제는 읽기 전용 모드에서 사용할 수 없습니다.', 'error');
-			this.log('💡 먼저 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 인증하세요.', 'info');
+			this.error('🚫 프로필 삭제는 읽기 전용 모드에서 사용할 수 없습니다.');
+			this.log('💡 먼저 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 인증하세요.');
 			return;
 		}
 		
-		this.log(`🔥 프로필 '${currentRoomKey}'를 삭제하려고 합니다.`, 'warning');
-		this.log('⚠️ 이 작업은 되돌릴 수 없습니다!', 'warning');
+		this.warn(`🔥 프로필 '${currentRoomKey}'를 삭제하려고 합니다.`);
+		this.warn('⚠️ 이 작업은 되돌릴 수 없습니다!');
 		
 		// 비밀번호가 있는지 확인
 		if (this.storedPassword && this.storedPassword !== '') {
 			// 비밀번호가 있으면 비밀번호 입력 모드
-			this.log('비밀번호를 입력하여 확인하세요:', 'info');
+			this.log('비밀번호를 입력하여 확인하세요:');
 			this.inputMode = 'delete-password-confirm';
 			this.input.type = 'password';
 			this.input.placeholder = '비밀번호 입력...';
@@ -1877,7 +1889,7 @@ saveCommand() {
 			setTimeout(() => this.input.focus(), 50);
 		} else {
 			// 비밀번호가 없으면 확인/취소 버튼 표시
-			this.log('삭제하시겠습니까?', 'warning');
+			this.warn('삭제하시겠습니까?');
 			this.inputMode = 'delete-confirm';
 			this.showConfirmButtons();
 		}

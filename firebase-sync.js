@@ -79,7 +79,7 @@ function setupRealtimeSync() {
 		if (syncTrigger && syncTrigger !== lastSyncTrigger && lastSyncTrigger !== 0) {
 			// 새로운 동기화 트리거 감지
 			if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-				commandConsole.log('🔄 동기화 중...', 'info');
+				commandConsole.log('🔄 동기화 중...');
 			}
 			
 			// 데이터 로드
@@ -89,13 +89,13 @@ function setupRealtimeSync() {
 					if (data) {
 						loadStateFromData(data);
 						if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-							commandConsole.log('✅ 동기화가 완료되었습니다.', 'success');
+							commandConsole.log('✅ 동기화가 완료되었습니다.');
 						}
 					}
 				})
 				.catch((error) => {
-					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-						commandConsole.log(`동기화 실패: ${error.message}`, 'error');
+					if (typeof commandConsole !== 'undefined' && commandConsole.error) {
+						commandConsole.error(`동기화 실패: ${error.message}`);
 					}
 				});
 		}
