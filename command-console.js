@@ -1179,36 +1179,26 @@ const commandConsole = {
 				this.helpCommand();
 				break;
 			default:
-				this.log(`알 수 없는 명령어: ${command}. 'help' 또는 '도움'을 입력하여 도움말을 확인하세요.`, 'error');
-		}
-	},
+			this.log(`알 수 없는 명령어: <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code>를 입력하여 도움말을 확인하세요.`, 'error');
+	}
+},
+
+saveCommand() {
+	if (!syncEnabled || !currentRoomKey) {
+		this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
+		return;
+	}
 	
-	saveCommand() {
-		if (!syncEnabled || !currentRoomKey) {
-			this.log('Firebase가 설정되지 않았거나 Room Key가 없습니다.', 'error');
-			return;
-		}
-		// 먼저 현재 password를 읽어옴
-		database.ref(`rooms/${currentRoomKey}/password`).once('value')
-			.then((snapshot) => {
-				const currentPassword = snapshot.val();
-				
-				const data = {
-					people: state.people,
-					inactivePeople: state.inactivePeople,
-					requiredGroups: state.requiredGroups,
-					nextId: state.nextId,
-					forbiddenPairs: state.forbiddenPairs,
-					pendingConstraints: state.pendingConstraints,
-					hiddenGroups: state.hiddenGroups,
-					hiddenGroupChains: state.hiddenGroupChains,
-					pendingHiddenGroups: state.pendingHiddenGroups,
-					pendingHiddenGroupChains: state.pendingHiddenGroupChains,
-					maxTeamSizeEnabled: state.maxTeamSizeEnabled,
-					genderBalanceEnabled: state.genderBalanceEnabled,
-					weightBalanceEnabled: state.weightBalanceEnabled,
-					membersPerTeam: state.membersPerTeam,
-					timestamp: Date.now()
+	// 먼저 현재 password를 읽어옴
+	database.ref(`rooms/${currentRoomKey}/password`).once('value')
+		.then((snapshot) => {
+			const currentPassword = snapshot.val();
+			
+			const data = {
+				people: state.people,
+				inactivePeople: state.inactivePeople,
+				requiredGroups: state.requiredGroups,
+				nextId: state.nextId,
 				};
 				
 				// password가 존재하면 포함
@@ -1676,7 +1666,7 @@ const commandConsole = {
 		}
 		
 		let output = `<div style="margin: 10px 0;">
-			<div style="font-weight: bold; margin-bottom: 8px;">=== 🔗 확률 규칙 (${totalHidden}개) ===</div>`;
+			<div style="font-weight: bold; margin-bottom: 8px;">🔗 확률 규칙 (규칙 설정 : <code data-cmd="규칙">규칙</code>)</div>`;
 		
 		// 확률 기반 그룹 (hiddenGroups)
 		if (state.hiddenGroups.length > 0) {
