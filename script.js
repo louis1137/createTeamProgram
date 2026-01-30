@@ -1,10 +1,11 @@
-﻿const teamDisplayDelay = isLocalView() ? 50 : 400;
+﻿
+let console = window.console;
+const teamDisplayDelay = isLocalView() ? 50 : 400;
 const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
 // 검증 비교창 표시 여부 (true: 표시, false: 숨김)
 const SHOW_VALIDATION_COMPARISON = isLocalView() ? false : false;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
-let console = window.console;
 
 // 파비콘 애니메이션
 (function() {

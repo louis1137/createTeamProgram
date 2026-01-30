@@ -34,6 +34,7 @@ function initFirebase() {
 			firebaseApp = firebase.initializeApp(firebaseConfig);
 			database = firebase.database();
 			console.log('✅ Firebase 초기화 완료');
+			console.log('⚙️ 참가자 입력란에 \'cmd\' 또는 \'command\'를 입력하면 명령 콘솔이 열립니다.');
 			
 			// URL에서 프로필 키 읽기
 			currentRoomKey = getRoomKeyFromURL();
