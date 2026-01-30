@@ -17,19 +17,23 @@ const commandConsole = {
 		profile: '프로필 이름 입력...',
 		passwordInput: '비밀번호 입력...',
 		passwordCreate: '비밀번호를 생성하세요...',
+		passwordConfirm: '비밀번호 확인...',
 		passwordChangeNew: '새 비밀번호 입력...',
 		passwordChangeConfirm: '비밀번호 확인...',
 		inputData: '참가자 입력 (취소: ESC)',
 		participantData: '참가자 데이터 입력...',
-		matchingRule: '확률 규칙 입력...'
+		matchingRule: '확률 규칙 입력...',
+		ruleInput: '확률 규칙 입력 (취소: ESC)...'
 	},
 
 	comments: {
 		cancel: '❌ 취소되었습니다.',
 		help: '💡 명령어 목록을 보려면 <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code> 명령어를 입력하세요.',
 		passwordCreate: '비밀번호를 생성하시겠습니까?',
+		passwordSetup: '🔑 비밀번호를 설정하시겠습니까?',
 		passwordInput: '🔒 비밀번호를 입력하세요:',
 		passwordInputAsk: '🔒 비밀번호를 입력하시겠습니까?',
+		passwordInputSkipped: '비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.',
 		passwordInputConfirm: '비밀번호를 다시 한번 입력해주세요:',
 		passwordChangeNew: '새 비밀번호를 입력하세요:',
 		passwordChangeConfirm: '새 비밀번호를 다시 한번 입력해주세요:',
@@ -37,19 +41,38 @@ const commandConsole = {
 		passwordSkip: '비밀번호 입력을 건너뛰었습니다.<br>읽기 전용 모드로 프로필을 사용합니다.',
 		passwordChangeCanceled: '비밀번호 삭제가 취소되었습니다.<br>새 비밀번호를 입력하세요:',
 		passwordDeleted: '🗑️ 비밀번호가 삭제되었습니다.<br>콘솔이 준비되었습니다.',
+		passwordDeleteConfirm: '⚠️ 비밀번호를 삭제하시겠습니까?',
+		passwordAskSwitch: '🔒 비밀번호를 입력하시겠습니까?',
+		passwordAskInitial: '🔒 비밀번호를 입력하시겠습니까?',
 		profileInput: '프로필 이름을 입력하세요:',
 		profileSwitch: '🔄 프로필 이름을 입력하세요:',
 		profileCreateCanceled: '프로필 생성이 취소되었습니다.<br>프로필 이름을 입력하세요:',
 		deleteConfirm: '삭제하려면 프로필 이름을 정확히 입력하세요:',
 		deleteCanceled: '삭제가 취소되었습니다.',
+		deleteFinalConfirm: '삭제하려면 프로필 이름을 정확히 입력하세요:',
 		deleteRedirect: '잠시 후 프로필 선택 화면으로 이동합니다...',
 		loginRequired: '인증하려면 <code data-cmd="로그인">로그인</code> 또는 <code data-cmd="login">login</code> 명령어를 사용하세요.',
 		loginSuccess: '✅ 이미 로그인되어 있습니다.',
+		loginInstructions: '💡 다시 로그인하려면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.',
+		logoutSuccess: '✅ 읽기 전용 모드로 전환되었습니다.',
 		logoutInfo: '💡 다시 로그인하려면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.',
 		readonlyMode: 'ℹ️ 이미 읽기 전용 모드입니다.',
+		firebaseOrRoomKeyMissing: '⚠️ Firebase가 설정되지 않았거나 Room Key가 없습니다.',
 		saving: '💾 저장 중...',
 		syncing: '🔄 동기화 요청중...',
-		ruleCheck: '확인하기 (명령어: <code data-cmd="확률">확률</code>)'
+		ruleCheck: '확인하기 (명령어: <code data-cmd="확률">확률</code>)',
+		noConstraints: '설정된 제약 조건이 없습니다.',
+		noProbabilityRules: '설정된 확률 규칙이 없습니다.',
+		probabilityRules: '확률 규칙 목록',
+		ruleSetup: '규칙 설정',
+		memberA: '멤버 A',
+		memberB: '멤버 B',
+		probability: '확률',
+		ruleRemoveSuccess: '✅ 규칙 제거 완료',
+		ruleAddSuccess: '✅ 규칙 추가 완료',
+		checkMatching: '확인하기 (명령어: <code data-cmd="확률">확률</code>)',
+		matchingSetup: '📊 확률 규칙을 설정합니다.',
+		matchingFormat: '형식: <code>기준참가자(확률)매칭참가자1(확률)매칭참가자2...</code>'
 	},
 	
 	init() {
@@ -104,6 +127,15 @@ const commandConsole = {
 				}
 			}
 		});
+		
+		if (this.input) {
+			this.input.addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					this.executeCommand();
+				}
+			});
+		}
 		
 		if (sendBtn) {
 			sendBtn.addEventListener('click', () => this.executeCommand());
@@ -473,32 +505,33 @@ const commandConsole = {
 		const cancelBtn = document.getElementById('commandCancelBtn');
 		
 		if (this.input) {
-			this.input.addEventListener('keypress', (e) => {
-				if (e.key === 'Enter') {
-					this.executeCommand();
-				}
-			});
-			// 입력 폼에 포커스
-			setTimeout(() => this.input.focus(), 50);
-		}
-		
-		if (sendBtn) {
-			sendBtn.addEventListener('click', () => this.executeCommand());
-		}
-		
-		if (cancelBtn) {
-			cancelBtn.addEventListener('click', () => {
-				this.log(this.comments.cancel);
-				this.inputMode = 'normal';
-				this.input.type = 'text';
-				this.input.value = '';
-				this.input.placeholder = this.placeholders.input;
-				this.restoreInputField(false);
-			});
-		}
-	},
+		this.input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				this.executeCommand();
+			}
+		});
+		// 입력 폼에 포커스
+		setTimeout(() => this.input.focus(), 50);
+	}
 	
-	handleConfirmResponse(confirmed) {
+	if (sendBtn) {
+		sendBtn.addEventListener('click', () => this.executeCommand());
+	}
+	
+	if (cancelBtn) {
+		cancelBtn.addEventListener('click', () => {
+			this.log(this.comments.cancel);
+			this.inputMode = 'normal';
+			this.input.type = 'text';
+			this.input.value = '';
+			this.input.placeholder = this.placeholders.input;
+			this.restoreInputField(false);
+		});
+	}
+},
+
+handleConfirmResponse(confirmed) {
 		if (this.inputMode === 'profile-create-confirm') {
 			if (confirmed) {
 				currentRoomKey = this.tempProfile;

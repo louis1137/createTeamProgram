@@ -1,5 +1,5 @@
 ﻿
-let console = window.console;
+// let console = window.console;
 const teamDisplayDelay = isLocalView() ? 50 : 400;
 const maxTimer = isLocalView() ? 0 : 3000;
 const blindDelay = isLocalView() ? null : 5000;
@@ -789,10 +789,20 @@ function saveToLocalStorage() {
 
 // localStorage에서 복원
 function loadFromLocalStorage() {
+	
 	try {
 		const saved = localStorage.getItem('teamMakerData');
+		
 		if (saved) {
 			const data = JSON.parse(saved);
+			
+			// cmd 콘솔에도 출력
+			setTimeout(() => {
+				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+					commandConsole.log(`✅ 로컬 데이터 복원: 참가자 ${data.people?.length || 0}명`);
+				}
+			}, 200);
+			
 			state.people = data.people || [];
 			state.inactivePeople = data.inactivePeople || []; // 미참가자 목록 복원
 			// 참가자 목록을 이름순으로 정렬
@@ -833,81 +843,26 @@ function loadFromLocalStorage() {
 				elements.teamSizeInput.value = data.membersPerTeam;
 			}
 			
-			// 콘솔에 복원된 데이터 출력
-			console.group('📦 저장된 데이터 복원');
-			
-			if (state.people.length > 0) {
-				console.log('%c👥 참가자 목록', 'color: #667eea; font-weight: bold; font-size: 14px;');
-				const sortedPeople = [...state.people].sort((a, b) => a.name.localeCompare(b.name));
-				// 그룹 레이블 생성: A~Z, 넘으면 A1, A2...
-				const groupLabelForIndex = (i) => {
-					const base = String.fromCharCode(65 + (i % 26));
-					return i < 26 ? base : base + Math.floor(i / 26).toString();
-				};
-				const personGroupMap = new Map();
-				state.requiredGroups.forEach((group, gi) => {
-					const label = groupLabelForIndex(gi);
-					group.forEach(pid => personGroupMap.set(pid, label));
-				});
-
-				const peopleTable = sortedPeople.map(p => {
-					const row = {
-						'이름': p.name,
-						'성별': p.gender === 'male' ? '♂️' : '♀️',
-						'가중치': p.weight ?? 0
-					};
-					const grp = personGroupMap.get(p.id);
-					if (grp) row['그룹'] = grp;
-					return row;
-				});
-				console.table(peopleTable);
-			} else {
-				console.log('%c👥 참가자: 없음', 'color: #999; font-style: italic;');
-			}
-			
-			if (state.inactivePeople.length > 0) {
-				console.log('%c💤 미참가자 목록', 'color: #999; font-weight: bold; font-size: 14px;');
-				const inactiveTable = state.inactivePeople.map(p => ({
-					'이름': p.name,
-					'성별': p.gender === 'male' ? '♂️' : '♀️',
-					'가중치': p.weight ?? 0
-				}));
-				console.table(inactiveTable);
-			} else {
-				console.log('%c💤 미참가자: 없음', 'color: #999; font-style: italic;');
-			}
-			
-			if (state.forbiddenPairs.length > 0) {
-				console.log('%c🚫 적용된 제약', 'color: #ef4444; font-weight: bold; font-size: 14px;');
-				state.forbiddenPairs.forEach((pair, idx) => {
-					const person1 = state.people.find(p => p.id === pair[0]);
-					const person2 = state.people.find(p => p.id === pair[1]);
-					if (person1 && person2) {
-						console.log(`  ${idx + 1}. ${person1.name} ↔ ${person2.name}`);
-					}
-				});
-			} else {
-				console.log('%c🚫 적용된 제약: 없음', 'color: #999; font-style: italic;');
-			}
-			
-			if (state.pendingConstraints.length > 0) {
-				console.log('%c⏳ 대기 중인 제약', 'color: #f59e0b; font-weight: bold; font-size: 14px;');
-				state.pendingConstraints.forEach((constraint, idx) => {
-					console.log(`  ${idx + 1}. ${constraint.left} ↔ ${constraint.right}`);
-				});
-			} else {
-				console.log('%c⏳ 대기 중인 제약: 없음', 'color: #999; font-style: italic;');
-			}
-			
-			console.groupEnd();
+			// cmd 콘솔에도 출력
+			setTimeout(() => {
+				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+					commandConsole.log('✅ 모든 설정 복원 완료');
+				}
+			}, 250);
 		}
 	} catch (e) {
-		console.error('localStorage 복원 실패:', e);
+		
+		// cmd 콘솔에도 출력
+		setTimeout(() => {
+			if (typeof commandConsole !== 'undefined' && commandConsole.error) {
+				commandConsole.error('❌ localStorage 복원 실패: ' + e.message);
+			}
+		}, 300);
 	}
+	
 }
 
 // 이름별 기본값 가져오기
-// getPersonDefaults는 제거됨(사용되지 않음). 필요 시 localStorage의 기본값을 직접 사용합니다.
 
 // 결과 섹션 캐처 기능
 function captureResultsSection() {
