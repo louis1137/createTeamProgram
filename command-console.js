@@ -1,18 +1,18 @@
-ï»¿// ==================== ëª…ë ¹ì–´ ì½˜ì†” ====================
+// ==================== ¸í·É¾î ÄÜ¼Ö ====================
 
 const commandConsole = {
 	output: null,
 	input: null,
-	savedPosition: { x: 0, y: 0, width: '900px', height: '600px' }, // ìµœì†Œí™” ì „ ìœ„ì¹˜ì™€ í¬ê¸° ì €ì¥
-	dragState: null, // ë“œë˜ê·¸ ìƒíƒœ ì €ì¥
-	inputMode: 'normal', // ì…ë ¥ ëª¨ë“œ: 'normal', 'auth', 'profile', 'password', 'password-confirm', 'password-ask'
-	tempProfile: '', // ì„ì‹œ í”„ë¡œí•„ ì´ë¦„ ì €ì¥
-	tempPassword: '', // ì„ì‹œ ë¹„ë°€ë²ˆí˜¸ ì €ì¥
-	authenticated: false, // ì¸ì¦ ìƒíƒœ
-	storedPassword: null, // Firebaseì—ì„œ ê°€ì ¸ì˜¨ ë¹„ë°€ë²ˆí˜¸
-	firstTimeHelpShown: false, // ì²« ë²ˆì§¸ ë„ì›€ë§ ì•ˆë‚´ í‘œì‹œ ì—¬ë¶€
+	savedPosition: { x: 0, y: 0, width: '900px', height: '600px' }, // ÃÖ¼ÒÈ­ Àü À§Ä¡¿Í Å©±â ÀúÀå
+	dragState: null, // µå·¡±× »óÅÂ ÀúÀå
+	inputMode: 'normal', // ÀÔ·Â ¸ğµå: 'normal', 'auth', 'profile', 'password', 'password-confirm', 'password-ask'
+	tempProfile: '', // ÀÓ½Ã ÇÁ·ÎÇÊ ÀÌ¸§ ÀúÀå
+	tempPassword: '', // ÀÓ½Ã ºñ¹Ğ¹øÈ£ ÀúÀå
+	authenticated: false, // ÀÎÁõ »óÅÂ
+	storedPassword: null, // Firebase¿¡¼­ °¡Á®¿Â ºñ¹Ğ¹øÈ£
+	firstTimeHelpShown: false, // Ã¹ ¹øÂ° µµ¿ò¸» ¾È³» Ç¥½Ã ¿©ºÎ
 
-	// ì™¸ë¶€ íŒŒì¼ì—ì„œ ë©”ì‹œì§€ ë¶ˆëŸ¬ì˜¤ê¸°
+	// ¿ÜºÎ ÆÄÀÏ¿¡¼­ ¸Ş½ÃÁö ºÒ·¯¿À±â
 	placeholders: commandConsoleMessages.placeholders,
 	comments: commandConsoleMessages.comments,
 	
@@ -24,31 +24,31 @@ const commandConsole = {
 		const consoleEl = document.getElementById('commandConsole');
 		const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 		
-		// key íŒŒë¼ë¯¸í„°ê°€ ìˆì„ ë•Œ room key ì„¤ì • (ì½˜ì†”ì€ í‘œì‹œí•˜ì§€ ì•ŠìŒ)
+		// key ÆÄ¶ó¹ÌÅÍ°¡ ÀÖÀ» ¶§ room key ¼³Á¤ (ÄÜ¼ÖÀº Ç¥½ÃÇÏÁö ¾ÊÀ½)
 		currentRoomKey = getRoomKeyFromURL();
 		if (currentRoomKey) {
 			roomKeyDisplay.textContent = `Profile: ${currentRoomKey}`;
-			// ì¸ì¦ ìƒíƒœë©´ ì´ˆë¡ìƒ‰ ë°°ê²½
+			// ÀÎÁõ »óÅÂ¸é ÃÊ·Ï»ö ¹è°æ
 			if (authenticatedPassword) {
 				roomKeyDisplay.classList.add('authenticated');
 			} else {
 				roomKeyDisplay.classList.remove('authenticated');
 			}
 			
-			// Firebase ì´ˆê¸°í™” ì‹œë„
+			// Firebase ÃÊ±âÈ­ ½Ãµµ
 			if (initFirebase()) {
 				syncEnabled = true;
 				setupRealtimeSync();
 			}
 		}
 		
-		// ë“œë˜ê·¸ ê¸°ëŠ¥ ì¶”ê°€ (dragStateë¥¼ commandConsoleì— ì €ì¥)
+		// µå·¡±× ±â´É Ãß°¡ (dragState¸¦ commandConsole¿¡ ÀúÀå)
 		this.dragState = this.setupDragging(consoleEl);
 		
-		// ì „ì—­ ESC í‚¤ ì´ë²¤íŠ¸ ë¦¬ìŠ¤ë„ˆ (ë¹„ë°€ë²ˆí˜¸ ëª¨ë“œ ì·¨ì†Œìš©)
+		// Àü¿ª ESC Å° ÀÌº¥Æ® ¸®½º³Ê (ºñ¹Ğ¹øÈ£ ¸ğµå Ãë¼Ò¿ë)
 		document.addEventListener('keydown', (e) => {
 			if (e.key === 'Escape' || e.keyCode === 27) {
-				// ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ëª¨ë“œì—ì„œ ESC í‚¤ë¥¼ ëˆ„ë¥´ë©´ ì½ê¸° ì „ìš© ëª¨ë“œë¡œ ì „í™˜
+				// ºñ¹Ğ¹øÈ£ ÀÔ·Â ¸ğµå¿¡¼­ ESC Å°¸¦ ´©¸£¸é ÀĞ±â Àü¿ë ¸ğµå·Î ÀüÈ¯
 				if (this.inputMode === 'auth' || this.inputMode === 'auth-switch' || 
 				    this.inputMode === 'password-change' || this.inputMode === 'delete-confirm' ||
 				    this.inputMode === 'delete-password-confirm' || this.inputMode === 'password-delete-confirm' ||
@@ -82,23 +82,23 @@ const commandConsole = {
 			sendBtn.addEventListener('click', () => this.executeCommand());
 		}
 		
-		// ì½˜ì†” í† ê¸€
+		// ÄÜ¼Ö Åä±Û
 		if (toggleBtn) {
 			toggleBtn.addEventListener('click', () => {
 				const content = document.querySelector('.command-content');
 				const isHidden = content.style.display === 'none';
 				
 				if (isHidden) {
-					// í¼ì¹˜ê¸°: ì €ì¥ëœ ìœ„ì¹˜ì™€ í¬ê¸° ë³µì›
+					// ÆîÄ¡±â: ÀúÀåµÈ À§Ä¡¿Í Å©±â º¹¿ø
 					content.style.display = 'flex';
 					consoleEl.style.width = this.savedPosition.width || '900px';
 					consoleEl.style.height = this.savedPosition.height || '600px';
 					consoleEl.style.transform = `translate(${this.savedPosition.x}px, ${this.savedPosition.y}px)`;
 					this.dragState.xOffset = this.savedPosition.x;
 					this.dragState.yOffset = this.savedPosition.y;
-					toggleBtn.textContent = 'âˆ’';
+					toggleBtn.textContent = '?';
 				} else {
-					// ìµœì†Œí™”: í˜„ì¬ ìœ„ì¹˜ì™€ í¬ê¸° ì €ì¥ í›„ ìš°ì¸¡ í•˜ë‹¨ìœ¼ë¡œ ì´ë™, í—¤ë”ë§Œ í‘œì‹œ
+					// ÃÖ¼ÒÈ­: ÇöÀç À§Ä¡¿Í Å©±â ÀúÀå ÈÄ ¿ìÃø ÇÏ´ÜÀ¸·Î ÀÌµ¿, Çì´õ¸¸ Ç¥½Ã
 					this.savedPosition.x = this.dragState.xOffset;
 					this.savedPosition.y = this.dragState.yOffset;
 					this.savedPosition.width = consoleEl.style.width;
@@ -112,15 +112,15 @@ const commandConsole = {
 			});
 		}
 		
-		// ì½˜ì†” ë‹«ê¸°
+		// ÄÜ¼Ö ´İ±â
 		const closeBtn = document.getElementById('closeConsoleBtn');
 		if (closeBtn) {
 			closeBtn.addEventListener('click', () => {
 				consoleEl.style.display = 'none';
 				
-				// ìƒíƒœ ì´ˆê¸°í™” (ë‹¤ì‹œ ì—´ì—ˆì„ ë•Œ í”„ë¡œí•„ ì…ë ¥ë¶€í„° ì‹œì‘)
+				// »óÅÂ ÃÊ±âÈ­ (´Ù½Ã ¿­¾úÀ» ¶§ ÇÁ·ÎÇÊ ÀÔ·ÂºÎÅÍ ½ÃÀÛ)
 				if (!currentRoomKey) {
-					// íŒŒë¼ë¯¸í„°ê°€ ì—†ëŠ” ê²½ìš°ì—ë§Œ ì´ˆê¸°í™”
+					// ÆÄ¶ó¹ÌÅÍ°¡ ¾ø´Â °æ¿ì¿¡¸¸ ÃÊ±âÈ­
 					this.inputMode = 'profile';
 					this.input.type = 'text';
 					this.input.placeholder = this.placeholders.profile;
@@ -129,13 +129,13 @@ const commandConsole = {
 					this.tempProfile = '';
 					this.tempPassword = '';
 					
-					// ì¶œë ¥ í™”ë©´ í´ë¦¬ì–´
+					// Ãâ·Â È­¸é Å¬¸®¾î
 					if (this.output) {
 						this.output.innerHTML = '';
 					}
 				} else {
-					// í”„ë¡œí•„ì´ ìˆëŠ” ê²½ìš°
-					// ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ëª¨ë“œì—ì„œ ë‹«ìœ¼ë©´ ìë™ìœ¼ë¡œ ì½ê¸° ëª¨ë“œë¡œ ì „í™˜
+					// ÇÁ·ÎÇÊÀÌ ÀÖ´Â °æ¿ì
+					// ºñ¹Ğ¹øÈ£ ÀÔ·Â ¸ğµå¿¡¼­ ´İÀ¸¸é ÀÚµ¿À¸·Î ÀĞ±â ¸ğµå·Î ÀüÈ¯
 					if (this.inputMode === 'auth' || this.inputMode === 'auth-switch' || 
 					    this.inputMode === 'password-change' || this.inputMode === 'delete-confirm' ||
 					    this.inputMode === 'delete-password-confirm' || this.inputMode === 'password-delete-confirm' ||
@@ -144,13 +144,13 @@ const commandConsole = {
 						this.log(this.comments.cancel);
 						this.inputMode = 'normal';
 						
-						// í™•ì¸ ë²„íŠ¼ì´ í‘œì‹œë˜ì–´ ìˆë‹¤ë©´ ì…ë ¥ í•„ë“œë¡œ ë³µì›
+						// È®ÀÎ ¹öÆ°ÀÌ Ç¥½ÃµÇ¾î ÀÖ´Ù¸é ÀÔ·Â ÇÊµå·Î º¹¿ø
 						this.restoreInputField();
 						
 						this.input.type = 'text';
 						this.input.placeholder = this.placeholders.input;
 					} else if (this.inputMode !== 'normal') {
-						// ë‹¤ë¥¸ íŠ¹ìˆ˜ ëª¨ë“œì—ì„œëŠ” normalë¡œ ë³µê·€
+						// ´Ù¸¥ Æ¯¼ö ¸ğµå¿¡¼­´Â normal·Î º¹±Í
 						this.inputMode = 'normal';
 						this.input.type = 'text';
 						this.input.placeholder = this.placeholders.input;
@@ -159,7 +159,7 @@ const commandConsole = {
 			});
 		}
 		
-		// ë¦¬ì‚¬ì´ì¦ˆ ê¸°ëŠ¥ ì¶”ê°€
+		// ¸®»çÀÌÁî ±â´É Ãß°¡
 		this.setupResizing(consoleEl);
 	},
 
@@ -367,8 +367,8 @@ const commandConsole = {
 		if (!container) return;
 		
 		container.innerHTML = `
-			<button id="commandConfirmBtn" class="command-confirm-btn">í™•ì¸</button>
-			<button id="commandCancelBtn" class="command-cancel-btn">ì·¨ì†Œ</button>
+			<button id="commandConfirmBtn" class="command-confirm-btn">È®ÀÎ</button>
+			<button id="commandCancelBtn" class="command-cancel-btn">Ãë¼Ò</button>
 		`;
 		
 		document.getElementById('commandConfirmBtn').addEventListener('click', () => {
@@ -384,13 +384,13 @@ const commandConsole = {
 		const container = document.querySelector('.command-input-container');
 		if (!container) return;
 		
-		// ì´ë¯¸ ì·¨ì†Œ ë²„íŠ¼ì´ ìˆëŠ”ì§€ í™•ì¸
+		// ÀÌ¹Ì Ãë¼Ò ¹öÆ°ÀÌ ÀÖ´ÂÁö È®ÀÎ
 		if (document.getElementById('commandCancelBtn')) return;
 		
 		const cancelBtn = document.createElement('button');
 		cancelBtn.id = 'commandCancelBtn';
 		cancelBtn.className = 'command-send-btn';
-		cancelBtn.textContent = 'ì·¨ì†Œ';
+		cancelBtn.textContent = 'Ãë¼Ò';
 		cancelBtn.style.cssText = 'background: #ef4444; margin-left: 5px;';
 		
 		cancelBtn.addEventListener('click', () => {
@@ -425,19 +425,19 @@ const commandConsole = {
 		const container = document.querySelector('.command-input-container');
 		if (!container) return;
 		
-		// ì·¨ì†Œ ë²„íŠ¼ ì œê±°
+		// Ãë¼Ò ¹öÆ° Á¦°Å
 		this.removeCancelButton();
 		
 		if (showCancelButton) {
 			container.innerHTML = `
 				<input type="text" id="commandInput" class="command-input" placeholder="${this.placeholders.input}">
-				<button id="commandSendBtn" class="command-send-btn">ì „ì†¡</button>
-				<button id="commandCancelBtn" class="command-send-btn" style="background: #ef4444; margin-left: 5px;">ì·¨ì†Œ</button>
+				<button id="commandSendBtn" class="command-send-btn">Àü¼Û</button>
+				<button id="commandCancelBtn" class="command-send-btn" style="background: #ef4444; margin-left: 5px;">Ãë¼Ò</button>
 			`;
 		} else {
 			container.innerHTML = `
 				<input type="text" id="commandInput" class="command-input" placeholder="${this.placeholders.input}">
-				<button id="commandSendBtn" class="command-send-btn">ì „ì†¡</button>
+				<button id="commandSendBtn" class="command-send-btn">Àü¼Û</button>
 			`;
 		}
 		
@@ -452,7 +452,7 @@ const commandConsole = {
 					this.executeCommand();
 				}
 			});
-			// ì…ë ¥ í¼ì— í¬ì»¤ìŠ¤
+			// ÀÔ·Â Æû¿¡ Æ÷Ä¿½º
 			setTimeout(() => this.input.focus(), 50);
 		}
 		
@@ -484,19 +484,19 @@ const commandConsole = {
 				const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 				if (roomKeyDisplay) {
 					roomKeyDisplay.textContent = `Profile: ${this.tempProfile}`;
-					// ì‹ ê·œ ìƒì„± ì‹œì—ëŠ” ì¸ì¦ë¨
+					// ½Å±Ô »ı¼º ½Ã¿¡´Â ÀÎÁõµÊ
 					roomKeyDisplay.classList.add('authenticated');
 				}
 				
-				this.success(`í”„ë¡œí•„ '${this.tempProfile}' ìƒì„±ë¨`);
+				this.success(`ÇÁ·ÎÇÊ '${this.tempProfile}' »ı¼ºµÊ`);
 				
-				// ë™ê¸°í™” í™œì„±í™”
+				// µ¿±âÈ­ È°¼ºÈ­
 				if (!syncEnabled) {
 					syncEnabled = true;
 					setupRealtimeSync();
 				}
 				
-				// ì‹ ê·œ í”„ë¡œí•„ ìƒì„± ì‹œ ë°”ë¡œ ë¹ˆ ë°ì´í„°ë¡œ ì´ˆê¸°í™”í•˜ì—¬ ë™ê¸°í™” ì‹œì‘
+				// ½Å±Ô ÇÁ·ÎÇÊ »ı¼º ½Ã ¹Ù·Î ºó µ¥ÀÌÅÍ·Î ÃÊ±âÈ­ÇÏ¿© µ¿±âÈ­ ½ÃÀÛ
 				const initialData = {
 					people: state.people || [],
 					inactivePeople: state.inactivePeople || [],
@@ -512,7 +512,7 @@ const commandConsole = {
 					genderBalanceEnabled: state.genderBalanceEnabled || false,
 					weightBalanceEnabled: state.weightBalanceEnabled || false,
 					membersPerTeam: state.membersPerTeam || 4,
-					password: '', // ë¹„ë°€ë²ˆí˜¸ ì—†ìŒ
+					password: '', // ºñ¹Ğ¹øÈ£ ¾øÀ½
 					timestamp: Date.now()
 				};
 				
@@ -520,31 +520,31 @@ const commandConsole = {
 					database.ref(`rooms/${currentRoomKey}`).set(initialData)
 						.then(() => {
 							this.success(this.comments.syncActivated);
-							this.log(this.comments.passwordSetup);
+							this.log(this.comments.passwordCreate);
 							this.inputMode = 'password-ask';
 							this.showConfirmButtons();
 						})
 						.catch((error) => {
-							this.error(`ì´ˆê¸°í™” ì‹¤íŒ¨: ${error.message}`);
-							this.log(this.comments.passwordSetup);
+							this.error(`ÃÊ±âÈ­ ½ÇÆĞ: ${error.message}`);
+							this.log(this.comments.passwordCreate);
 							this.inputMode = 'password-ask';
 							this.showConfirmButtons();
 						});
 				} else {
-					this.log(this.comments.passwordSetup);
+					this.log(this.comments.passwordCreate);
 					this.inputMode = 'password-ask';
 					this.showConfirmButtons();
 				}
 			} else {
-				// í”„ë¡œí•„ ìƒì„± ì·¨ì†Œ: í˜„ì¬ í”„ë¡œí•„ ìœ ì§€ ë˜ëŠ” ì´ˆê¸° ëª¨ë“œë¡œ ëŒì•„ê°€ê¸°
+				// ÇÁ·ÎÇÊ »ı¼º Ãë¼Ò: ÇöÀç ÇÁ·ÎÇÊ À¯Áö ¶Ç´Â ÃÊ±â ¸ğµå·Î µ¹¾Æ°¡±â
 				if (currentRoomKey) {
-					// ì´ë¯¸ í”„ë¡œí•„ì´ ìˆìœ¼ë©´ í˜„ì¬ í”„ë¡œí•„ ìœ ì§€
+					// ÀÌ¹Ì ÇÁ·ÎÇÊÀÌ ÀÖÀ¸¸é ÇöÀç ÇÁ·ÎÇÊ À¯Áö
 					this.log(this.comments.profileSwitchCanceled.replace('{currentRoomKey}', currentRoomKey));
 					this.inputMode = 'normal';
 					this.restoreInputField();
 					this.input.placeholder = this.placeholders.input;
 				} else {
-					// í”„ë¡œí•„ì´ ì—†ìœ¼ë©´ ì´ˆê¸° ìƒíƒœë¡œ
+					// ÇÁ·ÎÇÊÀÌ ¾øÀ¸¸é ÃÊ±â »óÅÂ·Î
 					const url = new URL(window.location);
 					url.searchParams.delete('key');
 					window.history.pushState({}, '', url);
@@ -585,7 +585,7 @@ const commandConsole = {
 				this.input.placeholder = this.placeholders.input;
 			}
 		} else if (this.inputMode === 'password-ask-switch') {
-			// í”„ë¡œí•„ ì „í™˜ ì‹œ ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ í™•ì¸
+			// ÇÁ·ÎÇÊ ÀüÈ¯ ½Ã ºñ¹Ğ¹øÈ£ ÀÔ·Â È®ÀÎ
 			if (confirmed) {
 				this.log(this.comments.passwordInput);
 				this.inputMode = 'auth-switch';
@@ -595,16 +595,16 @@ const commandConsole = {
 				this.addCancelButton();
 				setTimeout(() => this.input.focus(), 50);
 			} else {
-				// ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ì·¨ì†Œ - ì½ê¸° ì „ìš© ëª¨ë“œë¡œ ì‚¬ìš©
+				// ºñ¹Ğ¹øÈ£ ÀÔ·Â Ãë¼Ò - ÀĞ±â Àü¿ë ¸ğµå·Î »ç¿ë
 				this.log(this.comments.readOnlyModeInfo);
 				this.inputMode = 'normal';
-				this.authenticated = false; // ì¸ì¦ë˜ì§€ ì•ŠìŒ
+				this.authenticated = false; // ÀÎÁõµÇÁö ¾ÊÀ½
 				this.restoreInputField();
 				this.input.placeholder = this.placeholders.input;
 				this.showFirstTimeHelp();
 			}
 		} else if (this.inputMode === 'password-ask-initial') {
-			// ì´ˆê¸° ì ‘ì† ì‹œ ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ í™•ì¸
+			// ÃÊ±â Á¢¼Ó ½Ã ºñ¹Ğ¹øÈ£ ÀÔ·Â È®ÀÎ
 			if (confirmed) {
 				this.log(this.comments.passwordInput);
 				this.inputMode = 'auth';
@@ -614,16 +614,16 @@ const commandConsole = {
 				this.addCancelButton();
 				setTimeout(() => this.input.focus(), 50);
 			} else {
-				// ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ì·¨ì†Œ - ì½ê¸° ì „ìš© ëª¨ë“œë¡œ ì‚¬ìš©
+				// ºñ¹Ğ¹øÈ£ ÀÔ·Â Ãë¼Ò - ÀĞ±â Àü¿ë ¸ğµå·Î »ç¿ë
 				this.log(this.comments.passwordInputSkipped);
 				this.inputMode = 'normal';
-				this.authenticated = false; // ì¸ì¦ë˜ì§€ ì•ŠìŒ
+				this.authenticated = false; // ÀÎÁõµÇÁö ¾ÊÀ½
 				this.restoreInputField();
 				this.input.placeholder = this.placeholders.input;
 				this.showFirstTimeHelp();
 			}
 		} else if (this.inputMode === 'delete-confirm') {
-			// ë¹„ë°€ë²ˆí˜¸ ì—†ì„ ë•Œ ì‚­ì œ í™•ì¸
+			// ºñ¹Ğ¹øÈ£ ¾øÀ» ¶§ »èÁ¦ È®ÀÎ
 			if (confirmed) {
 				this.warn(this.comments.deleteConfirmQuestion.replace('{profile}', currentRoomKey));
 				this.log(this.comments.deleteFinalConfirm);
@@ -639,13 +639,13 @@ const commandConsole = {
 				this.input.placeholder = this.placeholders.input;
 			}
 		} else if (this.inputMode === 'password-delete-confirm') {
-			// ë¹„ë°€ë²ˆí˜¸ ì‚­ì œ í™•ì¸
+			// ºñ¹Ğ¹øÈ£ »èÁ¦ È®ÀÎ
 			if (confirmed) {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}/password`).set('')
 						.then(() => {
 							this.success(this.comments.passwordDeleted);
-							this.storedPassword = ''; // ì €ì¥ëœ ë¹„ë°€ë²ˆí˜¸ ì´ˆê¸°í™”
+							this.storedPassword = ''; // ÀúÀåµÈ ºñ¹Ğ¹øÈ£ ÃÊ±âÈ­
 						})
 						.catch((error) => {
 							this.error(this.comments.passwordDeleteFailed.replace('{error}', error.message));
@@ -676,20 +676,20 @@ const commandConsole = {
 		this.output.appendChild(entry);
 		this.output.scrollTop = this.output.scrollHeight;
 		
-		// <code> íƒœê·¸ì— í´ë¦­ ì´ë²¤íŠ¸ ì¶”ê°€ (ëª…ë ¹ì–´ ìë™ ì…ë ¥)
+		// <code> ÅÂ±×¿¡ Å¬¸¯ ÀÌº¥Æ® Ãß°¡ (¸í·É¾î ÀÚµ¿ ÀÔ·Â)
 		entry.querySelectorAll('code[data-cmd]').forEach(code => {
 			code.style.cursor = 'pointer';
 			code.addEventListener('click', (e) => {
 				e.stopPropagation();
 				const cmdText = code.getAttribute('data-cmd');
 				if (this.input && cmdText) {
-					// ëª¨ë“  íŠ¹ìˆ˜ ëª¨ë“œë¥¼ í•´ì œí•˜ê³  normal ëª¨ë“œë¡œ ì „í™˜
+					// ¸ğµç Æ¯¼ö ¸ğµå¸¦ ÇØÁ¦ÇÏ°í normal ¸ğµå·Î ÀüÈ¯
 					this.inputMode = 'normal';
 					this.input.type = 'text';
 					this.input.placeholder = this.placeholders.input;
 					this.removeCancelButton();
 					
-					// ëª…ë ¹ì–´ ìë™ ì…ë ¥
+					// ¸í·É¾î ÀÚµ¿ ÀÔ·Â
 					this.input.value = cmdText;
 					this.input.focus();
 				}
@@ -713,10 +713,10 @@ const commandConsole = {
 		if (!this.input) return;
 		const cmd = this.input.value.trim();
 		
-		// password-change-new ëª¨ë“œì—ì„œëŠ” ë¹ˆ ê°’ë„ ì²˜ë¦¬í•´ì•¼ í•¨ (ë¹„ë°€ë²ˆí˜¸ ì‚­ì œ ê¸°ëŠ¥)
+		// password-change-new ¸ğµå¿¡¼­´Â ºó °ªµµ Ã³¸®ÇØ¾ß ÇÔ (ºñ¹Ğ¹øÈ£ »èÁ¦ ±â´É)
 		if (!cmd && this.inputMode !== 'password-change-new') return;
 		
-		// ë¹„ë°€ë²ˆí˜¸ ê´€ë ¨ ì…ë ¥ ëª¨ë“œì—ì„œëŠ” ë¡œê·¸ ì¶œë ¥í•˜ì§€ ì•ŠìŒ
+		// ºñ¹Ğ¹øÈ£ °ü·Ã ÀÔ·Â ¸ğµå¿¡¼­´Â ·Î±× Ãâ·ÂÇÏÁö ¾ÊÀ½
 		if (this.inputMode !== 'auth' && 
 		    this.inputMode !== 'auth-switch' && 
 		    this.inputMode !== 'password' && 
@@ -730,26 +730,26 @@ const commandConsole = {
 		this.input.value = '';
 		
 		if (this.inputMode === 'matching') {
-			// ê·œì¹™ ëª¨ë“œ: íˆë“  ê·¸ë£¹ ëª…ë ¹ì–´ ì²˜ë¦¬
+			// ±ÔÄ¢ ¸ğµå: È÷µç ±×·ì ¸í·É¾î Ã³¸®
 			this.log(`> ${cmd}`, 'command');
 			
-			// ê·œì¹™ ì œê±° ëª…ë ¹ì–´ ì²´í¬
+			// ±ÔÄ¢ Á¦°Å ¸í·É¾î Ã¼Å©
 			const isRemoveCommand = /^([^()!]+)\(!\)/.test(cmd);
 			
-			// input ëª…ë ¹ì–´ë¥¼ í†µí•´ ì²˜ë¦¬
+			// input ¸í·É¾î¸¦ ÅëÇØ Ã³¸®
 			this.inputCommand(cmd);
 			
-			// ê²°ê³¼ ë©”ì‹œì§€ ì¶œë ¥
+			// °á°ú ¸Ş½ÃÁö Ãâ·Â
 			if (isRemoveCommand) {
-				this.success('âœ… ê·œì¹™ ì œê±° ì™„ë£Œ');
+				this.success('? ±ÔÄ¢ Á¦°Å ¿Ï·á');
 			} else {
-				this.success('âœ… ê·œì¹™ ì¶”ê°€ ì™„ë£Œ');
+				this.success('? ±ÔÄ¢ Ãß°¡ ¿Ï·á');
 			}
 			
-			// í™•ì¸í•˜ê¸° ì•ˆë‚´
-			this.log('í™•ì¸í•˜ê¸° (ëª…ë ¹ì–´: <code data-cmd="í™•ë¥ ">í™•ë¥ </code>)');
+			// È®ÀÎÇÏ±â ¾È³»
+			this.log('È®ÀÎÇÏ±â (¸í·É¾î: <code data-cmd="È®·ü">È®·ü</code>)');
 			
-			// ê·œì¹™ ëª¨ë“œ ìœ ì§€ (ì·¨ì†Œ ë˜ëŠ” ESCë¡œë§Œ ì¢…ë£Œ ê°€ëŠ¥)
+			// ±ÔÄ¢ ¸ğµå À¯Áö (Ãë¼Ò ¶Ç´Â ESC·Î¸¸ Á¾·á °¡´É)
 			this.input.placeholder = this.placeholders.ruleInput;
 			setTimeout(() => this.input.focus(), 50);
 			return;
@@ -761,7 +761,7 @@ const commandConsole = {
 				return;
 			}
 			
-			// í˜„ì¬ í”„ë¡œí•„ê³¼ ë™ì¼í•œ ì´ë¦„ì„ ì…ë ¥í•œ ê²½ìš°
+			// ÇöÀç ÇÁ·ÎÇÊ°ú µ¿ÀÏÇÑ ÀÌ¸§À» ÀÔ·ÂÇÑ °æ¿ì
 			if (cmd === currentRoomKey) {
 				this.log(this.comments.profileKeepCurrent);
 				this.inputMode = 'normal';
@@ -770,19 +770,19 @@ const commandConsole = {
 				return;
 			}
 			
-			// í”„ë¡œí•„ ì „ì²´ ë°ì´í„° í™•ì¸ (passwordë¿ë§Œ ì•„ë‹ˆë¼ ë‹¤ë¥¸ ë°ì´í„°ë„ ì²´í¬)
+			// ÇÁ·ÎÇÊ ÀüÃ¼ µ¥ÀÌÅÍ È®ÀÎ (password»Ó¸¸ ¾Æ´Ï¶ó ´Ù¸¥ µ¥ÀÌÅÍµµ Ã¼Å©)
 			database.ref(`rooms/${cmd}`).once('value', (snapshot) => {
 				const profileData = snapshot.val();
 				const isProfileSwitch = this.inputMode === 'profile-switch';
 				
-				// í”„ë¡œí•„ì´ ì¡´ì¬í•˜ëŠ”ì§€ í™•ì¸ (password ë˜ëŠ” ë‹¤ë¥¸ ë°ì´í„°ê°€ ìˆìœ¼ë©´ ì¡´ì¬)
+				// ÇÁ·ÎÇÊÀÌ Á¸ÀçÇÏ´ÂÁö È®ÀÎ (password ¶Ç´Â ´Ù¸¥ µ¥ÀÌÅÍ°¡ ÀÖÀ¸¸é Á¸Àç)
 				if (profileData !== null) {
 					const password = profileData.password || '';
 					this.tempProfile = cmd;
 					currentRoomKey = cmd;
 					this.storedPassword = password;
 					this.authenticated = false;
-					authenticatedPassword = ''; // í”„ë¡œí•„ ì „í™˜ ì‹œ ì¸ì¦ ì´ˆê¸°í™”
+					authenticatedPassword = ''; // ÇÁ·ÎÇÊ ÀüÈ¯ ½Ã ÀÎÁõ ÃÊ±âÈ­
 					
 					const url = new URL(window.location);
 					url.searchParams.set('key', cmd);
@@ -791,12 +791,12 @@ const commandConsole = {
 					const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 					if (roomKeyDisplay) {
 						roomKeyDisplay.textContent = `Profile: ${cmd}`;
-						// í”„ë¡œí•„ ì „í™˜ ì‹œì—ëŠ” í•­ìƒ ì¸ì¦ë˜ì§€ ì•Šì€ ìƒíƒœ
+						// ÇÁ·ÎÇÊ ÀüÈ¯ ½Ã¿¡´Â Ç×»ó ÀÎÁõµÇÁö ¾ÊÀº »óÅÂ
 						roomKeyDisplay.classList.remove('authenticated');
 					}
 					
 					if (isProfileSwitch) {
-						// í”„ë¡œí•„ ì „í™˜ ëª¨ë“œ: ë¹„ë°€ë²ˆí˜¸ ì—†ìœ¼ë©´ ë°”ë¡œ ì „í™˜, ìˆìœ¼ë©´ ì¸ì¦ ìš”ì²­
+						// ÇÁ·ÎÇÊ ÀüÈ¯ ¸ğµå: ºñ¹Ğ¹øÈ£ ¾øÀ¸¸é ¹Ù·Î ÀüÈ¯, ÀÖÀ¸¸é ÀÎÁõ ¿äÃ»
 						if (password === '') {
 							this.authenticated = true;
 							this.inputMode = 'normal';
@@ -808,16 +808,16 @@ const commandConsole = {
 								setupRealtimeSync();
 							}
 							
-							// ë°ì´í„° ë¡œë“œ
+							// µ¥ÀÌÅÍ ·Îµå
 							database.ref(`rooms/${currentRoomKey}`).once('value')
 								.then((snapshot) => {
 									const data = snapshot.val();
 									if (data && (data.people || data.timestamp)) {
-										// ì €ì¥ëœ ë°ì´í„°ê°€ ìˆìœ¼ë©´ ë¡œë“œ
+										// ÀúÀåµÈ µ¥ÀÌÅÍ°¡ ÀÖÀ¸¸é ·Îµå
 										loadStateFromData(data);
 										this.success(this.comments.profileSwitchSuccess.replace('{profile}', cmd));
 									} else {
-										// ë°ì´í„°ê°€ ì—†ìœ¼ë©´ ì´ˆê¸°í™”
+										// µ¥ÀÌÅÍ°¡ ¾øÀ¸¸é ÃÊ±âÈ­
 										clearState();
 										this.success(this.comments.profileSwitchSuccess.replace('{profile}', cmd));
 									}
@@ -826,15 +826,15 @@ const commandConsole = {
 									this.error(this.comments.dataLoadFailed.replace('{error}', error.message));
 								});
 						} else {
-							// ë°ì´í„° ë¨¼ì € ë¡œë“œ
+							// µ¥ÀÌÅÍ ¸ÕÀú ·Îµå
 							database.ref(`rooms/${currentRoomKey}`).once('value')
 								.then((snapshot) => {
 									const data = snapshot.val();
 									if (data && (data.people || data.timestamp)) {
 										loadStateFromData(data);
-										this.log(this.comments.profileFoundMessage.replace('{profile}', cmd));
+										this.log(this.comments.profileFound.replace('{profile}', cmd));
 									} else {
-										this.log(this.comments.profileFoundMessage.replace('{profile}', cmd));
+										this.log(this.comments.profileFound.replace('{profile}', cmd));
 									}
 									this.log(this.comments.passwordAskSwitch);
 									this.inputMode = 'password-ask-switch';
@@ -848,8 +848,8 @@ const commandConsole = {
 								});
 						}
 					} else {
-						// ì´ˆê¸° ì ‘ì† ëª¨ë“œ
-						// ë°ì´í„° ë¨¼ì € ë¡œë“œ
+						// ÃÊ±â Á¢¼Ó ¸ğµå
+						// µ¥ÀÌÅÍ ¸ÕÀú ·Îµå
 						database.ref(`rooms/${currentRoomKey}`).once('value')
 							.then((snapshot) => {
 								const data = snapshot.val();
@@ -898,34 +898,34 @@ const commandConsole = {
 			
 			if (cmd === this.storedPassword) {
 				this.authenticated = true;
-				authenticatedPassword = cmd; // ì¸ì¦ëœ ë¹„ë°€ë²ˆí˜¸ ì €ì¥
+				authenticatedPassword = cmd; // ÀÎÁõµÈ ºñ¹Ğ¹øÈ£ ÀúÀå
 				this.inputMode = 'normal';
 				this.input.type = 'text';
 				this.input.placeholder = this.placeholders.input;
 				this.removeCancelButton();
 				
-				// í”„ë¡œí•„ ë°°ê²½ìƒ‰ ì—…ë°ì´íŠ¸
+				// ÇÁ·ÎÇÊ ¹è°æ»ö ¾÷µ¥ÀÌÆ®
 				const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 				if (roomKeyDisplay) {
 					roomKeyDisplay.classList.add('authenticated');
 				}
 				
-				// í”„ë¡œí•„ ì „í™˜ ëª¨ë“œë“  ì´ˆê¸° ì ‘ì† ëª¨ë“œë“  ë°ì´í„° ë¡œë“œ
+				// ÇÁ·ÎÇÊ ÀüÈ¯ ¸ğµåµç ÃÊ±â Á¢¼Ó ¸ğµåµç µ¥ÀÌÅÍ ·Îµå
 				database.ref(`rooms/${currentRoomKey}`).once('value')
 					.then((snapshot) => {
 						const data = snapshot.val();
 						if (data && (data.people || data.timestamp)) {
 							if (isSwitch) {
-								this.success(`âœ… '${this.tempProfile}' í”„ë¡œí•„ë¡œ ì „í™˜ ì„±ê³µ!`);
+								this.success(`? '${this.tempProfile}' ÇÁ·ÎÇÊ·Î ÀüÈ¯ ¼º°ø!`);
 							} else {
 								this.success(this.comments.authSuccess);
 								this.showFirstTimeHelp();
 							}
 						} else {
-							// ë°ì´í„°ê°€ ì—†ìœ¼ë©´ ì´ˆê¸°í™”
+							// µ¥ÀÌÅÍ°¡ ¾øÀ¸¸é ÃÊ±âÈ­
 							clearState();
 							if (isSwitch) {
-								this.success(`âœ… '${this.tempProfile}' í”„ë¡œí•„ë¡œ ì „í™˜ ì„±ê³µ!`);
+								this.success(`? '${this.tempProfile}' ÇÁ·ÎÇÊ·Î ÀüÈ¯ ¼º°ø!`);
 							} else {
 								this.success(this.comments.authSuccess);
 								this.showFirstTimeHelp();
@@ -936,7 +936,7 @@ const commandConsole = {
 						this.error(this.comments.dataLoadFailed.replace('{error}', error.message));
 					});
 			} else {
-				this.error(this.comments.passwordMismatch + '. ë‹¤ì‹œ ì‹œë„í•´ì£¼ì„¸ìš”.');
+				this.error(this.comments.passwordMismatch + '. ´Ù½Ã ½ÃµµÇØÁÖ¼¼¿ä.');
 			}
 			return;
 		}
@@ -946,7 +946,7 @@ const commandConsole = {
 			this.log(this.comments.passwordInputConfirm);
 			this.inputMode = 'password-confirm';
 			this.input.placeholder = this.placeholders.passwordConfirm;
-			// ì·¨ì†Œ ë²„íŠ¼ ìœ ì§€ (ì´ë¯¸ ìˆìŒ)
+			// Ãë¼Ò ¹öÆ° À¯Áö (ÀÌ¹Ì ÀÖÀ½)
 			if (cmd === this.tempPassword) {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}/password`).set(this.tempPassword)
@@ -957,7 +957,7 @@ const commandConsole = {
 							this.showFirstTimeHelp();
 						})
 						.catch((error) => {
-							this.error(`ë¹„ë°€ë²ˆí˜¸ ì„¤ì • ì‹¤íŒ¨: ${error.message}`);
+							this.error(`ºñ¹Ğ¹øÈ£ ¼³Á¤ ½ÇÆĞ: ${error.message}`);
 						});
 				}
 				this.inputMode = 'normal';
@@ -975,7 +975,7 @@ const commandConsole = {
 		}
 		
 		if (this.inputMode === 'password-change') {
-			// 1ë‹¨ê³„: í˜„ì¬ ë¹„ë°€ë²ˆí˜¸ í™•ì¸
+			// 1´Ü°è: ÇöÀç ºñ¹Ğ¹øÈ£ È®ÀÎ
 			if (cmd === this.storedPassword) {
 				this.success(this.comments.passwordConfirmed);
 				this.removeCancelButton();
@@ -985,7 +985,7 @@ const commandConsole = {
 				this.addCancelButton();
 				setTimeout(() => this.input.focus(), 50);
 			} else {
-				this.error('í˜„ì¬ ' + this.comments.passwordMismatch.toLowerCase() + '. ë‹¤ì‹œ ì‹œë„í•´ì£¼ì„¸ìš”.');
+				this.error('ÇöÀç ' + this.comments.passwordMismatch.toLowerCase() + '. ´Ù½Ã ½ÃµµÇØÁÖ¼¼¿ä.');
 				this.inputMode = 'normal';
 				this.input.type = 'text';
 				this.input.placeholder = this.placeholders.input;
@@ -995,9 +995,9 @@ const commandConsole = {
 		}
 		
 		if (this.inputMode === 'password-change-new') {
-			// 2ë‹¨ê³„: ìƒˆ ë¹„ë°€ë²ˆí˜¸ ì…ë ¥
+			// 2´Ü°è: »õ ºñ¹Ğ¹øÈ£ ÀÔ·Â
 			if (!cmd || cmd.trim() === '') {
-				// ë¹ˆ ê°’ì´ë©´ ë¹„ë°€ë²ˆí˜¸ ì‚­ì œ í™•ì¸
+				// ºó °ªÀÌ¸é ºñ¹Ğ¹øÈ£ »èÁ¦ È®ÀÎ
 				this.warn(this.comments.passwordDeleteConfirm);
 				this.inputMode = 'password-delete-confirm';
 				this.showConfirmButtons();
@@ -1012,17 +1012,17 @@ const commandConsole = {
 		}
 		
 		if (this.inputMode === 'password-change-confirm') {
-			// 3ë‹¨ê³„: ìƒˆ ë¹„ë°€ë²ˆí˜¸ í™•ì¸
+			// 3´Ü°è: »õ ºñ¹Ğ¹øÈ£ È®ÀÎ
 			if (cmd === this.tempPassword) {
 				if (database && currentRoomKey) {
 					database.ref(`rooms/${currentRoomKey}/password`).set(this.tempPassword)
 						.then(() => {
 							this.success(this.comments.passwordChanged);
-							this.storedPassword = this.tempPassword; // ì €ì¥ëœ ë¹„ë°€ë²ˆí˜¸ ì—…ë°ì´íŠ¸
+							this.storedPassword = this.tempPassword; // ÀúÀåµÈ ºñ¹Ğ¹øÈ£ ¾÷µ¥ÀÌÆ®
 							this.removeCancelButton();
 						})
 						.catch((error) => {
-							this.error(`ë¹„ë°€ë²ˆí˜¸ ë³€ê²½ ì‹¤íŒ¨: ${error.message}`);
+							this.error(`ºñ¹Ğ¹øÈ£ º¯°æ ½ÇÆĞ: ${error.message}`);
 						});
 				}
 				this.inputMode = 'normal';
@@ -1040,7 +1040,7 @@ const commandConsole = {
 		}
 		
 		if (this.inputMode === 'input-data') {
-			// ì°¸ê°€ì ë°ì´í„° ì…ë ¥ ì™„ë£Œ
+			// Âü°¡ÀÚ µ¥ÀÌÅÍ ÀÔ·Â ¿Ï·á
 			if (typeof addPerson === 'function' && elements.nameInput) {
 				elements.nameInput.value = cmd;
 				addPerson();
@@ -1049,24 +1049,24 @@ const commandConsole = {
 				this.error(this.comments.participantAddDisabled);
 			}
 			
-			// ì…ë ¥ ëª¨ë“œ ìœ ì§€ (ì·¨ì†Œ ë˜ëŠ” ESCë¡œë§Œ ì¢…ë£Œ ê°€ëŠ¥)
+			// ÀÔ·Â ¸ğµå À¯Áö (Ãë¼Ò ¶Ç´Â ESC·Î¸¸ Á¾·á °¡´É)
 			this.input.placeholder = this.placeholders.inputData;
 			setTimeout(() => this.input.focus(), 50);
 			return;
 		}
 	
 		if (this.inputMode === 'delete-password-confirm') {
-			// ì‚­ì œ ì „ ë¹„ë°€ë²ˆí˜¸ í™•ì¸
+			// »èÁ¦ Àü ºñ¹Ğ¹øÈ£ È®ÀÎ
 			if (cmd === this.storedPassword) {
 				this.success(this.comments.profileDeleteConfirmFinal);
-				this.warn(`âš ï¸ ${this.comments.profileDeleteQuestion.replace('í”„ë¡œí•„ì„', `í”„ë¡œí•„ '${currentRoomKey}'ë¥¼`)}`);
+				this.warn(`?? ${this.comments.profileDeleteQuestion.replace('ÇÁ·ÎÇÊÀ»', `ÇÁ·ÎÇÊ '${currentRoomKey}'¸¦`)}`);
 				this.log(this.comments.profileDeleteNameMatch);
 				this.inputMode = 'delete-final-confirm';
 				this.input.type = 'text';
 				this.input.placeholder = this.placeholders.profile;
 				setTimeout(() => this.input.focus(), 50);
 			} else {
-				this.error(this.comments.passwordMismatch + '. ì‚­ì œê°€ ì·¨ì†Œë˜ì—ˆìŠµë‹ˆë‹¤.');
+				this.error(this.comments.passwordMismatch + '. »èÁ¦°¡ Ãë¼ÒµÇ¾ú½À´Ï´Ù.');
 				this.inputMode = 'normal';
 				this.input.type = 'text';
 				this.input.placeholder = this.placeholders.input;
@@ -1076,26 +1076,26 @@ const commandConsole = {
 		}
 			
 		if (this.inputMode === 'delete-final-confirm') {
-			// ìµœì¢… í™•ì¸: í”„ë¡œí•„ ì´ë¦„ ì¼ì¹˜ í™•ì¸
+			// ÃÖÁ¾ È®ÀÎ: ÇÁ·ÎÇÊ ÀÌ¸§ ÀÏÄ¡ È®ÀÎ
 			if (cmd === currentRoomKey) {
-				// Firebaseì—ì„œ í”„ë¡œí•„ ì‚­ì œ
+				// Firebase¿¡¼­ ÇÁ·ÎÇÊ »èÁ¦
 				database.ref(`rooms/${currentRoomKey}`).remove()
 					.then(() => {
-						this.success(`ğŸ—‘ï¸ ${this.comments.profileDeleted.replace('í”„ë¡œí•„ì´', `í”„ë¡œí•„ '${currentRoomKey}'ê°€`).replace('ì‚­ì œë˜ì—ˆìŠµë‹ˆë‹¤', 'ì™„ì „íˆ ì‚­ì œë˜ì—ˆìŠµë‹ˆë‹¤')}`);
+						this.success(`??? ${this.comments.profileDeleted.replace('ÇÁ·ÎÇÊÀÌ', `ÇÁ·ÎÇÊ '${currentRoomKey}'°¡`).replace('»èÁ¦µÇ¾ú½À´Ï´Ù', '¿ÏÀüÈ÷ »èÁ¦µÇ¾ú½À´Ï´Ù')}`);
 						this.log(this.comments.deleteRedirect);
 						
-						// ë¡œì»¬ ìƒíƒœ ì´ˆê¸°í™”
+						// ·ÎÄÃ »óÅÂ ÃÊ±âÈ­
 						clearState();
 						currentRoomKey = null;
 						syncEnabled = false;
 						
-						// 2ì´ˆ í›„ index.htmlë¡œ ë¦¬ë‹¤ì´ë ‰íŠ¸
+						// 2ÃÊ ÈÄ index.html·Î ¸®´ÙÀÌ·ºÆ®
 						setTimeout(() => {
 							window.location.href = 'index.html';
 						}, 2000);
 					})
 					.catch((error) => {
-						this.error(`ì‚­ì œ ì‹¤íŒ¨: ${error.message}`);
+						this.error(`»èÁ¦ ½ÇÆĞ: ${error.message}`);
 						this.inputMode = 'normal';
 						this.input.placeholder = this.placeholders.input;
 					});
@@ -1108,9 +1108,9 @@ const commandConsole = {
 		}
 			
 		if (!this.authenticated && currentRoomKey) {
-			// ì½ê¸° ëª¨ë“œì—ì„œëŠ” saveì™€ ì…ë ¥ ê´€ë ¨ ëª…ë ¹ì–´ë§Œ ì°¨ë‹¨
+			// ÀĞ±â ¸ğµå¿¡¼­´Â save¿Í ÀÔ·Â °ü·Ã ¸í·É¾î¸¸ Â÷´Ü
 			const [command] = cmd.split(' ');
-			const writeCommands = ['save', 'ì €ì¥', 'input', 'ì…ë ¥', 'clear', 'ì´ˆê¸°í™”'];
+			const writeCommands = ['save', 'ÀúÀå', 'input', 'ÀÔ·Â', 'clear', 'ÃÊ±âÈ­'];
 			if (writeCommands.includes(command.toLowerCase())) {
 				this.warn(this.comments.readOnlyModeWarning + '. ' + this.comments.authenticationNeeded);
 				this.log(this.comments.loginRequired);
@@ -1122,78 +1122,78 @@ const commandConsole = {
 		
 		switch (command.toLowerCase()) {
 			case 'save':
-			case 'ì €ì¥':
+			case 'ÀúÀå':
 				this.saveCommand();
 				break;
 			case 'load':
-			case 'ë¶ˆëŸ¬ì˜¤ê¸°':
+			case 'ºÒ·¯¿À±â':
 				this.loadCommand();
 				break;
 			case 'sync':
-			case 'ë™ê¸°í™”':
+			case 'µ¿±âÈ­':
 				this.syncCommand();
 				break;
 			case 'clear':
-			case 'ì´ˆê¸°í™”':
+			case 'ÃÊ±âÈ­':
 				this.clearCommand();
 				break;
 			case 'status':
-			case 'ìƒíƒœ':
+			case '»óÅÂ':
 				this.statusCommand();
 				break;
 			case 'login':
-			case 'ë¡œê·¸ì¸':
-				// ë¡œê·¸ì¸ ëª…ë ¹ì–´ - ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ëª¨ë“œë¡œ ì „í™˜
+			case '·Î±×ÀÎ':
+				// ·Î±×ÀÎ ¸í·É¾î - ºñ¹Ğ¹øÈ£ ÀÔ·Â ¸ğµå·Î ÀüÈ¯
 				this.loginCommand();
 				break;
 			case 'logout':
-			case 'ì¢…ë£Œ':
-				// ë¡œê·¸ì•„ì›ƒ ëª…ë ¹ì–´ - ì“°ê¸° ëª¨ë“œì—ì„œ ì½ê¸° ëª¨ë“œë¡œ ì „í™˜
+			case 'Á¾·á':
+				// ·Î±×¾Æ¿ô ¸í·É¾î - ¾²±â ¸ğµå¿¡¼­ ÀĞ±â ¸ğµå·Î ÀüÈ¯
 				this.logoutCommand();
 				break;
 			case 'password':
-			case 'ë¹„ë°€ë²ˆí˜¸':
-				// ë¹„ë°€ë²ˆí˜¸ ë³€ê²½ ëª…ë ¹ì–´
+			case 'ºñ¹Ğ¹øÈ£':
+				// ºñ¹Ğ¹øÈ£ º¯°æ ¸í·É¾î
 				this.passwordCommand(args.join(' '));
 				break;
 			case 'profile':
-			case 'í”„ë¡œí•„':
+			case 'ÇÁ·ÎÇÊ':
 				this.profileCommand();
 				break;
-			case 'ì°¸ê°€ì':
+			case 'Âü°¡ÀÚ':
 				this.participantsCommand();
 				break;
-			case 'ë¯¸ì°¸ê°€ì':
+			case '¹ÌÂü°¡ÀÚ':
 				this.nonParticipantsCommand();
 				break;
-			case 'ì œì•½':
+			case 'Á¦¾à':
 				this.constraintsCommand();
 				break;
-			case 'íˆë“ ':
-			case 'í™•ë¥ ':
+			case 'È÷µç':
+			case 'È®·ü':
 				this.hiddenCommand();
 				break;
-			case 'ê·œì¹™':
+			case '±ÔÄ¢':
 			case 'rule':
 			case 'matching':
 				this.matchingCommand(args.join(' '));
 				break;
-			case 'ìƒì„±':
+			case '»ı¼º':
 			case 'generate':
 				this.generateCommand();
 				break;
 			case 'input':
-			case 'ì…ë ¥':
+			case 'ÀÔ·Â':
 				this.inputCommand(args.join(' '));
 				break;
 			case 'delete':
-			case 'ì‚­ì œ':
+			case '»èÁ¦':
 			case 'delete-profile':
-			case 'í”„ë¡œí•„ì‚­ì œ':
+			case 'ÇÁ·ÎÇÊ»èÁ¦':
 				this.deleteCommand();
 				break;
 			case 'help':
-			case 'ë„ì›€':
+			case 'µµ¿ò':
 				this.helpCommand();
 				break;
 			default:
@@ -1207,7 +1207,7 @@ const commandConsole = {
 			return;
 		}
 	
-		// ë¨¼ì € í˜„ì¬ passwordë¥¼ ì½ì–´ì˜´
+		// ¸ÕÀú ÇöÀç password¸¦ ÀĞ¾î¿È
 		database.ref(`rooms/${currentRoomKey}/password`).once('value')
 		.then((snapshot) => {
 			const currentPassword = snapshot.val();
@@ -1219,7 +1219,7 @@ const commandConsole = {
 				nextId: state.nextId,
 			};
 				
-			// passwordê°€ ì¡´ì¬í•˜ë©´ í¬í•¨
+			// password°¡ Á¸ÀçÇÏ¸é Æ÷ÇÔ
 			if (currentPassword !== null) {
 				data.password = currentPassword;
 			}
@@ -1230,7 +1230,7 @@ const commandConsole = {
 			this.success(this.comments.saveComplete);
 		})
 		.catch((error) => {
-			this.error(`ì €ì¥ ì‹¤íŒ¨: ${error.message}`);
+			this.error(`ÀúÀå ½ÇÆĞ: ${error.message}`);
 		});
 	},
 	
@@ -1251,7 +1251,7 @@ const commandConsole = {
 				}
 			})
 			.catch((error) => {
-				this.error(`ë¡œë“œ ì‹¤íŒ¨: ${error.message}`);
+				this.error(`·Îµå ½ÇÆĞ: ${error.message}`);
 			});
 	},
 	
@@ -1263,7 +1263,7 @@ const commandConsole = {
 		
 		this.log(this.comments.saving);
 		
-		// ë¨¼ì € í˜„ì¬ ìƒíƒœë¥¼ ì €ì¥
+		// ¸ÕÀú ÇöÀç »óÅÂ¸¦ ÀúÀå
 		database.ref(`rooms/${currentRoomKey}/password`).once('value')
 			.then((snapshot) => {
 				const currentPassword = snapshot.val();
@@ -1286,7 +1286,7 @@ const commandConsole = {
 					timestamp: Date.now()
 				};
 				
-				// passwordê°€ ì¡´ì¬í•˜ë©´ í¬í•¨
+				// password°¡ Á¸ÀçÇÏ¸é Æ÷ÇÔ
 				if (currentPassword !== null) {
 					data.password = currentPassword;
 				}
@@ -1296,10 +1296,10 @@ const commandConsole = {
 			.then(() => {
 					this.success(this.comments.saveComplete);
 					this.log(this.comments.syncing);
-				// ë™ê¸°í™” íŠ¸ë¦¬ê±°ë¥¼ Firebaseì— ê¸°ë¡í•˜ì—¬ ëª¨ë“  ì°½ì— ì•Œë¦¼
+				// µ¿±âÈ­ Æ®¸®°Å¸¦ Firebase¿¡ ±â·ÏÇÏ¿© ¸ğµç Ã¢¿¡ ¾Ë¸²
 				const syncTrigger = Date.now();
 				
-				// ìì‹ ì´ ë°œìƒì‹œí‚¨ íŠ¸ë¦¬ê±°ëŠ” ë¦¬ìŠ¤ë„ˆì—ì„œ ë¬´ì‹œí•˜ë„ë¡ lastSyncTrigger ë¯¸ë¦¬ ì—…ë°ì´íŠ¸
+				// ÀÚ½ÅÀÌ ¹ß»ı½ÃÅ² Æ®¸®°Å´Â ¸®½º³Ê¿¡¼­ ¹«½ÃÇÏµµ·Ï lastSyncTrigger ¹Ì¸® ¾÷µ¥ÀÌÆ®
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -1307,20 +1307,20 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
-				// í˜„ì¬ ì°½ì—ì„œë„ ë™ê¸°í™” ì‹¤í–‰
+				// ÇöÀç Ã¢¿¡¼­µµ µ¿±âÈ­ ½ÇÇà
 				return database.ref(`rooms/${currentRoomKey}`).once('value');
 			})
 			.then((snapshot) => {
 				const data = snapshot.val();
 				if (data) {
 					loadStateFromData(data);
-					this.success(`âœ… ë™ê¸°í™” ìš”ì²­ì™„ë£Œ`);
+					this.success(`? µ¿±âÈ­ ¿äÃ»¿Ï·á`);
 				} else {
 					this.warn(this.comments.noSavedData + '.');
 				}
 			})
 			.catch((error) => {
-				this.error(`ë™ê¸°í™” ì‹¤íŒ¨: ${error.message}`);
+				this.error(`µ¿±âÈ­ ½ÇÆĞ: ${error.message}`);
 			});
 	},
 	
@@ -1331,12 +1331,12 @@ const commandConsole = {
 		}
 		
 		if (confirm(this.comments.clearConfirmMessage)) {
-			// ë¹„ë°€ë²ˆí˜¸ ë°±ì—…
+			// ºñ¹Ğ¹øÈ£ ¹é¾÷
 			database.ref(`rooms/${currentRoomKey}/password`).once('value')
 				.then((snapshot) => {
 					const savedPassword = snapshot.val();
 					
-					// ì´ˆê¸°í™”ëœ ë°ì´í„° ì €ì¥ (ë¹„ë°€ë²ˆí˜¸ëŠ” ìœ ì§€)
+					// ÃÊ±âÈ­µÈ µ¥ÀÌÅÍ ÀúÀå (ºñ¹Ğ¹øÈ£´Â À¯Áö)
 					const emptyData = {
 						people: [],
 						inactivePeople: [],
@@ -1359,18 +1359,18 @@ const commandConsole = {
 					return database.ref(`rooms/${currentRoomKey}`).set(emptyData);
 				})
 				.then(() => {
-					// ë¡œì»¬ state ì´ˆê¸°í™”
+					// ·ÎÄÃ state ÃÊ±âÈ­
 					clearState();
 					this.success(this.comments.clearComplete);
 				})
 				.catch((error) => {
-					this.error(`ì´ˆê¸°í™” ì‹¤íŒ¨: ${error.message}`);
+					this.error(`ÃÊ±âÈ­ ½ÇÆĞ: ${error.message}`);
 				});
 		}
 	},
 	
 	statusCommand() {
-		this.log('=== í˜„ì¬ ìƒíƒœ ===<br>Room Key: ' + (currentRoomKey || 'ì—†ìŒ') + '<br>Firebase: ' + (syncEnabled ? 'í™œì„±í™”' : 'ë¹„í™œì„±í™”') + '<br>ì°¸ê°€ì: ' + state.people.length + 'ëª…<br>ë¯¸ì°¸ê°€ì: ' + state.inactivePeople.length + 'ëª…<br>ì œì•½: ' + state.forbiddenPairs.length + 'ê°œ');
+		this.log('=== ÇöÀç »óÅÂ ===<br>Room Key: ' + (currentRoomKey || '¾øÀ½') + '<br>Firebase: ' + (syncEnabled ? 'È°¼ºÈ­' : 'ºñÈ°¼ºÈ­') + '<br>Âü°¡ÀÚ: ' + state.people.length + '¸í<br>¹ÌÂü°¡ÀÚ: ' + state.inactivePeople.length + '¸í<br>Á¦¾à: ' + state.forbiddenPairs.length + '°³');
 	},
 	
 	
@@ -1389,9 +1389,9 @@ const commandConsole = {
 
 	passwordCommand(newPassword) {
 		
-		// í˜„ì¬ ë¹„ë°€ë²ˆí˜¸ê°€ ì—†ëŠ”ì§€ í™•ì¸
+		// ÇöÀç ºñ¹Ğ¹øÈ£°¡ ¾ø´ÂÁö È®ÀÎ
 		if (!this.storedPassword || this.storedPassword === '') {
-			// ë¹„ë°€ë²ˆí˜¸ê°€ ì—†ìœ¼ë©´ ë°”ë¡œ ìƒˆ ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ëª¨ë“œë¡œ
+			// ºñ¹Ğ¹øÈ£°¡ ¾øÀ¸¸é ¹Ù·Î »õ ºñ¹Ğ¹øÈ£ ÀÔ·Â ¸ğµå·Î
 			this.log(this.comments.passwordChangeNew);
 			this.inputMode = 'password-change-new';
 			this.input.type = 'password';
@@ -1401,7 +1401,7 @@ const commandConsole = {
 			return;
 		}
 		
-		// ì¸ìê°€ ì œê³µëœ ê²½ìš° - ë¹„ë°€ë²ˆí˜¸ ë³€ê²½ í”Œë¡œìš° ì‹œì‘
+		// ÀÎÀÚ°¡ Á¦°øµÈ °æ¿ì - ºñ¹Ğ¹øÈ£ º¯°æ ÇÃ·Î¿ì ½ÃÀÛ
 		if (newPassword && newPassword.trim()) {
 			this.warn(this.comments.passwordChangeInteractive);
 			this.log(this.comments.passwordCurrent);
@@ -1411,7 +1411,7 @@ const commandConsole = {
 			this.addCancelButton();
 			setTimeout(() => this.input.focus(), 50);
 		} else {
-			// ì¸ìê°€ ì—†ìœ¼ë©´ ë¹„ë°€ë²ˆí˜¸ ë³€ê²½ ëª¨ë“œë¡œ ì „í™˜
+			// ÀÎÀÚ°¡ ¾øÀ¸¸é ºñ¹Ğ¹øÈ£ º¯°æ ¸ğµå·Î ÀüÈ¯
 			this.log(this.comments.passwordCurrent);
 			this.inputMode = 'password-change';
 			this.input.type = 'password';
@@ -1423,7 +1423,7 @@ const commandConsole = {
 	
 	loginCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.error(this.comments.firebaseOrRoomKeyMissing);
+			this.error(this.comments.firebaseMissing);
 			return;
 		}
 		
@@ -1432,8 +1432,8 @@ const commandConsole = {
 			return;
 		}
 		
-		// ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ëª¨ë“œë¡œ ì „í™˜
-		this.log('ğŸ” ë¹„ë°€ë²ˆí˜¸ë¥¼ ì…ë ¥í•˜ì„¸ìš”:');
+		// ºñ¹Ğ¹øÈ£ ÀÔ·Â ¸ğµå·Î ÀüÈ¯
+		this.log('?? ºñ¹Ğ¹øÈ£¸¦ ÀÔ·ÂÇÏ¼¼¿ä:');
 		this.inputMode = 'auth';
 		this.input.type = 'password';
 		this.input.placeholder = this.placeholders.passwordInput;
@@ -1443,7 +1443,7 @@ const commandConsole = {
 	
 	logoutCommand() {
 		if (!syncEnabled || !currentRoomKey) {
-			this.error(this.comments.firebaseOrRoomKeyMissing);
+			this.error(this.comments.firebaseMissing);
 			return;
 		}
 		
@@ -1452,11 +1452,11 @@ const commandConsole = {
 			return;
 		}
 		
-		// ì“°ê¸° ëª¨ë“œì—ì„œ ì½ê¸° ëª¨ë“œë¡œ ì „í™˜
+		// ¾²±â ¸ğµå¿¡¼­ ÀĞ±â ¸ğµå·Î ÀüÈ¯
 		this.authenticated = false;
-		authenticatedPassword = ''; // ì¸ì¦ í•´ì œ
+		authenticatedPassword = ''; // ÀÎÁõ ÇØÁ¦
 		
-		// í”„ë¡œí•„ ë°°ê²½ìƒ‰ ì—…ë°ì´íŠ¸
+		// ÇÁ·ÎÇÊ ¹è°æ»ö ¾÷µ¥ÀÌÆ®
 		const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 		if (roomKeyDisplay) {
 			roomKeyDisplay.classList.remove('authenticated');
@@ -1473,21 +1473,21 @@ const commandConsole = {
 		}
 		
 		let output = `<div style="margin: 10px 0;">
-			<div style="font-weight: bold; margin-bottom: 8px;">=== ğŸ‘¥ ì°¸ê°€ì ëª©ë¡ (${state.people.length}ëª…) ===</div>
+			<div style="font-weight: bold; margin-bottom: 8px;">=== ?? Âü°¡ÀÚ ¸ñ·Ï (${state.people.length}¸í) ===</div>
 			<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 				<thead>
 					<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
 						<th style="padding: 6px; text-align: center; width: 60px;">(index)</th>
-						<th style="padding: 6px; text-align: left;">ì´ë¦„</th>
-						<th style="padding: 6px; text-align: center; width: 60px;">ì„±ë³„</th>
-						<th style="padding: 6px; text-align: center; width: 80px;">ê°€ì¤‘ì¹˜</th>
-						<th style="padding: 6px; text-align: left;">ê·¸ë£¹</th>
+						<th style="padding: 6px; text-align: left;">ÀÌ¸§</th>
+						<th style="padding: 6px; text-align: center; width: 60px;">¼ºº°</th>
+						<th style="padding: 6px; text-align: center; width: 80px;">°¡ÁßÄ¡</th>
+						<th style="padding: 6px; text-align: left;">±×·ì</th>
 					</tr>
 				</thead>
 				<tbody>`;
 		
 		state.people.forEach((person, index) => {
-			const genderIcon = person.gender === 'male' ? 'â™‚ï¸' : person.gender === 'female' ? 'â™€ï¸' : 'âšª';
+			const genderIcon = person.gender === 'male' ? '¡Î?' : person.gender === 'female' ? '¡Ï?' : '?';
 			const weight = person.weight || 0;
 			const groups = state.requiredGroups
 				.filter(group => group.includes(person.id))
@@ -1529,20 +1529,20 @@ const commandConsole = {
 		}
 		
 		let output = `<div style="margin: 10px 0;">
-			<div style="font-weight: bold; margin-bottom: 8px;">=== ğŸ‘» ë¯¸ì°¸ê°€ì ëª©ë¡ (${state.inactivePeople.length}ëª…) ===</div>
+			<div style="font-weight: bold; margin-bottom: 8px;">=== ?? ¹ÌÂü°¡ÀÚ ¸ñ·Ï (${state.inactivePeople.length}¸í) ===</div>
 			<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 				<thead>
 					<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
 						<th style="padding: 6px; text-align: center; width: 60px;">(index)</th>
-						<th style="padding: 6px; text-align: left;">ì´ë¦„</th>
-						<th style="padding: 6px; text-align: center; width: 60px;">ì„±ë³„</th>
-						<th style="padding: 6px; text-align: center; width: 80px;">ê°€ì¤‘ì¹˜</th>
+						<th style="padding: 6px; text-align: left;">ÀÌ¸§</th>
+						<th style="padding: 6px; text-align: center; width: 60px;">¼ºº°</th>
+						<th style="padding: 6px; text-align: center; width: 80px;">°¡ÁßÄ¡</th>
 					</tr>
 				</thead>
 				<tbody>`;
 		
 		state.inactivePeople.forEach((person, index) => {
-			const genderIcon = person.gender === 'male' ? 'â™‚ï¸' : person.gender === 'female' ? 'â™€ï¸' : 'âšª';
+			const genderIcon = person.gender === 'male' ? '¡Î?' : person.gender === 'female' ? '¡Ï?' : '?';
 			const weight = person.weight || 0;
 			
 			output += `
@@ -1570,26 +1570,26 @@ const commandConsole = {
 			return;
 		}
 		
-		let output = `=== ğŸš« ì œì•½ ì¡°ê±´ (${totalConstraints}ê°œ) ===<br><br>`;
+		let output = `=== ?? Á¦¾à Á¶°Ç (${totalConstraints}°³) ===<br><br>`;
 		
-		// í™œì„± ì œì•½ (forbiddenPairs)
+		// È°¼º Á¦¾à (forbiddenPairs)
 		if (state.forbiddenPairs.length > 0) {
-			output += `<strong>âœ… í™œì„± ì œì•½ (${state.forbiddenPairs.length}ê°œ):</strong><br>`;
+			output += `<strong>? È°¼º Á¦¾à (${state.forbiddenPairs.length}°³):</strong><br>`;
 			state.forbiddenPairs.forEach((pair, index) => {
 				const personA = state.people.find(p => p.id === pair[0]);
 				const personB = state.people.find(p => p.id === pair[1]);
 				if (personA && personB) {
-					output += `${index + 1}. ${personA.name} â›” ${personB.name}<br>`;
+					output += `${index + 1}. ${personA.name} ? ${personB.name}<br>`;
 				}
 			});
 			output += '<br>';
 		}
 		
-		// ë³´ë¥˜ ì œì•½ (pendingConstraints)
+		// º¸·ù Á¦¾à (pendingConstraints)
 		if (state.pendingConstraints.length > 0) {
-			output += `<strong>â³ ë³´ë¥˜ ì œì•½ (${state.pendingConstraints.length}ê°œ):</strong><br>`;
+			output += `<strong>? º¸·ù Á¦¾à (${state.pendingConstraints.length}°³):</strong><br>`;
 			state.pendingConstraints.forEach((constraint, index) => {
-				output += `${index + 1}. ${constraint.left} â›” ${constraint.right}<br>`;
+				output += `${index + 1}. ${constraint.left} ? ${constraint.right}<br>`;
 			});
 		}
 		
@@ -1603,36 +1603,33 @@ const commandConsole = {
 			return;
 		}
 		
-		// ì¸ìê°€ ìˆìœ¼ë©´ ë°”ë¡œ ê·œì¹™ ë“±ë¡
+		// ÀÎÀÚ°¡ ÀÖÀ¸¸é ¹Ù·Î ±ÔÄ¢ µî·Ï
 		if (ruleInput && ruleInput.trim()) {
 			this.log(`> ${ruleInput}`, 'command');
 			
-			// ê·œì¹™ ì œê±° ëª…ë ¹ì–´ ì²´í¬
+			// ±ÔÄ¢ Á¦°Å ¸í·É¾î Ã¼Å©
 			const isRemoveCommand = /^([^()!]+)\(!\)/.test(ruleInput);
 			
-			// input ëª…ë ¹ì–´ë¥¼ í†µí•´ ì²˜ë¦¬
+			// input ¸í·É¾î¸¦ ÅëÇØ Ã³¸®
 			this.inputCommand(ruleInput);
 			
-			// ê²°ê³¼ ë©”ì‹œì§€ ì¶œë ¥
+			// °á°ú ¸Ş½ÃÁö Ãâ·Â
 			if (isRemoveCommand) {
 				this.success(this.comments.ruleRemoveSuccess);
 			} else {
 				this.success(this.comments.ruleAddSuccess);
 			}
 			
-			// í™•ì¸í•˜ê¸° ì•ˆë‚´
+			// È®ÀÎÇÏ±â ¾È³»
 			this.log(this.comments.checkMatching);
 			return;
 		}
 		
-		// ì¸ìê°€ ì—†ìœ¼ë©´ ì…ë ¥ ëª¨ë“œë¡œ ì „í™˜
+		// ÀÎÀÚ°¡ ¾øÀ¸¸é ÀÔ·Â ¸ğµå·Î ÀüÈ¯
 		this.log(this.comments.matchingSetup);
 		this.log(this.comments.matchingFormat);
 		this.log(this.comments.probabilityExample);
-		this.log(this.comments.matchingFormatExample);
-		this.log(this.comments.matchingGroupsHelp);
-		
-		// ê·œì¹™ ì…ë ¥ ëª¨ë“œë¡œ ì „í™˜
+
 		this.inputMode = 'matching';
 		this.input.placeholder = this.placeholders.matchingRule;
 		this.addCancelButton();
@@ -1644,7 +1641,7 @@ const commandConsole = {
 			this.log(this.comments.teamGenerating);
 			try {
 				shuffleTeams();
-				// shuffleTeamsê°€ ì„±ê³µí•˜ë©´ cmd ì½˜ì†”ì— ê²°ê³¼ê°€ ì¶œë ¥ë¨
+				// shuffleTeams°¡ ¼º°øÇÏ¸é cmd ÄÜ¼Ö¿¡ °á°ú°¡ Ãâ·ÂµÊ
 			} catch (error) {
 				this.error(this.comments.teamGenerationFailed.replace('{error}', error.message));
 			}
@@ -1663,12 +1660,12 @@ const commandConsole = {
 		}
 		
 		let output = `<div style="margin: 10px 0;">
-			<div style="font-weight: bold; margin-bottom: 8px;">ğŸ”— ${this.comments.probabilityRules} (${this.comments.ruleSetup} : <code data-cmd="ê·œì¹™">ê·œì¹™</code>)</div>`;
+			<div style="font-weight: bold; margin-bottom: 8px;">?? ${this.comments.probabilityRules} (${this.comments.ruleSetup} : <code data-cmd="±ÔÄ¢">±ÔÄ¢</code>)</div>`;
 		
-		// í™•ë¥  ê¸°ë°˜ ê·¸ë£¹ (hiddenGroups)
+		// È®·ü ±â¹İ ±×·ì (hiddenGroups)
 		if (state.hiddenGroups.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">âœ… ${this.comments.probabilityRules} (${state.hiddenGroups.length}ê°œ):</div>
+				<div style="font-weight: bold; margin-bottom: 5px;">? ${this.comments.probabilityRules} (${state.hiddenGroups.length}°³):</div>
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
@@ -1685,7 +1682,7 @@ const commandConsole = {
 				const probability = group[2];
 				
 				if (personA && personB) {
-					// probabilityê°€ 1ë³´ë‹¤ í¬ë©´ ì´ë¯¸ í¼ì„¼íŠ¸ ê°’, ì•„ë‹ˆë©´ 0~1 ë²”ìœ„
+					// probability°¡ 1º¸´Ù Å©¸é ÀÌ¹Ì ÆÛ¼¾Æ® °ª, ¾Æ´Ï¸é 0~1 ¹üÀ§
 					const displayPercent = probability > 1 ? Math.round(probability) : Math.round(probability * 100);
 					output += `
 						<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
@@ -1702,7 +1699,7 @@ const commandConsole = {
 			</div>`;
 		}
 		
-		// í™•ë¥  ê·œì¹™ ì²´ì¸ (hiddenGroupChains) - rowspan ì‚¬ìš©
+		// È®·ü ±ÔÄ¢ Ã¼ÀÎ (hiddenGroupChains) - rowspan »ç¿ë
 		if (state.hiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -1716,25 +1713,25 @@ const commandConsole = {
 					<tbody>`;
 			
 			state.hiddenGroupChains.forEach((chain) => {
-				// ì´ë¦„ ê¸°ë°˜ìœ¼ë¡œ ì°¸ê°€ì ì°¾ê¸°
+				// ÀÌ¸§ ±â¹İÀ¸·Î Âü°¡ÀÚ Ã£±â
 				const primaryPerson = state.people.find(p => p.name === chain.primary);
 				const candidates = chain.candidates || [];
 				
-				// primaryê°€ ì°¸ê°€ì ëª©ë¡ì— ì—†ì–´ë„ ê·œì¹™ì€ í‘œì‹œ
+				// primary°¡ Âü°¡ÀÚ ¸ñ·Ï¿¡ ¾ø¾îµµ ±ÔÄ¢Àº Ç¥½Ã
 				const primaryName = primaryPerson ? primaryPerson.name : chain.primary;
 				const primaryDisplay = primaryPerson ? `'${primaryName}'` : `<span style="color: #94a3b8;">'${primaryName}'</span>`;
 				
 				if (candidates.length > 0) {
 					candidates.forEach((candidate, idx) => {
-						// ì´ë¦„ ê¸°ë°˜ìœ¼ë¡œ í›„ë³´ ì°¾ê¸°
+						// ÀÌ¸§ ±â¹İÀ¸·Î ÈÄº¸ Ã£±â
 						const candidatePerson = state.people.find(p => p.name === candidate.name);
 						const candidateName = candidatePerson ? candidatePerson.name : candidate.name;
 						const candidateDisplay = candidatePerson ? `'${candidateName}'` : `<span style="color: #94a3b8;">'${candidateName}'</span>`;
 						
-						// probabilityëŠ” ì´ë¯¸ í¼ì„¼íŠ¸ ê°’
+						// probability´Â ÀÌ¹Ì ÆÛ¼¾Æ® °ª
 						const displayPercent = Math.round(candidate.probability);
 						if (idx === 0) {
-							// ì²« ë²ˆì§¸ í–‰: primary í‘œì‹œ
+							// Ã¹ ¹øÂ° Çà: primary Ç¥½Ã
 							output += `
 								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
 									<td style="padding: 6px;">${primaryDisplay}</td>
@@ -1742,7 +1739,7 @@ const commandConsole = {
 									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
 								</tr>`;
 						} else {
-							// ë‚˜ë¨¸ì§€ í–‰: ë©¤ë²„ AëŠ” ê³µë°±
+							// ³ª¸ÓÁö Çà: ¸â¹ö A´Â °ø¹é
 							output += `
 								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
 									<td style="padding: 6px;"></td>
@@ -1760,17 +1757,17 @@ const commandConsole = {
 			</div>`;
 		}
 		
-		// ë³´ë¥˜ í™•ë¥  ê·œì¹™ (pendingHiddenGroups)
+		// º¸·ù È®·ü ±ÔÄ¢ (pendingHiddenGroups)
 		if (state.pendingHiddenGroups.length > 0) {
 			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">â³ ë³´ë¥˜ í™•ë¥  ê·œì¹™ (${state.pendingHiddenGroups.length}ê°œ):</div>`;
+				<div style="font-weight: bold; margin-bottom: 5px;">? º¸·ù È®·ü ±ÔÄ¢ (${state.pendingHiddenGroups.length}°³):</div>`;
 			state.pendingHiddenGroups.forEach((group, index) => {
-				output += `<div style="padding: 4px 0;">${index + 1}. ${group.left} ğŸ”— ${group.right} (${Math.round(group.probability * 100)}%)</div>`;
+				output += `<div style="padding: 4px 0;">${index + 1}. ${group.left} ?? ${group.right} (${Math.round(group.probability * 100)}%)</div>`;
 			});
 			output += `</div>`;
 		}
 		
-		// ë³´ë¥˜ í™•ë¥  ê¸°ë°˜ ê·¸ë£¹ ì²´ì¸ (pendingHiddenGroupChains)
+		// º¸·ù È®·ü ±â¹İ ±×·ì Ã¼ÀÎ (pendingHiddenGroupChains)
 		if (state.pendingHiddenGroupChains.length > 0) {
 			output += `<div style="margin: 10px 0;">
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -1790,7 +1787,7 @@ const commandConsole = {
 					candidates.forEach((candidate, idx) => {
 						const displayPercent = candidate.probability > 1 ? Math.round(candidate.probability) : Math.round(candidate.probability * 100);
 						if (idx === 0) {
-							// ì²« ë²ˆì§¸ í–‰: primary í‘œì‹œ
+							// Ã¹ ¹øÂ° Çà: primary Ç¥½Ã
 							output += `
 								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
 									<td style="padding: 6px;">'${chain.primary}'</td>
@@ -1798,7 +1795,7 @@ const commandConsole = {
 									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
 								</tr>`;
 						} else {
-							// ë‚˜ë¨¸ì§€ í–‰: ë©¤ë²„ AëŠ” ê³µë°±
+							// ³ª¸ÓÁö Çà: ¸â¹ö A´Â °ø¹é
 							output += `
 								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
 									<td style="padding: 6px;"></td>
@@ -1822,9 +1819,9 @@ const commandConsole = {
 	},
 	
 	inputCommand(data) {
-		// ì°¸ê°€ì ì¶”ê°€ í¼ì— ì…ë ¥í•˜ëŠ” ê²ƒê³¼ ë™ì¼í•˜ê²Œ ì²˜ë¦¬
+		// Âü°¡ÀÚ Ãß°¡ Æû¿¡ ÀÔ·ÂÇÏ´Â °Í°ú µ¿ÀÏÇÏ°Ô Ã³¸®
 		if (!data || data.trim() === '') {
-			// ë°ì´í„°ê°€ ì—†ìœ¼ë©´ ì…ë ¥ ëª¨ë“œë¡œ ì „í™˜
+			// µ¥ÀÌÅÍ°¡ ¾øÀ¸¸é ÀÔ·Â ¸ğµå·Î ÀüÈ¯
 			this.log(this.comments.inputDataPrompt);
 			this.inputMode = 'input-data';
 			this.input.placeholder = this.placeholders.participantData;
@@ -1833,12 +1830,12 @@ const commandConsole = {
 			return;
 		}
 		
-		// nameInputì— ê°’ì„ ì„¤ì •í•˜ê³  addPerson í•¨ìˆ˜ í˜¸ì¶œ
+		// nameInput¿¡ °ªÀ» ¼³Á¤ÇÏ°í addPerson ÇÔ¼ö È£Ãâ
 		if (typeof addPerson === 'function' && elements.nameInput) {
 			const originalValue = elements.nameInput.value;
 			elements.nameInput.value = data;
 			
-			// addPerson í•¨ìˆ˜ ì‹¤í–‰ (fromConsole=true ì „ë‹¬)
+			// addPerson ÇÔ¼ö ½ÇÇà (fromConsole=true Àü´Ş)
 			addPerson(true);
 			
 			this.success(`${this.comments.participantAddComplete} ${data}`);
@@ -1862,9 +1859,9 @@ const commandConsole = {
 		this.warn(this.comments.profileDeleteAttemptMessage.replace('{profile}', currentRoomKey));
 		this.warn(this.comments.deleteWarning);
 		
-		// ë¹„ë°€ë²ˆí˜¸ê°€ ìˆëŠ”ì§€ í™•ì¸
+		// ºñ¹Ğ¹øÈ£°¡ ÀÖ´ÂÁö È®ÀÎ
 		if (this.storedPassword && this.storedPassword !== '') {
-			// ë¹„ë°€ë²ˆí˜¸ê°€ ìˆìœ¼ë©´ ë¹„ë°€ë²ˆí˜¸ ì…ë ¥ ëª¨ë“œ
+			// ºñ¹Ğ¹øÈ£°¡ ÀÖÀ¸¸é ºñ¹Ğ¹øÈ£ ÀÔ·Â ¸ğµå
 			this.log(this.comments.passwordConfirmPrompt);
 			this.inputMode = 'delete-password-confirm';
 			this.input.type = 'password';
@@ -1872,8 +1869,8 @@ const commandConsole = {
 			this.addCancelButton();
 			setTimeout(() => this.input.focus(), 50);
 		} else {
-			// ë¹„ë°€ë²ˆí˜¸ê°€ ì—†ìœ¼ë©´ í™•ì¸/ì·¨ì†Œ ë²„íŠ¼ í‘œì‹œ
-			this.warn('ì‚­ì œí•˜ì‹œê² ìŠµë‹ˆê¹Œ?');
+			// ºñ¹Ğ¹øÈ£°¡ ¾øÀ¸¸é È®ÀÎ/Ãë¼Ò ¹öÆ° Ç¥½Ã
+			this.warn('»èÁ¦ÇÏ½Ã°Ú½À´Ï±î?');
 			this.inputMode = 'delete-confirm';
 			this.showConfirmButtons();
 		}

@@ -1251,7 +1251,7 @@ function handleTeamSizeChange(e) {
 
 function shuffleOrder() {
 	if (state.people.length === 0) {
-		alert(commandConsoleMessages.comments.noParticipantsAlert);
+		alert(commandConsoleMessages.comments.noParticipants);
 		return;
 	}
 	
@@ -1419,7 +1419,7 @@ function addPerson(fromConsole = false) {
 	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
 
 	if (tokens.length === 0) {
-		if (!fromConsole) alert(commandConsoleMessages.comments.nameInputRequired);
+		if (!fromConsole) alert(commandConsoleMessages.comments.nameRequired);
 		return;
 	}
 
@@ -1995,7 +1995,7 @@ function addForbiddenPairByNames(nameA, nameB) {
 function addPendingConstraint(leftName, rightName) {
 	const l = normalizeName(leftName);
 	const r = normalizeName(rightName);
-	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePendingConstraintError };
+	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePersonConstraintError };
 	// 보류 목록에서 중복 방지
 	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
 	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
@@ -2289,7 +2289,7 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 function addPendingHiddenGroup(leftName, rightName, probability) {
 	const l = normalizeName(leftName);
 	const r = normalizeName(rightName);
-	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePendingHiddenGroupError };
+	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePersonHiddenGroupError };
 	
 	// 기존 보류 히든 그룹 찾기 (양방향 체크)
 	const existingIndex = state.pendingHiddenGroups.findIndex(
@@ -2619,13 +2619,7 @@ function openForbiddenWindow() {
 							if (confirm(commandConsoleMessages.comments.resetAllConstraintsConfirm)) {
 								try {
 									if (parentWindow && parentWindow.clearAllConstraints) parentWindow.clearAllConstraints(); else {
-										alert(commandConsoleMessages.comments.parentWindowNotFoundReset);
-									}
-								} catch(e){ console.log(commandConsoleMessages.comments.resetFailed, e); alert(commandConsoleMessages.comments.resetFailed + e.message); }
-							}
-						});
-					}
-					
+									alert(commandConsoleMessages.comments.parentWindowNotFound);
 					function hideModal(){
 						if (reShowTimeout) { clearTimeout(reShowTimeout); reShowTimeout = null; }
 						modal.classList.remove('visible');
@@ -4123,7 +4117,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	`;
 	
 	const titleParts = [];
-	if (state.weightBalanceEnabled) titleParts.push(commandConsoleMessages.comments.weightBalanceOption);
+	if (state.weightBalanceEnabled) titleParts.push(commandConsoleMessages.comments.weightBalance);
 	
 	header.innerHTML = `
 		<h2 style="font-size: 32px; margin-bottom: 10px;">${commandConsoleMessages.comments.validationResult}</h2>
@@ -4147,7 +4141,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	
 	// 전 (Before)
 	const beforeSection = document.createElement('div');
-	beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.beforeValidation + '</h3>';
+	beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.beforeAdjustment + '</h3>';
 	const beforeDisplay = createComparisonTeamsDisplay(beforeTeams, afterTeams, colorMap);
 	beforeSection.appendChild(beforeDisplay);
 	
@@ -4164,7 +4158,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	
 	// 후 (After)
 	const afterSection = document.createElement('div');
-	afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.afterValidation + '</h3>';
+	afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.afterAdjustment + '</h3>';
 	const afterDisplay = createComparisonTeamsDisplay(afterTeams, beforeTeams, colorMap);
 	afterSection.appendChild(afterDisplay);
 	
