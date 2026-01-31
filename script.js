@@ -152,7 +152,7 @@ function init() {
 		state.pendingConstraints = [];
 		state.forbiddenMap = {};
 		saveToLocalStorage();
-		console.log('제약 목록이 모두 초기화되었습니다.');
+		console.log(commandConsoleMessages.comments.constraintsCleared);
 		hideConstraintNotification();
 	});
 
@@ -193,8 +193,8 @@ function checkDevToolsAndOpenConsole() {
 					if (currentRoomKey) {
 						// 프로필이 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 						if (commandConsole.authenticated) {
-							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`);
-							commandConsole.log('🔄 실시간 동기화 활성화됨');
+							commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentRoomKey));
+							commandConsole.log(commandConsoleMessages.comments.realtimeSyncActivated);
 							commandConsole.log(commandConsoleMessages.comments.consoleReady);
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else if (database) {
@@ -240,13 +240,13 @@ function checkDevToolsAndOpenConsole() {
 												}
 												commandConsole.log('🔄 실시간 동기화 활성화됨');
 												setupRealtimeSync();
-												commandConsole.log('🔒 비밀번호를 입력하시겠습니까?');
+												commandConsole.log(commandConsoleMessages.comments.passwordInputAsk);
 												commandConsole.inputMode = 'password-ask-initial';
 												commandConsole.showConfirmButtons();
 											})
 											.catch((error) => {
-												commandConsole.error(`데이터 로드 실패: ${error.message}`);
-												commandConsole.log('🔒 비밀번호를 입력하시겠습니까?');
+												commandConsole.error(commandConsoleMessages.comments.dataLoadFailed + error.message);
+												commandConsole.log(commandConsoleMessages.comments.passwordInputAsk);
 												commandConsole.inputMode = 'password-ask-initial';
 												commandConsole.showConfirmButtons();
 											});
@@ -262,9 +262,9 @@ function checkDevToolsAndOpenConsole() {
 						}
 					} else {
 						// 프로필이 없는 경우
-						commandConsole.log('프로필 이름을 입력하세요:');
+						commandConsole.log(commandConsoleMessages.comments.profileInput);
 						commandConsole.inputMode = 'profile';
-						commandConsole.input.placeholder = '프로필 이름 입력...';
+						commandConsole.input.placeholder = commandConsoleMessages.placeholders.profile;
 						setTimeout(() => commandConsole.input.focus(), 100);
 					}
 				}
@@ -846,7 +846,7 @@ function loadFromLocalStorage() {
 			// cmd 콘솔에도 출력
 			setTimeout(() => {
 				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					commandConsole.log('✅ 모든 설정 복원 완료');
+					commandConsole.log(commandConsoleMessages.comments.allSettingsRestored);
 				}
 			}, 250);
 		}
@@ -855,7 +855,7 @@ function loadFromLocalStorage() {
 		// cmd 콘솔에도 출력
 		setTimeout(() => {
 			if (typeof commandConsole !== 'undefined' && commandConsole.error) {
-				commandConsole.error('❌ localStorage 복원 실패: ' + e.message);
+				commandConsole.error(commandConsoleMessages.comments.localStorageRestoreFailed + e.message);
 			}
 		}, 300);
 	}
@@ -874,7 +874,7 @@ function captureResultsSection() {
 	
 	// html2canvas가 로드되었는지 확인
 	if (typeof html2canvas === 'undefined') {
-		alert('html2canvas 라이브러리를 찾을 수 없습니다.');
+		alert(commandConsoleMessages.comments.html2canvasNotFound);
 		return;
 	}
 	
@@ -922,7 +922,7 @@ function captureResultsSection() {
 		// 캔버스를 이미지로 변환하여 클립보드에 복사
 		canvas.toBlob(blob => {
 			if (!blob) {
-				alert('이미지 생성에 실패했습니다.');
+				alert(commandConsoleMessages.comments.imageGenerationFailed);
 				btn.innerHTML = originalHTML;
 				btn.disabled = false;
 				return;
@@ -930,7 +930,7 @@ function captureResultsSection() {
 			
 			// 클립보드 API 확인
 			if (!navigator.clipboard || !navigator.clipboard.write) {
-				alert('클립보드 기능을 사용할 수 없습니다. HTTPS 환경이 필요합니다.');
+				alert(commandConsoleMessages.comments.clipboardHttpsRequired);
 				btn.innerHTML = originalHTML;
 				btn.disabled = false;
 				return;
@@ -955,7 +955,7 @@ function captureResultsSection() {
 		}, 'image/png');
 	}).catch(err => {
 		console.error('캐처 실패:', err);
-		alert('화면 캐처에 실패했습니다.');
+		alert(commandConsoleMessages.comments.captureFailed);
 		btn.innerHTML = originalHTML;
 		btn.disabled = false;
 	});
@@ -1000,7 +1000,7 @@ function playCameraShutterSound() {
 		playBeep(now + 0.06, 0.05);
 
 	} catch (e) {
-		console.log('사운드 재생 실패:', e);
+		console.log(commandConsoleMessages.comments.soundPlaybackFailed, e);
 	}
 }
 
@@ -1115,7 +1115,7 @@ function formatPersonString(person) {
 function copyToClipboard(text) {
 	if (navigator.clipboard && navigator.clipboard.writeText) {
 		navigator.clipboard.writeText(text).then(() => {
-			console.log('참가자 데이터가 클립보드에 복사되었습니다:', text);
+			console.log(commandConsoleMessages.comments.participantsCopiedToClipboard, text);
 		}).catch(err => {
 			console.error('클립보드 복사 실패:', err);
 			fallbackCopyToClipboard(text);
@@ -1137,7 +1137,7 @@ function fallbackCopyToClipboard(text) {
 	
 	try {
 		document.execCommand('copy');
-		console.log('참가자 데이터가 클립보드에 복사되었습니다:', text);
+		console.log(commandConsoleMessages.comments.participantsCopiedToClipboard, text);
 	} catch (err) {
 		console.error('클립보드 복사 실패:', err);
 	}
@@ -1167,7 +1167,7 @@ function resetAll(e) {
 	const isCompleteReset = e && e.shiftKey;
 	
 	if (isCompleteReset) {
-		if (!confirm('⚠️ 완전 초기화를 실행합니다!\n\n참가자와 미참가자를 포함한 모든 데이터가 삭제됩니다.')) {
+		if (!confirm(commandConsoleMessages.comments.completeResetConfirm)) {
 			return;
 		}
 	} else {
@@ -1302,7 +1302,7 @@ function addPerson(fromConsole = false) {
 				if (currentRoomKey) {
 					// 파라미터가 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 					if (commandConsole.authenticated) {
-						commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨`);
+						commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentRoomKey));
 						commandConsole.log(commandConsoleMessages.comments.consoleReady);
 						setTimeout(() => commandConsole.input.focus(), 100);
 					} else if (database) {
@@ -1310,8 +1310,8 @@ function addPerson(fromConsole = false) {
 						if (commandConsole.storedPassword !== null && commandConsole.storedPassword !== undefined) {
 							// 읽기 전용 모드로 진입
 							commandConsole.authenticated = false;
-							commandConsole.log(`📡 프로필 '${currentRoomKey}' 연결됨 (읽기 전용 모드)`);
-							commandConsole.log(' 쓰기 권한이 필요하면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.');
+							commandConsole.log(commandConsoleMessages.comments.profileConnectedReadOnly.replace('{profile}', currentRoomKey));
+							commandConsole.log(commandConsoleMessages.comments.writeLoginRequired);
 							commandConsole.log(commandConsoleMessages.comments.consoleReady);
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else {
@@ -1379,7 +1379,7 @@ function addPerson(fromConsole = false) {
 									// 존재하지 않는 프로필 - 생성 확인
 									commandConsole.tempProfile = currentRoomKey;
 									commandConsole.warn(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`);
-									commandConsole.log('신규 프로필로 등록하시겠습니까?');
+									commandConsole.log(commandConsoleMessages.comments.registerNewProfile);
 									commandConsole.inputMode = 'profile-create-confirm';
 									commandConsole.showConfirmButtons();
 								}
@@ -1419,7 +1419,7 @@ function addPerson(fromConsole = false) {
 	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
 
 	if (tokens.length === 0) {
-		if (!fromConsole) alert('이름을 입력해주세요.');
+		if (!fromConsole) alert(commandConsoleMessages.comments.nameInputRequired);
 		return;
 	}
 
@@ -1441,7 +1441,7 @@ function addPerson(fromConsole = false) {
 				const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryName);
 				
 				if (!existingChain) {
-					console.log(`⚠️ 규칙 삭제 실패: '${primaryName}' 주최자의 규칙이 없습니다.`);
+					console.log(commandConsoleMessages.comments.chainRuleDeleteFailed.replace('{name}', primaryName));
 					return;
 				}
 				
@@ -1450,7 +1450,7 @@ function addPerson(fromConsole = false) {
 					state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
 					saveToLocalStorage();
 					constraintsTouched = true;
-					console.log(`✅ 규칙 삭제 완료: '${primaryName}' 주최자의 모든 규칙이 삭제되었습니다.`);
+					console.log(commandConsoleMessages.comments.chainRuleDeleted.replace('{name}', primaryName));
 				} else {
 					// A(!)B 또는 A(!)B(!)C - 특정 후보 제거
 					const removeTargets = rest.split('(!)').map(n => n.trim()).filter(n => n);
@@ -1470,11 +1470,11 @@ function addPerson(fromConsole = false) {
 					// 후보가 모두 제거되면 체인 자체를 제거
 					if (existingChain.candidates.length === 0) {
 						state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
-						console.log(`✅ 규칙 삭제 완료: '${primaryName}' 주최자의 모든 후보가 삭제되어 규칙이 제거되었습니다.`);
+						console.log(commandConsoleMessages.comments.chainAllCandidatesDeleted.replace('{name}', primaryName));
 					} else if (removedCount > 0) {
-						console.log(`✅ 규칙 삭제 완료: '${primaryName}' → ${removedNames.map(n => `'${n}'`).join(', ')} (${removedCount}개)`);
+						console.log(commandConsoleMessages.comments.chainCandidatesDeleted + `: '${primaryName}' → ${removedNames.map(n => `'${n}'`).join(', ')} (${removedCount}개)`);
 					} else {
-						console.log(`⚠️ 규칙 삭제 실패: 삭제할 후보를 찾을 수 없습니다.`);
+						console.log(commandConsoleMessages.comments.chainCandidateDeleteFailed);
 					}
 					
 					if (removedCount > 0) {
@@ -1966,15 +1966,15 @@ function addForbiddenPairByNames(nameA, nameB) {
 		return { ok: false, message: msg };
 	}
 	if (pa.id === pb.id) {
-		const msg = '동일인에 대한 제약은 불가능합니다.';
-		console.log('금지 제약 추가 실패:', msg);
+		const msg = commandConsoleMessages.comments.samePersonConstraintError;
+		console.log(commandConsoleMessages.comments.constraintAddFailed, msg);
 		return { ok: false, message: msg };
 	}
 	const gA = getPersonGroupIndex(pa.id);
 	const gB = getPersonGroupIndex(pb.id);
 	if (gA !== -1 && gA === gB) {
-		const msg = `${pa.name}와 ${pb.name}는 같은 그룹에 속해 있어 제약을 추가할 수 없습니다.`;
-		console.log('금지 제약 추가 실패:', msg);
+		const msg = `${pa.name}${commandConsoleMessages.comments.sameGroupConstraintError.replace('와 는', '와 ' + pb.name + '는')}`;
+		console.log(commandConsoleMessages.comments.constraintAddFailed, msg);
 		return { ok: false, message: msg };
 	}
 	const exists = state.forbiddenPairs.some(([a, b]) => (a === pa.id && b === pb.id) || (a === pb.id && b === pa.id));
@@ -1995,7 +1995,7 @@ function addForbiddenPairByNames(nameA, nameB) {
 function addPendingConstraint(leftName, rightName) {
 	const l = normalizeName(leftName);
 	const r = normalizeName(rightName);
-	if (l === r) return { ok: false, message: '동일인 제약은 불가능합니다.' };
+	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePendingConstraintError };
 	// 보류 목록에서 중복 방지
 	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
 	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
@@ -2070,8 +2070,8 @@ function removeForbiddenPairByNames(nameA, nameB) {
 	const na = normalizeName(nameA);
 	const nb = normalizeName(nameB);
 	if (na === nb) {
-		console.log('제약 제거 실패: 동일인 제약은 불가능합니다.');
-		return { ok: false, message: '동일인 제약은 불가능합니다.' };
+		console.log(commandConsoleMessages.comments.constraintRemoveFailed);
+		return { ok: false, message: commandConsoleMessages.comments.constraintRemoveFailed };
 	}
 	// 둘 다 존재하면 적용된(id 기반) 제약을 먼저 제거 시도
 	const pa = findPersonByName(na);
@@ -2094,7 +2094,7 @@ function removeForbiddenPairByNames(nameA, nameB) {
 		safeOpenForbiddenWindow();
 		return { ok: true };
 	}
-	return { ok: false, message: '해당 제약을 찾을 수 없습니다.' };
+	return { ok: false, message: commandConsoleMessages.comments.constraintNotFound };
 }
 
 function buildForbiddenMap() {
@@ -2238,8 +2238,8 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		return { ok: false, message: msg };
 	}
 	if (pa.id === pb.id) {
-		const msg = '동일인에 대한 히든 그룹은 불가능합니다.';
-		console.log('히든 그룹 추가 실패:', msg);
+		const msg = commandConsoleMessages.comments.samePersonHiddenGroupError;
+		console.log(commandConsoleMessages.comments.hiddenGroupAddFailed, msg);
 		return { ok: false, message: msg };
 	}
 	
@@ -2252,10 +2252,10 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		const existingCandidate = existingChainAsA.candidates.find(c => c.name === nameB);
 		if (existingCandidate) {
 			existingCandidate.probability = probability;
-			console.log(`🔄 체인 후보 확률 갱신: ${nameA} → ${nameB}(${probability}%)`);
+			console.log(commandConsoleMessages.comments.chainCandidateProbabilityUpdated + `: ${nameA} → ${nameB}(${probability}%)`);
 		} else {
 			existingChainAsA.candidates.push({ name: nameB, probability: probability });
-			console.log(`➕ 체인에 후보 추가: ${nameA} → ${nameB}(${probability}%)`);
+			console.log(commandConsoleMessages.comments.chainCandidateAdded + `: ${nameA} → ${nameB}(${probability}%)`);
 		}
 		saveToLocalStorage();
 		return { ok: true, added: true };
@@ -2266,10 +2266,10 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		const existingCandidate = existingChainAsB.candidates.find(c => c.name === nameA);
 		if (existingCandidate) {
 			existingCandidate.probability = probability;
-			console.log(`🔄 체인 후보 확률 갱신: ${nameB} → ${nameA}(${probability}%)`);
+			console.log(commandConsoleMessages.comments.chainCandidateProbabilityUpdated + `: ${nameB} → ${nameA}(${probability}%)`);
 		} else {
 			existingChainAsB.candidates.push({ name: nameA, probability: probability });
-			console.log(`➕ 체인에 후보 추가: ${nameB} → ${nameA}(${probability}%)`);
+			console.log(commandConsoleMessages.comments.chainCandidateAdded + `: ${nameB} → ${nameA}(${probability}%)`);
 		}
 		saveToLocalStorage();
 		return { ok: true, added: true };
@@ -2281,7 +2281,7 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		candidates: [{ name: nameB, probability: probability }]
 	});
 	saveToLocalStorage();
-	console.log(`✅ 새 체인 생성: ${nameA} → ${nameB}(${probability}%)`);
+	console.log(commandConsoleMessages.comments.newChainCreated + `: ${nameA} → ${nameB}(${probability}%)`);
 	return { ok: true, added: true };
 }
 
@@ -2289,7 +2289,7 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 function addPendingHiddenGroup(leftName, rightName, probability) {
 	const l = normalizeName(leftName);
 	const r = normalizeName(rightName);
-	if (l === r) return { ok: false, message: '동일인 히든 그룹은 불가능합니다.' };
+	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePendingHiddenGroupError };
 	
 	// 기존 보류 히든 그룹 찾기 (양방향 체크)
 	const existingIndex = state.pendingHiddenGroups.findIndex(
@@ -2300,13 +2300,13 @@ function addPendingHiddenGroup(leftName, rightName, probability) {
 		// 새로 추가
 		state.pendingHiddenGroups.push({ left: l, right: r, probability: probability });
 		saveToLocalStorage();
-		console.log(`⏳ 보류 히든 그룹 추가 (${probability}%): ${leftName} ↔ ${rightName}`);
+		console.log(commandConsoleMessages.comments.pendingHiddenGroupAdded + ` (${probability}%): ${leftName} ↔ ${rightName}`);
 	} else {
 		// 확률 업데이트
 		const oldProb = state.pendingHiddenGroups[existingIndex].probability;
 		state.pendingHiddenGroups[existingIndex].probability = probability;
 		saveToLocalStorage();
-		console.log(`🔄 보류 히든 그룹 확률 갱신 (${oldProb}% → ${probability}%): ${leftName} ↔ ${rightName}`);
+		console.log(commandConsoleMessages.comments.pendingHiddenGroupUpdated + ` (${oldProb}% → ${probability}%): ${leftName} ↔ ${rightName}`);
 	}
 	
 	return { ok: true };
@@ -2511,21 +2511,21 @@ function openForbiddenWindow() {
 		if (!forbiddenPopup || forbiddenPopup.closed) {
 			forbiddenPopup = window.open('', 'forbiddenPopup', features);
 			if (!forbiddenPopup) {
-				console.log('팝업 차단: 제약 연결 창을 열 수 없습니다. 브라우저의 팝업 차단을 확인하세요.');
+				console.log(commandConsoleMessages.comments.popupBlockedError);
 				return;
 			}
 			let doc;
 			try {
 				doc = forbiddenPopup.document;
 			} catch (e) {
-				console.warn('팝업에 접근할 수 없습니다 (크로스오리진 또는 차단됨):', e);
+				console.warn(commandConsoleMessages.comments.popupAccessError, e);
 				// 반복되는 예외를 피하기 위해 참조를 제거
 				try { forbiddenPopup.close(); } catch(_){ }
 				forbiddenPopup = null;
 				return;
 			}
 			doc.open();
-			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>제약 관리</title><style>
+			doc.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${commandConsoleMessages.comments.constraintManagement}</title><style>
 				:root{--accent:#667eea;--bg:#ffffff;--muted:#666}
 				body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:18px;background:var(--bg);color:#111}
 				header{background:linear-gradient(135deg,var(--accent) 0%, #764ba2 100%);color:#fff;padding:14px;border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
@@ -2549,21 +2549,21 @@ function openForbiddenWindow() {
 				.modal-show-btn{background:var(--accent);color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1.1rem;cursor:pointer}
 				.initial-modal .warn{margin-top:8px;color:#ef4444;font-size:12px;font-weight:400;line-height:1.2}
 			</style></head><body>
-			<header><h1>제약 연결</h1><button id="resetAllBtn" class="reset-all-btn">초기화</button></header>
+			<header><h1>${commandConsoleMessages.comments.constraintConnection}</h1><button id="resetAllBtn" class="reset-all-btn">${commandConsoleMessages.comments.resetButton}</button></header>
 			<div id="initialModal" class="initial-modal visible">
 				<div class="modal-content">
-					<button id="showBtn" class="modal-show-btn">보기</button>
-					<div id="showWarn" class="warn"> 보기 버튼을 누르면 제약셋팅의 목록이 노출됩니다</div>
+					<button id="showBtn" class="modal-show-btn">${commandConsoleMessages.comments.showButton}</button>
+					<div id="showWarn" class="warn">${commandConsoleMessages.comments.showButtonWarning}</div>
 				</div>
 			</div>
-			<section class="add-form"><input id="addConstraintInput" placeholder="예: A!B 또는 해지: A!!B (쉼표로 여러 항목 가능)"><button id="addConstraintBtn">+</button></section>
-			<section id="appliedSection" style="display:none"><h2>적용된 제약</h2><div id="appliedList"></div></section>
-			<section id="pendingSection" style="display:none"><h2>대기중인 제약</h2><div id="pendingList"></div></section>
+			<section class="add-form"><input id="addConstraintInput" placeholder="${commandConsoleMessages.comments.constraintInputPlaceholder}"><button id="addConstraintBtn">+</button></section>
+			<section id="appliedSection" style="display:none"><h2>${commandConsoleMessages.comments.appliedConstraints}</h2><div id="appliedList"></div></section>
+			<section id="pendingSection" style="display:none"><h2>${commandConsoleMessages.comments.pendingConstraints}</h2><div id="pendingList"></div></section>
 			<script>
 				(function(){
 					const parentWindow = window.opener;
 					if (!parentWindow) {
-						alert('부모 창 참조를 찾을 수 없습니다. 팝업을 닫고 다시 열어주세요.');
+						alert(commandConsoleMessages.comments.parentWindowNotFound);
 						return;
 					}
 					const addBtn = document.getElementById('addConstraintBtn');
@@ -2609,19 +2609,19 @@ function openForbiddenWindow() {
 								}
 							});
 							refresh();
-						} catch(e){ console.log('추가 실패', e); }
+						} catch(e){ console.log(commandConsoleMessages.comments.additionFailed, e); }
 					});
 					input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') addBtn.click(); });
 					
 					// 초기화 버튼 이벤트
 					if (resetAllBtn) {
 						resetAllBtn.addEventListener('click', ()=>{
-							if (confirm('모든 제약을 초기화하시겠습니까?')) {
+							if (confirm(commandConsoleMessages.comments.resetAllConstraintsConfirm)) {
 								try {
 									if (parentWindow && parentWindow.clearAllConstraints) parentWindow.clearAllConstraints(); else {
-										alert('부모 창 참조를 찾을 수 없습니다.');
+										alert(commandConsoleMessages.comments.parentWindowNotFoundReset);
 									}
-								} catch(e){ console.log('초기화 실패:', e); alert('초기화 실패: ' + e.message); }
+								} catch(e){ console.log(commandConsoleMessages.comments.resetFailed, e); alert(commandConsoleMessages.comments.resetFailed + e.message); }
 							}
 						});
 					}
@@ -2671,7 +2671,7 @@ function openForbiddenWindow() {
 		renderForbiddenWindowContent();
 		if (forbiddenPopup && !forbiddenPopup.closed) forbiddenPopup.focus();
 	} catch (e) {
-		console.log('팝업 열기 중 오류:', e);
+		console.log(commandConsoleMessages.comments.popupOpenError, e);
 	}
 }
 
@@ -2681,7 +2681,7 @@ function renderForbiddenWindowContent() {
 	try {
 		doc = forbiddenPopup.document;
 	} catch (e) {
-		console.warn('팝업 문서에 접근할 수 없습니다 (크로스오리진):', e);
+		console.warn(commandConsoleMessages.comments.popupDocumentAccessError, e);
 		try { forbiddenPopup.close(); } catch(_){}
 		forbiddenPopup = null;
 		return;
@@ -2712,7 +2712,7 @@ function renderForbiddenWindowContent() {
 		});
 		appliedList.appendChild(ul);
 	} else {
-		const p = doc.createElement('div'); p.className='empty'; p.textContent='없음'; appliedList.appendChild(p);
+		const p = doc.createElement('div'); p.className='empty'; p.textContent=commandConsoleMessages.comments.noneText; appliedList.appendChild(p);
 	}
 	// 대기중인 제약
 	if (state.pendingConstraints.length) {
@@ -2730,16 +2730,16 @@ function renderForbiddenWindowContent() {
 		});
 		pendingList.appendChild(ul2);
 	} else {
-		const p = doc.createElement('div'); p.className='empty'; p.textContent='없음'; pendingList.appendChild(p);
+		const p = doc.createElement('div'); p.className='empty'; p.textContent=commandConsoleMessages.comments.noneText; pendingList.appendChild(p);
 	}
 }
 
 // 팝업 헬퍼가 현재 스코프에 없을 때 ReferenceError를 방지하는 안전한 래퍼
 function safeOpenForbiddenWindow() {
 	if (typeof openForbiddenWindow === 'function') {
-		try { openForbiddenWindow(); } catch (e) { console.log('팝업 열기 중 오류:', e); }
+		try { openForbiddenWindow(); } catch (e) { console.log(commandConsoleMessages.comments.popupOpenError, e); }
 	} else {
-		console.warn('openForbiddenWindow 함수가 정의되지 않았습니다.');
+		console.warn(commandConsoleMessages.comments.popupFunctionNotDefined);
 	}
 }
 
@@ -2831,7 +2831,7 @@ function createPersonTag(person, potentialDuplicates = []) {
 		// Shift 키를 누른 상태로 클릭한 경우 완전 삭제
 		const isCompleteDelete = e.shiftKey;
 		if (isCompleteDelete) {
-			if (confirm(`⚠️ ${person.name}을(를) 완전히 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 미참가자 목록에도 남지 않습니다.`)) {
+			if (confirm(commandConsoleMessages.comments.completePersonDeleteConfirm.replace('{name}', person.name))) {
 				removePerson(person.id, true);
 			}
 		} else {
@@ -2939,23 +2939,23 @@ function getPotentialDuplicatesFromInput() {
 
 function shuffleTeams() {
 	if (state.people.length === 0) {
-		showError('참가자를 추가해주세요.');
+		showError(commandConsoleMessages.comments.addParticipant);
 		return;
 	}
 
 	const validPeople = state.people.filter(p => p.name.trim() !== '');
 	if (validPeople.length === 0) {
-		showError('최소 1명 이상의 이름을 입력해주세요.');
+		showError(commandConsoleMessages.comments.minOneName);
 		return;
 	}
 
 	if (state.membersPerTeam < 2) {
-		showError('팀 인원수는 최소 2명 이상이어야 합니다.');
+		showError(commandConsoleMessages.comments.minTwoPerTeam);
 		return;
 	}
 
 	if (validPeople.length < state.membersPerTeam) {
-		showError('참가자 수가 팀 인원수보다 적습니다.');
+		showError(commandConsoleMessages.comments.notEnoughParticipants);
 		return;
 	}
 
@@ -3030,7 +3030,7 @@ function generateTeams(people) {
 		for (let i = 0; i < group.length; i++) {
 			for (let j = i + 1; j < group.length; j++) {
 				if (isForbidden(group[i], group[j])) {
-					showError('같은 그룹에 금지 제약이 있습니다.');
+					showError(commandConsoleMessages.comments.constraintInSameGroup);
 					return null;
 				}
 			}
@@ -3065,7 +3065,7 @@ function generateTeams(people) {
 	const totalTeamCount = completeTeamGroups.length + additionalTeamCount;
 	
 	if (totalTeamCount === 0) {
-		showError('팀을 구성할 수 없습니다.');
+		showError(commandConsoleMessages.comments.cannotFormTeams);
 		return null;
 	}
 	
@@ -3536,7 +3536,7 @@ function generateTeams(people) {
 		return allTeamsIncludingLast;
 	}
 
-	showError('제약 조건으로 팀 배치가 불가능합니다. 다시 시도해주세요.');
+	showError(commandConsoleMessages.comments.constraintPlacementImpossible);
 	return null;
 }
 
@@ -3688,10 +3688,8 @@ async function displayTeams(teams) {
 					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명/${teamCardData.currentWeight})`;
 				} else {
 					// 0명이 아니면 인원 수 표시
-					title.textContent = `팀 ${teamIdx + 1} (${teamCardData.currentCount}명)`;
 				}
-				
-				// 마지막 팀의 마지막 청크가 아니면 딜레이
+				title.textContent = commandConsoleMessages.comments.teamHeaderWithoutWeight.replace('{count}', teamCardData.currentCount).replace('{teamNum}', teamIdx + 1);
 				const isLastTeam = teamIdx === teamCards.length - 1;
 				const isLastChunk = chunkIdx === chunks.length - 1;
 				if (!isLastTeam || !isLastChunk) {
@@ -3812,7 +3810,7 @@ function logTeamResultsToConsole(teams) {
 			commandConsole.input.type = 'text';
 			commandConsole.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
 		}
-		commandConsole.log('🔓 읽기 전용 모드로 전환되었습니다.');
+		commandConsole.log(commandConsoleMessages.comments.readOnlyModeSwitch);
 	}
 	
 	// 팀 생성 결과 출력
@@ -3847,14 +3845,14 @@ function logTeamResultsToConsole(teams) {
 	}).join('<br>');
 	
 	// 적용된 규칙이 있을 경우 추가 (인증된 사용자만)
-	let outputMessage = `[생성된 팀]<br>${teamResults}`;
+	let outputMessage = `${commandConsoleMessages.comments.generatedTeams}<br>${teamResults}`;
 	
 	if (commandConsole.authenticated && state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
 		const ruleResults = state.activeHiddenGroupChainInfo.map(info => {
 			return `- ${info.primaryName} → ${info.candidateName} (${info.probability}%)`;
 		}).join('<br>');
 		
-		outputMessage += `<br><br>[적용된 규칙]<br>${ruleResults}`;
+		outputMessage += `<br><br>${commandConsoleMessages.comments.appliedRules}<br>${ruleResults}`;
 	}
 	
 	commandConsole.log(outputMessage);
@@ -3879,7 +3877,7 @@ async function startValidationLoop(initialTeams) {
 			if (sizeChanged) {
 				hasChanges = true;
 				if (SHOW_VALIDATION_COMPARISON) {
-					await showValidationStep(beforeTeamSize, currentTeams, '팀 인원 균형');
+					await showValidationStep(beforeTeamSize, currentTeams, commandConsoleMessages.comments.teamSizeBalance);
 					// 다음 검증을 위해 잠시 대기
 					await new Promise(resolve => setTimeout(resolve, 500));
 				}
@@ -3895,7 +3893,7 @@ async function startValidationLoop(initialTeams) {
 			if (genderChanged) {
 				hasChanges = true;
 				if (SHOW_VALIDATION_COMPARISON) {
-					await showValidationStep(beforeGender, currentTeams, '성비 블록 균형');
+					await showValidationStep(beforeGender, currentTeams, commandConsoleMessages.comments.genderBlockBalance);
 					// 다음 검증을 위해 잠시 대기
 					await new Promise(resolve => setTimeout(resolve, 500));
 				}
@@ -3911,7 +3909,7 @@ async function startValidationLoop(initialTeams) {
 			if (weightChanged) {
 				hasChanges = true;
 				if (SHOW_VALIDATION_COMPARISON) {
-					await showValidationStep(beforeWeight, currentTeams, '가중치 균형');
+					await showValidationStep(beforeWeight, currentTeams, commandConsoleMessages.comments.weightBalance);
 					// 다음 검증을 위해 잠시 대기
 					await new Promise(resolve => setTimeout(resolve, 500));
 				}
@@ -3965,8 +3963,8 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		`;
 		
 		header.innerHTML = `
-			<h2 style="font-size: 32px; margin-bottom: 10px;">검증 단계</h2>
-			<p style="font-size: 16px; opacity: 0.8;">${validationType} 조정</p>
+			<h2 style="font-size: 32px; margin-bottom: 10px;">${commandConsoleMessages.comments.validationStep}</h2>
+			<p style="font-size: 16px; opacity: 0.8;">${validationType} ${commandConsoleMessages.comments.validationStepName.replace('{stepName}', '조정')}</p>
 		`;
 		comparisonContainer.appendChild(header);
 		
@@ -3986,7 +3984,7 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		
 		// 전 (Before)
 		const beforeSection = document.createElement('div');
-		beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">조정 전</h3>';
+		beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.beforeAdjustment + '</h3>';
 		const beforeDisplay = createComparisonTeamsDisplay(beforeTeams, afterTeams, colorMap);
 		beforeSection.appendChild(beforeDisplay);
 		
@@ -4003,7 +4001,7 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		
 		// 후 (After)
 		const afterSection = document.createElement('div');
-		afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">조정 후</h3>';
+		afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.afterAdjustment + '</h3>';
 		const afterDisplay = createComparisonTeamsDisplay(afterTeams, beforeTeams, colorMap);
 		afterSection.appendChild(afterDisplay);
 		
@@ -4014,7 +4012,7 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		
 		// 닫기 버튼
 		const closeBtn = document.createElement('button');
-		closeBtn.textContent = '다음';
+		closeBtn.textContent = commandConsoleMessages.comments.nextButton;
 		closeBtn.style.cssText = `
 			margin: 30px auto 0;
 			padding: 15px 40px;
@@ -4063,7 +4061,7 @@ function showValidationHint() {
 		z-index: 10000;
 		animation: fadeInUp 0.3s ease-out;
 	`;
-	hint.textContent = '스페이스바를 눌러 성비 블록 균형을 검증하세요';
+	hint.textContent = commandConsoleMessages.comments.spacebarHint;
 	
 	document.body.appendChild(hint);
 	
@@ -4125,11 +4123,11 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	`;
 	
 	const titleParts = [];
-	if (state.weightBalanceEnabled) titleParts.push('가중치 균형');
+	if (state.weightBalanceEnabled) titleParts.push(commandConsoleMessages.comments.weightBalanceOption);
 	
 	header.innerHTML = `
-		<h2 style="font-size: 32px; margin-bottom: 10px;">검증 결과</h2>
-		<p style="font-size: 16px; opacity: 0.8;">${titleParts.length ? titleParts.join(' 및 ') + '이 조정되었습니다' : '팀이 조정되었습니다'}</p>
+		<h2 style="font-size: 32px; margin-bottom: 10px;">${commandConsoleMessages.comments.validationResult}</h2>
+		<p style="font-size: 16px; opacity: 0.8;">${titleParts.length ? titleParts.join(' 및 ') + commandConsoleMessages.comments.adjustedOptions : commandConsoleMessages.comments.teamsAdjusted}</p>
 	`;
 	comparisonContainer.appendChild(header);
 	
@@ -4149,7 +4147,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	
 	// 전 (Before)
 	const beforeSection = document.createElement('div');
-	beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">검증 전</h3>';
+	beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.beforeValidation + '</h3>';
 	const beforeDisplay = createComparisonTeamsDisplay(beforeTeams, afterTeams, colorMap);
 	beforeSection.appendChild(beforeDisplay);
 	
@@ -4166,7 +4164,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	
 	// 후 (After)
 	const afterSection = document.createElement('div');
-	afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">검증 후</h3>';
+	afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.afterValidation + '</h3>';
 	const afterDisplay = createComparisonTeamsDisplay(afterTeams, beforeTeams, colorMap);
 	afterSection.appendChild(afterDisplay);
 	
@@ -4177,7 +4175,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	
 	// 닫기 버튼
 	const closeBtn = document.createElement('button');
-	closeBtn.textContent = '확인';
+	closeBtn.textContent = commandConsoleMessages.comments.confirmButton;
 	closeBtn.style.cssText = `
 		margin: 30px auto 0;
 		padding: 15px 40px;
