@@ -37,8 +37,11 @@ const commandConsoleMessages = {
 			'📋 <code data-cmd="participants">participants</code> / <code data-cmd="참가자">참가자</code><br>   현재 등록된 모든 참가자 목록을 확인합니다.<br><br>' +
 			'📋 <code data-cmd="nonparticipants">nonparticipants</code> / <code data-cmd="미참가자">미참가자</code><br>   현재 등록된 모든 미참가자 목록을 확인합니다.<br><br>' +
 			'📋 <code data-cmd="constraints">constraints</code> / <code data-cmd="제약">제약</code><br>   현재 설정된 제약 조건 목록을 확인합니다.<br><br>' +
-			'📊 <code data-cmd="확률">확률</code><br>   확률 그룹 및 설정된 확률 규칙을 확인합니다.<br><br>' +
+			'📊 <code data-cmd="확률">확률</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 그룹 및 설정된 확률 규칙을 확인합니다.<br><br>' +
+			'📊 <code data-cmd="규칙 명령어">규칙 명령어</code> / <code data-cmd="rule 명령어">rule 명령어</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록하거나 수정합니다.<br>   예시: <code data-cmd="규칙 A(40)B(30)C">규칙 A(40)B(30)C</code><br><br>' +
+			'📊 <code data-cmd="규칙">규칙</code> / <code data-cmd="rule">rule</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록할 수 있는 모드로 들어갑니다.<br><br>' +
 			'✏️ <code data-cmd="input 데이터">input 데이터</code> / <code data-cmd="입력 데이터">입력 데이터</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 데이터를 직접 입력합니다.<br>   예시: <code data-cmd="입력 홍길동,김철수">입력 홍길동,김철수</code><br><br>' +
+			'✏️ <code data-cmd="input">input</code> / <code data-cmd="입력">입력</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 데이터를 직접 입력할 수 있는 모드로 들어갑니다.<br><br>' +
 			'🎲 <code data-cmd="generate">generate</code> / <code data-cmd="생성">생성</code><br>   설정된 조건에 따라 랜덤 팀을 생성합니다.<br><br>' +
 			'❓ <code data-cmd="help">help</code> / <code data-cmd="도움">도움</code><br>   이 도움말을 표시합니다.<br><br>',
 		

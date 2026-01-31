@@ -1696,6 +1696,12 @@ const commandConsole = {
 	},
 	
 	hiddenCommand() {
+		if (!this.authenticated) {
+			this.error(this.comments.ruleReadOnlyError);
+			this.log(this.comments.authenticationRequired);
+			return;
+		}
+		
 		const totalHidden = state.hiddenGroups.length + state.hiddenGroupChains.length + 
 		                    state.pendingHiddenGroups.length + state.pendingHiddenGroupChains.length;
 		
