@@ -34,8 +34,8 @@ const commandConsoleMessages = {
 			'🔒 <code data-cmd="logout">logout</code> / <code data-cmd="로그아웃">로그아웃</code><br>   쓰기 모드에서 읽기 전용 모드로 전환합니다.<br>   데이터를 읽을 수만 있고 수정할 수 없습니다.<br><br>' +
 			'🔄 <code data-cmd="profile">profile</code> / <code data-cmd="프로필">프로필</code><br>   다른 프로필로 전환합니다. 프로필 이름을 입력하면<br>   해당 프로필의 데이터를 불러옵니다.<br><br>' +
 			'🔑 <code data-cmd="password">password</code> / <code data-cmd="비밀번호">비밀번호</code><br>   현재 프로필의 비밀번호를 변경합니다.<br>   현재 비밀번호 확인 후 새 비밀번호를 설정할 수 있습니다.<br><br>' +
-			'📋 <code data-cmd="participants">participants</code> / <code data-cmd="참가자">참가자</code><br>   현재 등록된 모든 참가자 목록을 확인합니다.<br><br>' +
-			'📋 <code data-cmd="nonparticipants">nonparticipants</code> / <code data-cmd="미참가자">미참가자</code><br>   현재 등록된 모든 미참가자 목록을 확인합니다.<br><br>' +
+			'📋 <code data-cmd="member">member</code> / <code data-cmd="참가자">참가자</code><br>   현재 등록된 모든 참가자 목록을 확인합니다.<br><br>' +
+			'📋 <code data-cmd="people">people</code> / <code data-cmd="미참가자">미참가자</code><br>   현재 등록된 모든 미참가자 목록을 확인합니다.<br><br>' +
 			'📋 <code data-cmd="constraints">constraints</code> / <code data-cmd="제약">제약</code><br>   현재 설정된 제약 조건 목록을 확인합니다.<br><br>' +
 			'📊 <code data-cmd="확률">확률</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 그룹 및 설정된 확률 규칙을 확인합니다.<br><br>' +
 			'📊 <code data-cmd="규칙 명령어">규칙 명령어</code> / <code data-cmd="rule 명령어">rule 명령어</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록하거나 수정합니다.<br>   예시: <code data-cmd="규칙 A(40)B(30)C">규칙 A(40)B(30)C</code><br><br>' +

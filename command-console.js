@@ -1195,9 +1195,11 @@ const commandConsole = {
 				this.profileCommand();
 				break;
 			case '참가자':
+			case 'member':
 				this.participantsCommand();
 				break;
 			case '미참가자':
+			case 'people':
 				this.nonParticipantsCommand();
 				break;
 			case '제약':
