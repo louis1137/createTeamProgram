@@ -194,7 +194,7 @@ function checkDevToolsAndOpenConsole() {
 						// 프로필이 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 						if (commandConsole.authenticated) {
 							commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentRoomKey));
-							commandConsole.log(commandConsoleMessages.comments.realtimeSyncActivated);
+							commandConsole.log(commandConsoleMessages.comments.syncActivated);
 							commandConsole.log(commandConsoleMessages.comments.consoleReady);
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else if (database) {
@@ -253,8 +253,8 @@ function checkDevToolsAndOpenConsole() {
 									}
 								} else {
 									commandConsole.tempProfile = currentRoomKey;
-									commandConsole.warn(`⚠️ '${currentRoomKey}'${commandConsoleMessages.comments.profileNotFoundInitial}`);
-									commandConsole.log(commandConsoleMessages.comments.profileRegisterNew);
+									commandConsole.warn(commandConsoleMessages.comments.profileNotFoundInitial.replace('{profile}', currentRoomKey));
+									commandConsole.log(commandConsoleMessages.comments.profileCreateNew.replace('{profile}', currentRoomKey));
 									commandConsole.inputMode = 'profile-create-confirm';
 									commandConsole.showConfirmButtons();
 								}
@@ -265,7 +265,8 @@ function checkDevToolsAndOpenConsole() {
 						commandConsole.log(commandConsoleMessages.comments.profileInput);
 						commandConsole.inputMode = 'profile';
 						commandConsole.input.placeholder = commandConsoleMessages.placeholders.profile;
-						setTimeout(() => commandConsole.input.focus(), 100);
+						commandConsole.restoreInputField(true);
+						setTimeout(() => commandConsole.input && commandConsole.input.focus(), 100);
 					}
 				}
 			}
@@ -1391,8 +1392,8 @@ function addPerson(fromConsole = false) {
 					commandConsole.log(commandConsoleMessages.comments.profileInput);
 					commandConsole.inputMode = 'profile';
 					commandConsole.input.placeholder = commandConsoleMessages.placeholders.profile;
-					// 입력 폼에 포커스
-					setTimeout(() => commandConsole.input.focus(), 100);
+					commandConsole.restoreInputField(true);
+					setTimeout(() => commandConsole.input && commandConsole.input.focus(), 100);
 				}
 			}
 			// 위치와 크기 상태 완전 초기화

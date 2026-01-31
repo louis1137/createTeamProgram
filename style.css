@@ -1337,9 +1337,9 @@ background: rgba(239, 68, 68, 0.1);
 border-left: 3px solid #ef4444;
 }
 
-.command-log-warning {
-background: rgba(251, 191, 36, 0.1);
-border-left: 3px solid #fbbf24;
+.command-log-warn {
+background: rgba(239, 68, 68, 0.06);
+border-left: 3px solid #ef4444;
 }
 
 .command-log-command {

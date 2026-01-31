@@ -58,8 +58,10 @@ let lastSyncTrigger = 0;
 function setupRealtimeSync() {
 	if (!database || !currentRoomKey) return;
 	
-	// 실시간 동기화 시작 전에 현재 UI 초기화
-	clearState();
+	// 실시간 동기화 시작 전에 현재 UI 초기화 (이미 로드된 데이터가 있으면 초기화하지 않음)
+	if (!state.people || state.people.length === 0) {
+		clearState();
+	}
 	
 	realtimeSyncActive = true;
 	database.ref(`rooms/${currentRoomKey}`).on('value', (snapshot) => {
