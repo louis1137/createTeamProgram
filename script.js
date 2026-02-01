@@ -1897,36 +1897,61 @@ function removePerson(id, isCompleteDelete = false) {
 	state.people = state.people.filter(p => p.id !== id);
 	state.requiredGroups = state.requiredGroups.map(group => group.filter(pid => pid !== id));
 	state.requiredGroups = state.requiredGroups.filter(group => group.length > 1);
-	// 이 사람이 포함된 모든 금지(제약) 쌍 제거
-	const before = state.forbiddenPairs.length;
+	
+	// 이 사람이 포함된 제약을 이름 기반 보류 제약으로 변환 (제약 유지)
+	if (person) {
+		const personName = normalizeName(person.name);
+		state.forbiddenPairs.forEach(([a, b]) => {
+			if (a === id || b === id) {
+				const otherPerson = state.people.find(p => p.id === (a === id ? b : a));
+				if (otherPerson) {
+					const otherName = normalizeName(otherPerson.name);
+					// 보류 제약으로 변환
+					const exists = state.pendingConstraints.some(pc => 
+						(pc.left === personName && pc.right === otherName) ||
+						(pc.left === otherName && pc.right === personName)
+					);
+					if (!exists) {
+						state.pendingConstraints.push({ left: personName, right: otherName });
+						console.log(`제약 보존: ${person.name} - ${otherPerson.name} 제약이 보류 상태로 변환되었습니다.`);
+					}
+				}
+			}
+		});
+	}
+	
+	// id 기반 제약 제거 (이미 보류로 변환됨)
 	state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => a !== id && b !== id);
-	const after = state.forbiddenPairs.length;
-	if (before !== after) {
-		console.log(`제약 제거: 삭제된 사람(id:${id})과 관련된 제약 ${before - after}개가 제거되었습니다.`);
-		safeOpenForbiddenWindow();
-	}
 	buildForbiddenMap();
-	// 이 사람이 포함된 모든 히든 그룹 제거
-	const beforeHidden = state.hiddenGroups.length;
+	
+	// 히든 그룹도 이름 기반 보류로 변환 (규칙 유지)
+	if (person) {
+		const personName = person.name;
+		state.hiddenGroups.forEach(([a, b, prob]) => {
+			if (a === id || b === id) {
+				const otherPerson = state.people.find(p => p.id === (a === id ? b : a));
+				if (otherPerson) {
+					// 보류 히든 그룹으로 변환
+					const exists = state.pendingHiddenGroups.some(pg =>
+						(pg.left === personName && pg.right === otherPerson.name) ||
+						(pg.left === otherPerson.name && pg.right === personName)
+					);
+					if (!exists) {
+						state.pendingHiddenGroups.push({ 
+							left: personName, 
+							right: otherPerson.name, 
+							probability: prob 
+						});
+						console.log(`히든 그룹 보존: ${personName} - ${otherPerson.name}(${prob}%) 규칙이 보류 상태로 변환되었습니다.`);
+					}
+				}
+			}
+		});
+	}
+	
+	// id 기반 히든 그룹 제거 (이미 보류로 변환됨)
 	state.hiddenGroups = state.hiddenGroups.filter(([a, b]) => a !== id && b !== id);
-	const afterHidden = state.hiddenGroups.length;
-	if (beforeHidden !== afterHidden) {
-		console.log(`히든 그룹 제거: 삭제된 사람(id:${id})과 관련된 히든 그룹 ${beforeHidden - afterHidden}개가 제거되었습니다.`);
-	}
-	// 이 사람이 포함된 모든 히든 그룹 체인 제거
-	const beforeChain = state.hiddenGroupChains.length;
-	const personName = person.name;
-	state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => {
-		// primary가 삭제된 참가자면 체인 전체 삭제
-		if (chain.primary === personName) return false;
-		// candidates에서 삭제된 참가자 제거
-		chain.candidates = chain.candidates.filter(c => c.name !== personName);
-		return chain.candidates.length > 0; // 후보가 없으면 체인 삭제
-	});
-	const afterChain = state.hiddenGroupChains.length;
-	if (beforeChain !== afterChain) {
-		console.log(`히든 그룹 체인 제거: 삭제된 사람(id:${id})과 관련된 체인 ${beforeChain - afterChain}개가 제거되었습니다.`);
-	}
+	
 	saveToLocalStorage();
 	renderPeople();
 }
