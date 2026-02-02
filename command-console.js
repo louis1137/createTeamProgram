@@ -1316,6 +1316,7 @@ const commandConsole = {
 			switch (option) {
 				case 'rule':
 				case '규칙':
+				case '확률':
 					this.syncRuleCommand();
 					return;
 				case 'option':
@@ -1336,7 +1337,7 @@ const commandConsole = {
 					return;
 				default:
 					// 잘못된 옵션
-					this.error(`❌ 알 수 없는 동기화 옵션: "${args}"<br>사용 가능한 옵션: 규칙, 옵션, 참가자, 미참가자, 제약`);
+					this.error(`❌ 알 수 없는 동기화 옵션: "${args}"<br>사용 가능한 옵션: 규칙, 확률, 옵션, 참가자, 미참가자, 제약`);
 					return;
 			}
 		} else {
