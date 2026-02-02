@@ -3117,7 +3117,7 @@ function generateTeams(people) {
 		return null;
 	}
 	
-	const maxAttempts = 500;
+	const maxAttempts = 2000;
 
 	// 나머지 참가자에서 최소 성별(소수 성별) 계산
 	const maleCount = remainingPeople.filter(p => p.gender === 'male').length;
