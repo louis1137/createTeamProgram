@@ -1415,8 +1415,6 @@ const commandConsole = {
 			return;
 		}
 		
-		this.log('📊 규칙 동기화 중...');
-		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
@@ -1471,8 +1469,6 @@ const commandConsole = {
 			return;
 		}
 		
-		this.log('⚙️ 옵션 동기화 중...');
-		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
@@ -1526,8 +1522,6 @@ const commandConsole = {
 	
 	// 참가자만 동기화
 	syncMemberCommand() {
-		this.log('👥 참가자 동기화 중...');
-		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
@@ -1573,8 +1567,6 @@ const commandConsole = {
 	
 	// 미참가자만 동기화
 	syncPeopleCommand() {
-		this.log('👤 미참가자 동기화 중...');
-		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
@@ -1614,8 +1606,6 @@ const commandConsole = {
 	
 	// 제약만 동기화
 	syncConstraintCommand() {
-		this.log('🔗 제약 동기화 중...');
-		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};

@@ -53,10 +53,14 @@ function initFirebase() {
 // 실시간 동기화 활성화 상태
 let realtimeSyncActive = false;
 let lastSyncTrigger = 0;
+let syncListenerAttached = false; // 리스너 중복 등록 방지
 
 // 실시간 동기화 설정
 function setupRealtimeSync() {
 	if (!database || !currentRoomKey) return;
+	
+	// 이미 리스너가 등록되어 있으면 중복 등록 방지
+	if (syncListenerAttached) return;
 	
 	// 실시간 동기화 시작 전에 현재 UI 초기화 (이미 로드된 데이터가 있으면 초기화하지 않음)
 	if (!state.people || state.people.length === 0) {
@@ -64,16 +68,7 @@ function setupRealtimeSync() {
 	}
 	
 	realtimeSyncActive = true;
-	database.ref(`rooms/${currentRoomKey}`).on('value', (snapshot) => {
-		const data = snapshot.val();
-		if (data && data.timestamp) {
-			// 자신이 저장한 것이 아닌 경우에만 로드
-			const timeDiff = Date.now() - data.timestamp;
-			if (timeDiff > 1000) { // 1초 이상 차이나면 다른 사용자의 변경
-				loadStateFromData(data);
-			}
-		}
-	});
+	syncListenerAttached = true;
 	
 	// syncTrigger 감시 - 다른 창에서 동기화 명령어를 실행했을 때 감지
 	database.ref(`rooms/${currentRoomKey}/syncTrigger`).on('value', (snapshot) => {
@@ -83,8 +78,17 @@ function setupRealtimeSync() {
 			const syncType = typeof syncTrigger === 'object' ? syncTrigger.type : 'all';
 			const syncTimestamp = typeof syncTrigger === 'object' ? syncTrigger.timestamp : syncTrigger;
 			
+			if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+				commandConsole.log('🔄 동기화 중...');
+			}
+			
 			// 동기화 타입에 따라 선택적으로 데이터 로드
 			loadDataByType(syncType)
+				.then(() => {
+					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+						commandConsole.log('✅ 동기화가 완료되었습니다.');
+					}
+				})
 				.catch((error) => {
 					if (typeof commandConsole !== 'undefined' && commandConsole.error) {
 						commandConsole.error(`동기화 실패: ${error.message}`);
