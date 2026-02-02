@@ -1384,7 +1384,7 @@ const commandConsole = {
 					this.success(this.comments.saveComplete);
 					this.log(this.comments.syncing);
 				// 동기화 트리거를 Firebase에 기록하여 모든 창에 알림
-				const syncTrigger = Date.now();
+				const syncTrigger = { timestamp: Date.now(), type: 'all' };
 				
 				// 자신이 발생시킨 트리거는 리스너에서 무시하도록 lastSyncTrigger 미리 업데이트
 				if (typeof lastSyncTrigger !== 'undefined') {
@@ -1413,6 +1413,12 @@ const commandConsole = {
 	
 	// 규칙만 동기화
 	syncRuleCommand() {
+		// 인증 체크
+		if (!authenticatedPassword) {
+			this.error('❌ 인증이 필요합니다. <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 먼저 로그인하세요.');
+			return;
+		}
+		
 		this.log('📊 규칙 동기화 중...');
 		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
@@ -1431,21 +1437,30 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = Date.now();
+				const syncTrigger = { timestamp: Date.now(), type: 'rule' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
 				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
-				return database.ref(`rooms/${currentRoomKey}`).once('value');
+				// 규칙 데이터만 다시 로드
+				return Promise.all([
+					database.ref(`rooms/${currentRoomKey}/hiddenGroups`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/hiddenGroupChains`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/pendingHiddenGroups`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/pendingHiddenGroupChains`).once('value')
+				]);
 			})
-			.then((snapshot) => {
-				const data = snapshot.val();
-				if (data) {
-					loadStateFromData(data);
-					this.success(this.comments.syncRuleComplete);
-				}
+			.then(([hiddenGroupsSnap, hiddenGroupChainsSnap, pendingHiddenGroupsSnap, pendingHiddenGroupChainsSnap]) => {
+				// 규칙 데이터만 state에 반영
+				state.hiddenGroups = hiddenGroupsSnap.val() || [];
+				state.hiddenGroupChains = hiddenGroupChainsSnap.val() || [];
+				state.pendingHiddenGroups = pendingHiddenGroupsSnap.val() || [];
+				state.pendingHiddenGroupChains = pendingHiddenGroupChainsSnap.val() || [];
+				
+				// UI 업데이트는 필요 없음 (규칙은 UI에 직접 표시되지 않음)
+				this.success(this.comments.syncRuleComplete);
 			})
 			.catch((error) => {
 				this.error(`❌ 규칙 동기화 실패: ${error.message}`);
@@ -1454,6 +1469,12 @@ const commandConsole = {
 	
 	// 옵션만 동기화
 	syncOptionCommand() {
+		// 인증 체크
+		if (!authenticatedPassword) {
+			this.error('❌ 인증이 필요합니다. <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 먼저 로그인하세요.');
+			return;
+		}
+		
 		this.log('⚙️ 옵션 동기화 중...');
 		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
@@ -1472,21 +1493,35 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = Date.now();
+				const syncTrigger = { timestamp: Date.now(), type: 'option' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
 				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
-				return database.ref(`rooms/${currentRoomKey}`).once('value');
+				// 옵션 데이터만 다시 로드
+				return Promise.all([
+					database.ref(`rooms/${currentRoomKey}/maxTeamSizeEnabled`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/genderBalanceEnabled`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/weightBalanceEnabled`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/membersPerTeam`).once('value')
+				]);
 			})
-			.then((snapshot) => {
-				const data = snapshot.val();
-				if (data) {
-					loadStateFromData(data);
-					this.success(this.comments.syncOptionComplete);
-				}
+			.then(([maxTeamSizeSnap, genderBalanceSnap, weightBalanceSnap, membersPerTeamSnap]) => {
+				// 옵션 데이터만 state에 반영
+				state.maxTeamSizeEnabled = maxTeamSizeSnap.val() || false;
+				state.genderBalanceEnabled = genderBalanceSnap.val() || false;
+				state.weightBalanceEnabled = weightBalanceSnap.val() || false;
+				state.membersPerTeam = membersPerTeamSnap.val() || 4;
+				
+				// UI 업데이트
+				if (elements.maxTeamSizeCheckbox) elements.maxTeamSizeCheckbox.checked = state.maxTeamSizeEnabled;
+				if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.checked = state.genderBalanceEnabled;
+				if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.checked = state.weightBalanceEnabled;
+				if (elements.teamSizeInput) elements.teamSizeInput.value = state.membersPerTeam;
+				
+				this.success(this.comments.syncOptionComplete);
 			})
 			.catch((error) => {
 				this.error(`❌ 옵션 동기화 실패: ${error.message}`);
@@ -1511,21 +1546,29 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = Date.now();
+				const syncTrigger = { timestamp: Date.now(), type: 'member' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
 				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
-				return database.ref(`rooms/${currentRoomKey}`).once('value');
+				// 참가자 데이터만 다시 로드
+				return Promise.all([
+					database.ref(`rooms/${currentRoomKey}/people`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/nextId`).once('value')
+				]);
 			})
-			.then((snapshot) => {
-				const data = snapshot.val();
-				if (data) {
-					loadStateFromData(data);
-					this.success(this.comments.syncMemberComplete);
-				}
+			.then(([peopleSnap, nextIdSnap]) => {
+				// 참가자 데이터만 state에 반영
+				state.people = peopleSnap.val() || [];
+				state.nextId = nextIdSnap.val() || 1;
+				
+				// 금지 맵 재구성 및 UI 업데이트
+				buildForbiddenMap();
+				renderPeople();
+				
+				this.success(this.comments.syncMemberComplete);
 			})
 			.catch((error) => {
 				this.error(`❌ 참가자 동기화 실패: ${error.message}`);
@@ -1549,21 +1592,24 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = Date.now();
+				const syncTrigger = { timestamp: Date.now(), type: 'people' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
 				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
-				return database.ref(`rooms/${currentRoomKey}`).once('value');
+				// 미참가자 데이터만 다시 로드
+				return database.ref(`rooms/${currentRoomKey}/inactivePeople`).once('value');
 			})
 			.then((snapshot) => {
-				const data = snapshot.val();
-				if (data) {
-					loadStateFromData(data);
-					this.success(this.comments.syncPeopleComplete);
-				}
+				// 미참가자 데이터만 state에 반영
+				state.inactivePeople = snapshot.val() || [];
+				
+				// UI 업데이트
+				renderPeople();
+				
+				this.success(this.comments.syncPeopleComplete);
 			})
 			.catch((error) => {
 				this.error(`❌ 미참가자 동기화 실패: ${error.message}`);
@@ -1589,21 +1635,31 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = Date.now();
+				const syncTrigger = { timestamp: Date.now(), type: 'constraint' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
 				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
-				return database.ref(`rooms/${currentRoomKey}`).once('value');
+				// 제약 데이터만 다시 로드
+				return Promise.all([
+					database.ref(`rooms/${currentRoomKey}/requiredGroups`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/forbiddenPairs`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/pendingConstraints`).once('value')
+				]);
 			})
-			.then((snapshot) => {
-				const data = snapshot.val();
-				if (data) {
-					loadStateFromData(data);
-					this.success(this.comments.syncConstraintComplete);
-				}
+			.then(([requiredGroupsSnap, forbiddenPairsSnap, pendingConstraintsSnap]) => {
+				// 제약 데이터만 state에 반영
+				state.requiredGroups = requiredGroupsSnap.val() || [];
+				state.forbiddenPairs = forbiddenPairsSnap.val() || [];
+				state.pendingConstraints = pendingConstraintsSnap.val() || [];
+				
+				// 금지 맵 재구성 및 UI 업데이트
+				buildForbiddenMap();
+				renderPeople();
+				
+				this.success(this.comments.syncConstraintComplete);
 			})
 			.catch((error) => {
 				this.error(`❌ 제약 동기화 실패: ${error.message}`);
