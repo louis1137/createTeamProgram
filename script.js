@@ -2569,7 +2569,7 @@ function openForbiddenWindow() {
 				.remove-btn{background:#ef4444;border:none;color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer}
 				.empty{color:#999;padding:8px}
 				.initial-modal{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-				.initial-modal .modal-content{background:#fff;padding:24px;border-radius:12px;text-align:center;max-width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.2);transform-origin:top;transform:scaleY(1);transition:transform 320ms ease, opacity 220ms ease}
+				.initial-modal .modal-content{background:#fff;padding:24px;border-radius:12px;text-align:center;max-width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.2);transform-origin:top;transform:scaleY(1)}
 				.initial-modal:not(.visible) .modal-content{transform:scaleY(0);opacity:0}
 				.initial-modal.visible .modal-content{transform:scaleY(1);opacity:1}
 				.modal-show-btn{background:var(--accent);color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:1.1rem;cursor:pointer}
@@ -2644,8 +2644,15 @@ function openForbiddenWindow() {
 						resetAllBtn.addEventListener('click', ()=>{
 							if (confirm(commandConsoleMessages.comments.resetAllConstraintsConfirm)) {
 								try {
-									if (parentWindow && parentWindow.clearAllConstraints) parentWindow.clearAllConstraints(); else {
-									alert(commandConsoleMessages.comments.parentWindowNotFound);
+									if (parentWindow && parentWindow.clearAllConstraints) {
+										parentWindow.clearAllConstraints();
+									} else {
+										alert(commandConsoleMessages.comments.parentWindowNotFound);
+									}
+								} catch(e){ console.log(e); }
+							}
+						});
+					}
 					function hideModal(){
 						if (reShowTimeout) { clearTimeout(reShowTimeout); reShowTimeout = null; }
 						modal.classList.remove('visible');
@@ -2688,6 +2695,35 @@ function openForbiddenWindow() {
 			</body></html>`);
 			doc.close();
 		}
+		
+		// 팝업이 열릴 때마다 모달 상태 초기화
+		if (forbiddenPopup && !forbiddenPopup.closed) {
+			try {
+				const doc = forbiddenPopup.document;
+				const modal = doc.getElementById('initialModal');
+				const showBtn = doc.getElementById('showBtn');
+				const showWarn = doc.getElementById('showWarn');
+				const appliedSection = doc.getElementById('appliedSection');
+				const pendingSection = doc.getElementById('pendingSection');
+				
+				if (modal) {
+					// 항상 모달을 visible 상태로 강제 설정 (blindDelay는 나중에 체크)
+					modal.style.display = '';
+					modal.classList.remove('visible');
+					// 강제로 reflow 발생
+					void modal.offsetWidth;
+					modal.classList.add('visible');
+					
+					if (appliedSection) appliedSection.style.display = 'none';
+					if (pendingSection) pendingSection.style.display = 'none';
+					if (showBtn) showBtn.style.display = '';
+					if (showWarn) showWarn.style.display = '';
+				}
+			} catch(e) { 
+				console.warn('모달 초기화 실패:', e);
+			}
+		}
+		
 		renderForbiddenWindowContent();
 		if (forbiddenPopup && !forbiddenPopup.closed) forbiddenPopup.focus();
 	} catch (e) {

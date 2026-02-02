@@ -27,6 +27,11 @@ const commandConsoleMessages = {
 			'💾 <code data-cmd="save">save</code> / <code data-cmd="저장">저장</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>' +
 			'📥 <code data-cmd="load">load</code> / <code data-cmd="불러오기">불러오기</code><br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>' +
 			'🔄 <code data-cmd="sync">sync</code> / <code data-cmd="동기화">동기화</code><br>   서버의 최신 데이터를 불러와 현재 화면과 동기화합니다.<br>   다른 사용자가 변경한 내용을 즉시 반영합니다.<br><br>' +
+		'🔄 <code data-cmd="sync rule">sync rule</code> / <code data-cmd="동기화 규칙">동기화 규칙</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙만 서버에 저장하고 동기화합니다.<br><br>' +
+		'🔄 <code data-cmd="sync option">sync option</code> / <code data-cmd="동기화 옵션">동기화 옵션</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   팀 생성 옵션만 서버에 저장하고 동기화합니다.<br>   (최대인원, 성별균형, 가중치균형, 팀 인원수)<br><br>' +
+		'🔄 <code data-cmd="sync member">sync member</code> / <code data-cmd="동기화 참가자">동기화 참가자</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 목록만 서버에 저장하고 동기화합니다.<br><br>' +
+		'🔄 <code data-cmd="sync people">sync people</code> / <code data-cmd="동기화 미참가자">동기화 미참가자</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   미참가자 목록만 서버에 저장하고 동기화합니다.<br><br>' +
+		'🔄 <code data-cmd="sync constraint">sync constraint</code> / <code data-cmd="동기화 제약">동기화 제약</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   제약 조건만 서버에 저장하고 동기화합니다.<br><br>' +
 			'🗑️ <code data-cmd="clear">clear</code> / <code data-cmd="초기화">초기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화합니다.<br>   ⚠️ 비밀번호와 프로필은 유지되며, 초기화된 데이터는 복구할 수 없습니다.<br><br>' +
 			'🗑️ <code data-cmd="delete">delete</code> / <code data-cmd="삭제">삭제</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 프로필을 완전히 삭제합니다.<br>   ⚠️ 비밀번호 확인과 프로필 이름 확인 후 삭제되며 복구할 수 없습니다.<br>   삭제 후 프로필 선택 화면으로 이동합니다.<br><br>' +
 			'📊 <code data-cmd="status">status</code> / <code data-cmd="상태">상태</code><br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>' +

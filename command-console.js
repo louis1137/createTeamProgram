@@ -1165,7 +1165,7 @@ const commandConsole = {
 				break;
 			case 'sync':
 			case '동기화':
-				this.syncCommand();
+				this.syncCommand(args.join(' '));
 				break;
 			case 'clear':
 			case '초기화':
@@ -1302,12 +1302,52 @@ const commandConsole = {
 			});
 	},
 	
-	syncCommand() {
+	syncCommand(args) {
 		if (!syncEnabled || !currentRoomKey) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
 		
+		// 세분화된 동기화 옵션 처리
+		const option = args.toLowerCase().trim();
+		
+		// 옵션이 있는 경우
+		if (option) {
+			switch (option) {
+				case 'rule':
+				case '규칙':
+					this.syncRuleCommand();
+					return;
+				case 'option':
+				case '옵션':
+					this.syncOptionCommand();
+					return;
+				case 'member':
+				case '참가자':
+					this.syncMemberCommand();
+					return;
+				case 'people':
+				case '미참가자':
+					this.syncPeopleCommand();
+					return;
+				case 'constraint':
+				case '제약':
+					this.syncConstraintCommand();
+					return;
+				default:
+					// 잘못된 옵션
+					this.error(`❌ 알 수 없는 동기화 옵션: "${args}"<br>사용 가능한 옵션: 규칙, 옵션, 참가자, 미참가자, 제약`);
+					return;
+			}
+		} else {
+			// 옵션이 없으면 전체 동기화
+			this.syncAllCommand();
+			return;
+		}
+	},
+	
+	// 전체 동기화 (기존 sync 명령어)
+	syncAllCommand() {
 		this.log(this.comments.saving);
 		
 		// 먼저 현재 상태를 저장
@@ -1369,6 +1409,205 @@ const commandConsole = {
 				.catch((error) => {
 					this.error(`❌ 동기화 실패: ${error.message}`);
 				});
+	},
+	
+	// 규칙만 동기화
+	syncRuleCommand() {
+		this.log('📊 규칙 동기화 중...');
+		
+		database.ref(`rooms/${currentRoomKey}`).once('value')
+			.then((snapshot) => {
+				const existingData = snapshot.val() || {};
+				
+				// 규칙 관련 데이터만 업데이트
+				const updates = {
+					hiddenGroups: state.hiddenGroups,
+					hiddenGroupChains: state.hiddenGroupChains,
+					pendingHiddenGroups: state.pendingHiddenGroups,
+					pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+					timestamp: Date.now()
+				};
+				
+				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+			})
+			.then(() => {
+				const syncTrigger = Date.now();
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				return database.ref(`rooms/${currentRoomKey}`).once('value');
+			})
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data) {
+					loadStateFromData(data);
+					this.success(this.comments.syncRuleComplete);
+				}
+			})
+			.catch((error) => {
+				this.error(`❌ 규칙 동기화 실패: ${error.message}`);
+			});
+	},
+	
+	// 옵션만 동기화
+	syncOptionCommand() {
+		this.log('⚙️ 옵션 동기화 중...');
+		
+		database.ref(`rooms/${currentRoomKey}`).once('value')
+			.then((snapshot) => {
+				const existingData = snapshot.val() || {};
+				
+				// 옵션 관련 데이터만 업데이트
+				const updates = {
+					maxTeamSizeEnabled: state.maxTeamSizeEnabled,
+					genderBalanceEnabled: state.genderBalanceEnabled,
+					weightBalanceEnabled: state.weightBalanceEnabled,
+					membersPerTeam: state.membersPerTeam,
+					timestamp: Date.now()
+				};
+				
+				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+			})
+			.then(() => {
+				const syncTrigger = Date.now();
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				return database.ref(`rooms/${currentRoomKey}`).once('value');
+			})
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data) {
+					loadStateFromData(data);
+					this.success(this.comments.syncOptionComplete);
+				}
+			})
+			.catch((error) => {
+				this.error(`❌ 옵션 동기화 실패: ${error.message}`);
+			});
+	},
+	
+	// 참가자만 동기화
+	syncMemberCommand() {
+		this.log('👥 참가자 동기화 중...');
+		
+		database.ref(`rooms/${currentRoomKey}`).once('value')
+			.then((snapshot) => {
+				const existingData = snapshot.val() || {};
+				
+				// 참가자 관련 데이터만 업데이트
+				const updates = {
+					people: state.people,
+					nextId: state.nextId,
+					timestamp: Date.now()
+				};
+				
+				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+			})
+			.then(() => {
+				const syncTrigger = Date.now();
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				return database.ref(`rooms/${currentRoomKey}`).once('value');
+			})
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data) {
+					loadStateFromData(data);
+					this.success(this.comments.syncMemberComplete);
+				}
+			})
+			.catch((error) => {
+				this.error(`❌ 참가자 동기화 실패: ${error.message}`);
+			});
+	},
+	
+	// 미참가자만 동기화
+	syncPeopleCommand() {
+		this.log('👤 미참가자 동기화 중...');
+		
+		database.ref(`rooms/${currentRoomKey}`).once('value')
+			.then((snapshot) => {
+				const existingData = snapshot.val() || {};
+				
+				// 미참가자 관련 데이터만 업데이트
+				const updates = {
+					inactivePeople: state.inactivePeople,
+					timestamp: Date.now()
+				};
+				
+				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+			})
+			.then(() => {
+				const syncTrigger = Date.now();
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				return database.ref(`rooms/${currentRoomKey}`).once('value');
+			})
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data) {
+					loadStateFromData(data);
+					this.success(this.comments.syncPeopleComplete);
+				}
+			})
+			.catch((error) => {
+				this.error(`❌ 미참가자 동기화 실패: ${error.message}`);
+			});
+	},
+	
+	// 제약만 동기화
+	syncConstraintCommand() {
+		this.log('🔗 제약 동기화 중...');
+		
+		database.ref(`rooms/${currentRoomKey}`).once('value')
+			.then((snapshot) => {
+				const existingData = snapshot.val() || {};
+				
+				// 제약 관련 데이터만 업데이트
+				const updates = {
+					requiredGroups: state.requiredGroups,
+					forbiddenPairs: state.forbiddenPairs,
+					pendingConstraints: state.pendingConstraints,
+					timestamp: Date.now()
+				};
+				
+				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+			})
+			.then(() => {
+				const syncTrigger = Date.now();
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				return database.ref(`rooms/${currentRoomKey}`).once('value');
+			})
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data) {
+					loadStateFromData(data);
+					this.success(this.comments.syncConstraintComplete);
+				}
+			})
+			.catch((error) => {
+				this.error(`❌ 제약 동기화 실패: ${error.message}`);
+			});
 	},
 	
 	clearCommand() {
@@ -1626,7 +1865,7 @@ const commandConsole = {
 				const personA = state.people.find(p => p.id === pair[0]);
 				const personB = state.people.find(p => p.id === pair[1]);
 				if (personA && personB) {
-					output += `${index + 1}. ${personA.name} ? ${personB.name}<br>`;
+					output += `${index + 1}. ${personA.name} ⛔ ${personB.name}<br>`;
 				}
 			});
 			output += '<br>';
@@ -1636,7 +1875,7 @@ const commandConsole = {
 		if (state.pendingConstraints.length > 0) {
 			output += `<strong>? 보류 제약 (${state.pendingConstraints.length}개):</strong><br>`;
 			state.pendingConstraints.forEach((constraint, index) => {
-				output += `${index + 1}. ${constraint.left} ? ${constraint.right}<br>`;
+				output += `${index + 1}. ${constraint.left} ⛔ ${constraint.right}<br>`;
 			});
 		}
 		
