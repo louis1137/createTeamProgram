@@ -124,6 +124,21 @@ function init() {
 	// localStorage에서 데이터 복원 (프로필이 없을 경우에만)
 	if (!currentRoomKey) {
 		loadFromLocalStorage();
+	} else if (database) {
+		// 프로필이 있는 경우 Firebase에서 데이터 즉시 로드
+		database.ref(`rooms/${currentRoomKey}`).once('value')
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data && (data.people || data.timestamp)) {
+					loadStateFromData(data);
+					console.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`);
+				}
+				// 실시간 동기화 설정
+				setupRealtimeSync();
+			})
+			.catch((error) => {
+				console.error(`데이터 로드 실패: ${error.message}`);
+			});
 	}
 
 	renderPeople();
