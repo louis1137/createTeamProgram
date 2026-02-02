@@ -134,9 +134,6 @@ function init() {
 	// 이전에 참가자가 추가되어 있다면 보류 중인 히든 그룹을 해결 시도
 	tryResolveHiddenGroups();
 	
-	// 제약이 있으면 확인 레이어 띄우기 (모든 초기화 완료 후)
-	if (state.forbiddenPairs.length > 0 || state.pendingConstraints.length > 0) setTimeout(() => { showConstraintNotification(); }, 100);
-	
 	// 제약 목록 확인 레이어 이벤트 리스너
 	const constraintNotificationConfirm = document.getElementById('constraintNotificationConfirm');
 	const constraintNotificationCancel = document.getElementById('constraintNotificationCancel');
@@ -1587,7 +1584,9 @@ function addPerson(fromConsole = false) {
 					if (left && right) {
 						const rres = removeForbiddenPairByNames(left, right);
 						if (!rres.ok) console.log('보류/적용 제약 제거 실패:', rres.message);
-						else { safeOpenForbiddenWindow(); constraintsTouched = true; }
+						else { constraintsTouched = true; }
+						// 명령어로 제약 제거 시 창 열기
+						safeOpenForbiddenWindow();
 					}
 				}
 				// 쌍 제약 처리: A!B!C!D -> 모든 조합 쌍 생성
@@ -1612,6 +1611,8 @@ function addPerson(fromConsole = false) {
 							} else {
 								const pres = addPendingConstraint(ln, rn);
 								if (pres.ok) constraintsTouched = true;
+								// 보류 제약도 사용자가 명시적으로 !를 입력했으므로 창 표시
+								safeOpenForbiddenWindow();
 							}
 						}
 					}
@@ -2008,11 +2009,6 @@ function addForbiddenPairByNames(nameA, nameB) {
 		state.forbiddenPairs.push([pa.id, pb.id]);
 		buildForbiddenMap();
 		saveToLocalStorage();
-		safeOpenForbiddenWindow();
-	} else {
-		// 이미 존재할 때의 디버그 로그 제거
-		// 제약이 이미 존재하더라도 팝업을 열어 사용자가 확인/관리할 수 있도록 함
-		safeOpenForbiddenWindow();
 	}
 	return { ok: true, added: !exists };
 } 
@@ -2024,11 +2020,9 @@ function addPendingConstraint(leftName, rightName) {
 	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePersonConstraintError };
 	// 보류 목록에서 중복 방지
 	const existsPending = state.pendingConstraints.some(pc => pc.left === l && pc.right === r);
-	if (existsPending) { safeOpenForbiddenWindow(); return { ok: true }; }
+	if (existsPending) { return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
 	saveToLocalStorage();
-	// 팝업이 열려 있으면 갱신(또는 팝업 열기)
-	safeOpenForbiddenWindow();
 	return { ok: true }; 
 }
 
@@ -2050,7 +2044,7 @@ function tryResolvePendingConstraints() {
 	if (changed) {
 		buildForbiddenMap();
 		saveToLocalStorage();
-		safeOpenForbiddenWindow();
+		// 제약 관리창 자동 열기 제거 - 참가자 입력 시 !가 없으면 창이 열리지 않아야 함
 	} 
 }
 
@@ -2108,7 +2102,6 @@ function removeForbiddenPairByNames(nameA, nameB) {
 		if (state.forbiddenPairs.length !== before) {
 			buildForbiddenMap();
 			saveToLocalStorage();
-			safeOpenForbiddenWindow();
 			return { ok: true };
 		}
 	}
@@ -2117,7 +2110,6 @@ function removeForbiddenPairByNames(nameA, nameB) {
 	state.pendingConstraints = state.pendingConstraints.filter(pc => !( (pc.left === na && pc.right === nb) || (pc.left === nb && pc.right === na) ));
 	if (state.pendingConstraints.length !== beforePending) {
 		saveToLocalStorage();
-		safeOpenForbiddenWindow();
 		return { ok: true };
 	}
 	return { ok: false, message: commandConsoleMessages.comments.constraintNotFound };
