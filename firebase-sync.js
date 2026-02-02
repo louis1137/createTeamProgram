@@ -83,25 +83,8 @@ function setupRealtimeSync() {
 			const syncType = typeof syncTrigger === 'object' ? syncTrigger.type : 'all';
 			const syncTimestamp = typeof syncTrigger === 'object' ? syncTrigger.timestamp : syncTrigger;
 			
-			if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-				commandConsole.log('🔄 동기화 중...');
-			}
-			
 			// 동기화 타입에 따라 선택적으로 데이터 로드
 			loadDataByType(syncType)
-				.then(() => {
-					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-						const messages = {
-							'all': '✅ 전체 동기화가 완료되었습니다.',
-							'rule': '✅ 규칙 동기화가 완료되었습니다.',
-							'option': '✅ 옵션 동기화가 완료되었습니다.',
-							'member': '✅ 참가자 동기화가 완료되었습니다.',
-							'people': '✅ 미참가자 동기화가 완료되었습니다.',
-							'constraint': '✅ 제약 동기화가 완료되었습니다.'
-						};
-						commandConsole.log(messages[syncType] || '✅ 동기화가 완료되었습니다.');
-					}
-				})
 				.catch((error) => {
 					if (typeof commandConsole !== 'undefined' && commandConsole.error) {
 						commandConsole.error(`동기화 실패: ${error.message}`);

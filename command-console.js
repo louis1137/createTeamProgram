@@ -1348,8 +1348,6 @@ const commandConsole = {
 	
 	// 전체 동기화 (기존 sync 명령어)
 	syncAllCommand() {
-		this.log(this.comments.saving);
-		
 		// 먼저 현재 상태를 저장
 		database.ref(`rooms/${currentRoomKey}/password`).once('value')
 			.then((snapshot) => {
@@ -1381,11 +1379,9 @@ const commandConsole = {
 				return database.ref(`rooms/${currentRoomKey}`).set(data);
 			})
 			.then(() => {
-					this.success(this.comments.saveComplete);
-					this.log(this.comments.syncing);
 				// 동기화 트리거를 Firebase에 기록하여 모든 창에 알림
 				const syncTrigger = { timestamp: Date.now(), type: 'all' };
-				
+
 				// 자신이 발생시킨 트리거는 리스너에서 무시하도록 lastSyncTrigger 미리 업데이트
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
@@ -1401,7 +1397,7 @@ const commandConsole = {
 				const data = snapshot.val();
 					if (data) {
 						loadStateFromData(data);
-						this.success(`✅ 동기화 요청완료`);
+						this.success(`✅ 동기화 및 저장 완료`);
 					} else {
 					this.warn(this.comments.noSavedData + '.');
 				}
@@ -1460,7 +1456,7 @@ const commandConsole = {
 				state.pendingHiddenGroupChains = pendingHiddenGroupChainsSnap.val() || [];
 				
 				// UI 업데이트는 필요 없음 (규칙은 UI에 직접 표시되지 않음)
-				this.success(this.comments.syncRuleComplete);
+				this.success(`✅ 동기화 및 저장 완료`);
 			})
 			.catch((error) => {
 				this.error(`❌ 규칙 동기화 실패: ${error.message}`);
@@ -1521,7 +1517,7 @@ const commandConsole = {
 				if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.checked = state.weightBalanceEnabled;
 				if (elements.teamSizeInput) elements.teamSizeInput.value = state.membersPerTeam;
 				
-				this.success(this.comments.syncOptionComplete);
+				this.success(`✅ 동기화 및 저장 완료`);
 			})
 			.catch((error) => {
 				this.error(`❌ 옵션 동기화 실패: ${error.message}`);
@@ -1568,7 +1564,7 @@ const commandConsole = {
 				buildForbiddenMap();
 				renderPeople();
 				
-				this.success(this.comments.syncMemberComplete);
+				this.success(`✅ 동기화 및 저장 완료`);
 			})
 			.catch((error) => {
 				this.error(`❌ 참가자 동기화 실패: ${error.message}`);
@@ -1609,7 +1605,7 @@ const commandConsole = {
 				// UI 업데이트
 				renderPeople();
 				
-				this.success(this.comments.syncPeopleComplete);
+				this.success(`✅ 동기화 및 저장 완료`);
 			})
 			.catch((error) => {
 				this.error(`❌ 미참가자 동기화 실패: ${error.message}`);
@@ -1659,7 +1655,7 @@ const commandConsole = {
 				buildForbiddenMap();
 				renderPeople();
 				
-				this.success(this.comments.syncConstraintComplete);
+				this.success(`✅ 동기화 및 저장 완료`);
 			})
 			.catch((error) => {
 				this.error(`❌ 제약 동기화 실패: ${error.message}`);
