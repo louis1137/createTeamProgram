@@ -25,38 +25,57 @@ const commandConsoleMessages = {
 		unknownCommand: '알 수 없는 명령어: <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code>를 입력하여 도움말을 확인하세요.',
 		consoleReady: '콘솔이 준비되었습니다.',
 		helpMessage : '=== 📋 명령어 도움말 ===<br><br>' +
-			'💾 <code data-cmd="save">save</code> / <code data-cmd="저장">저장</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>' +
-			'📥 <code data-cmd="load">load</code> / <code data-cmd="불러오기">불러오기</code><br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>' +
-			'🔄 <code data-cmd="sync">sync</code> / <code data-cmd="동기화">동기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   서버의 최신 데이터를 불러와 현재 화면과 동기화합니다.<br>   다른 사용자가 변경한 내용을 즉시 반영합니다.<br><br>' +
-		'🔄 <code data-cmd="sync rule">sync rule</code> / <code data-cmd="동기화 규칙">동기화 규칙</code> / <code data-cmd="동기화 확률">동기화 확률</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙만 서버에 저장하고 동기화합니다.<br><br>' +
-		'🔄 <code data-cmd="sync option">sync option</code> / <code data-cmd="동기화 옵션">동기화 옵션</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   팀 생성 옵션만 서버에 저장하고 동기화합니다.<br>   (최대인원, 성별균형, 가중치균형, 팀 인원수)<br><br>' +
-		'🔄 <code data-cmd="sync member">sync member</code> / <code data-cmd="동기화 참가자">동기화 참가자</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 목록만 서버에 저장하고 동기화합니다.<br><br>' +
-		'🔄 <code data-cmd="sync people">sync people</code> / <code data-cmd="동기화 미참가자">동기화 미참가자</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   미참가자 목록만 서버에 저장하고 동기화합니다.<br><br>' +
-		'🔄 <code data-cmd="sync constraint">sync constraint</code> / <code data-cmd="동기화 제약">동기화 제약</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   제약 조건만 서버에 저장하고 동기화합니다.<br><br>' +
-		'🔄 <code data-cmd="sync reservation">sync reservation</code> / <code data-cmd="동기화 예약">동기화 예약</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   예약 목록만 서버에 저장하고 동기화합니다.<br><br>' +
-			'🗑️ <code data-cmd="clear">clear</code> / <code data-cmd="초기화">초기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화합니다.<br>   ⚠️ 비밀번호와 프로필은 유지되며, 초기화된 데이터는 복구할 수 없습니다.<br><br>' +
-			'🗑️ <code data-cmd="delete">delete</code> / <code data-cmd="삭제">삭제</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 프로필을 완전히 삭제합니다.<br>   ⚠️ 비밀번호 확인과 프로필 이름 확인 후 삭제되며 복구할 수 없습니다.<br>   삭제 후 프로필 선택 화면으로 이동합니다.<br><br>' +
-			'📊 <code data-cmd="status">status</code> / <code data-cmd="상태">상태</code><br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>' +
-			'🔓 <code data-cmd="login">login</code> / <code data-cmd="로그인">로그인</code><br>   읽기 전용 모드에서 쓰기 모드로 전환합니다.<br>   비밀번호를 입력하여 인증하면 데이터 수정이 가능합니다.<br><br>' +
-			'🔒 <code data-cmd="logout">logout</code> / <code data-cmd="로그아웃">로그아웃</code><br>   쓰기 모드에서 읽기 전용 모드로 전환합니다.<br>   데이터를 읽을 수만 있고 수정할 수 없습니다.<br><br>' +
-			'🔄 <code data-cmd="profile">profile</code> / <code data-cmd="프로필">프로필</code><br>   다른 프로필로 전환합니다. 프로필 이름을 입력하면<br>   해당 프로필의 데이터를 불러옵니다.<br><br>' +
-			'🔑 <code data-cmd="password">password</code> / <code data-cmd="비밀번호">비밀번호</code><br>   현재 프로필의 비밀번호를 변경합니다.<br>   현재 비밀번호 확인 후 새 비밀번호를 설정할 수 있습니다.<br><br>' +
-			'📋 <code data-cmd="member">member</code> / <code data-cmd="참가자">참가자</code><br>   현재 등록된 모든 참가자 목록을 확인합니다.<br><br>' +
-			'📋 <code data-cmd="people">people</code> / <code data-cmd="미참가자">미참가자</code><br>   현재 등록된 모든 미참가자 목록을 확인합니다.<br><br>' +
-			'📋 <code data-cmd="constraints">constraints</code> / <code data-cmd="제약">제약</code><br>   현재 설정된 제약 조건 목록을 확인합니다.<br><br>' +
-			'📊 <code data-cmd="확률">확률</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 그룹 및 설정된 확률 규칙을 확인합니다.<br><br>' +
-			'📊 <code data-cmd="규칙 명령어">규칙 명령어</code> / <code data-cmd="rule 명령어">rule 명령어</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록하거나 수정합니다.<br>   예시: <code data-cmd="규칙 A(40)B(30)C">규칙 A(40)B(30)C</code><br><br>' +
-			'📊 <code data-cmd="규칙">규칙</code> / <code data-cmd="rule">rule</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록할 수 있는 모드로 들어갑니다.<br><br>' +
-			'✏️ <code data-cmd="input 데이터">input 데이터</code> / <code data-cmd="입력 데이터">입력 데이터</code><br>   참가자 데이터를 직접 입력합니다.<br>   예시: <code data-cmd="입력 홍길동,김철수">입력 홍길동,김철수</code><br><br>' +
-			'✏️ <code data-cmd="input">input</code> / <code data-cmd="입력">입력</code><br>   참가자 데이터를 직접 입력할 수 있는 모드로 들어갑니다.<br><br>' +
-			'📅 <code data-cmd="예약">예약</code> / <code data-cmd="reservation">reservation</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   예약 모드로 진입하여 팀 구성을 예약할 수 있습니다.<br><br>' +
-			'📅 <code data-cmd="예약 A,B,C,D">예약 A,B,C,D</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   A,B,C,D를 다음 팀 생성 시 하나의 팀으로 예약합니다.<br><br>' +
-			'📋 <code data-cmd="예약 목록">예약 목록</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 등록된 예약 목록을 확인합니다.<br><br>' +
-			'❌ <code data-cmd="예약 취소">예약 취소</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   마지막에 등록한 예약을 취소합니다.<br><br>' +
-			'⏫ <code data-cmd="예약 우선 A,B,C,D">예약 우선 A,B,C,D</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   A,B,C,D를 다음 예약보다 우선하여 예약 스택 맨 앞에 추가합니다.<br><br>' +
-			'🗑️ <code data-cmd="예약 초기화">예약 초기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   모든 예약을 제거합니다.<br><br>' +
-			'🎲 <code data-cmd="generate">generate</code> / <code data-cmd="생성">생성</code><br>   설정된 조건에 따라 랜덤 팀을 생성합니다.<br><br>' +
-			'❓ <code data-cmd="help">help</code> / <code data-cmd="도움">도움</code><br>   이 도움말을 표시합니다.<br><br>',
+		'<div style="margin-bottom: 30px;">' +
+		'<h3 style="color: #22c55e; margin: 15px 0 10px 0;">🔓 명령어</h3>' +
+		'<table style="width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden;">' +
+		'<thead><tr style="background: rgba(34, 197, 94, 0.1); border-bottom: 2px solid #22c55e;">' +
+		'<th style="padding: 12px; text-align: left; width: 35%; color: #22c55e; font-weight: bold;">명령어</th>' +
+		'<th style="padding: 12px; text-align: left; color: #22c55e; font-weight: bold;">설명</th>' +
+		'</tr></thead>' +
+		'<tbody style="font-size: 14px;">' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="load">load</code> / <code data-cmd="불러오기">불러오기</code></td><td style="padding: 10px;">서버에 저장된 데이터를 불러옵니다. 최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="status">status</code> / <code data-cmd="상태">상태</code></td><td style="padding: 10px;">현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수, 제약 조건 개수 등 현재 상태를 확인합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="login">login</code> / <code data-cmd="로그인">로그인</code></td><td style="padding: 10px;">읽기 전용 모드에서 쓰기 모드로 전환합니다. 비밀번호를 입력하여 인증하면 데이터 수정이 가능합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="logout">logout</code> / <code data-cmd="로그아웃">로그아웃</code></td><td style="padding: 10px;">쓰기 모드에서 읽기 전용 모드로 전환합니다. 데이터를 읽을 수만 있고 수정할 수 없습니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="profile">profile</code> / <code data-cmd="프로필">프로필</code></td><td style="padding: 10px;">다른 프로필로 전환합니다. 프로필 이름을 입력하면 해당 프로필의 데이터를 불러옵니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="password">password</code> / <code data-cmd="비밀번호">비밀번호</code></td><td style="padding: 10px;">현재 프로필의 비밀번호를 변경합니다. 현재 비밀번호 확인 후 새 비밀번호를 설정할 수 있습니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="member">member</code> / <code data-cmd="참가자">참가자</code></td><td style="padding: 10px;">현재 등록된 모든 참가자 목록을 확인합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="people">people</code> / <code data-cmd="미참가자">미참가자</code></td><td style="padding: 10px;">현재 등록된 모든 미참가자 목록을 확인합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="constraints">constraints</code> / <code data-cmd="제약">제약</code></td><td style="padding: 10px;">현재 설정된 제약 조건 목록을 확인합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="input">input</code> / <code data-cmd="입력">입력</code></td><td style="padding: 10px;">참가자 데이터를 직접 입력할 수 있는 모드로 들어갑니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="input 데이터">input 데이터</code> / <code data-cmd="입력 데이터">입력 데이터</code></td><td style="padding: 10px;">참가자 데이터를 직접 입력합니다. 예: <code data-cmd="입력 홍길동,김철수">입력 홍길동,김철수</code></td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="generate">generate</code> / <code data-cmd="생성">생성</code></td><td style="padding: 10px;">설정된 조건에 따라 랜덤 팀을 생성합니다.</td></tr>' +
+		'<tr><td style="padding: 10px;"><code data-cmd="help">help</code> / <code data-cmd="도움">도움</code></td><td style="padding: 10px;">이 도움말을 표시합니다.</td></tr>' +
+		'</tbody></table></div>',
+		
+		helpMessageAuth : '<div style="margin-bottom: 30px;">' +
+		'<h3 style="color: #f59e0b; margin: 15px 0 10px 0;">🔐 인증 필요 명령어</h3>' +
+		'<table style="width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden;">' +
+		'<thead><tr style="background: rgba(245, 158, 11, 0.1); border-bottom: 2px solid #f59e0b;">' +
+		'<th style="padding: 12px; text-align: left; width: 35%; color: #f59e0b; font-weight: bold;">명령어</th>' +
+		'<th style="padding: 12px; text-align: left; color: #f59e0b; font-weight: bold;">설명</th>' +
+		'</tr></thead>' +
+		'<tbody style="font-size: 14px;">' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="save">save</code> / <code data-cmd="저장">저장</code></td><td style="padding: 10px;">현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다. 동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync">sync</code> / <code data-cmd="동기화">동기화</code></td><td style="padding: 10px;">서버의 최신 데이터를 불러와 현재 화면과 동기화합니다. 다른 사용자가 변경한 내용을 즉시 반영합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync rule">sync rule</code> / <code data-cmd="동기화 규칙">동기화 규칙</code></td><td style="padding: 10px;">확률 규칙만 서버에 저장하고 동기화합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync option">sync option</code> / <code data-cmd="동기화 옵션">동기화 옵션</code></td><td style="padding: 10px;">팀 생성 옵션만 서버에 저장하고 동기화합니다. (최대인원, 성별균형, 가중치균형, 팀 인원수)</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync member">sync member</code> / <code data-cmd="동기화 참가자">동기화 참가자</code></td><td style="padding: 10px;">참가자 목록만 서버에 저장하고 동기화합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync people">sync people</code> / <code data-cmd="동기화 미참가자">동기화 미참가자</code></td><td style="padding: 10px;">미참가자 목록만 서버에 저장하고 동기화합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync constraint">sync constraint</code> / <code data-cmd="동기화 제약">동기화 제약</code></td><td style="padding: 10px;">제약 조건만 서버에 저장하고 동기화합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync reservation">sync reservation</code> / <code data-cmd="동기화 예약">동기화 예약</code></td><td style="padding: 10px;">예약 목록만 서버에 저장하고 동기화합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="clear">clear</code> / <code data-cmd="초기화">초기화</code></td><td style="padding: 10px;">참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화합니다. ⚠️ 비밀번호와 프로필은 유지되며, 초기화된 데이터는 복구할 수 없습니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="delete">delete</code> / <code data-cmd="삭제">삭제</code></td><td style="padding: 10px;">현재 프로필을 완전히 삭제합니다. ⚠️ 비밀번호 확인과 프로필 이름 확인 후 삭제되며 복구할 수 없습니다. 삭제 후 프로필 선택 화면으로 이동합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="확률">확률</code></td><td style="padding: 10px;">확률 그룹 및 설정된 확률 규칙을 확인합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="규칙">규칙</code> / <code data-cmd="rule">rule</code></td><td style="padding: 10px;">확률 규칙을 등록할 수 있는 모드로 들어갑니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="규칙 명령어">규칙 명령어</code> / <code data-cmd="rule 명령어">rule 명령어</code></td><td style="padding: 10px;">확률 규칙을 등록하거나 수정합니다. 예: <code data-cmd="규칙 A(40)B(30)C">규칙 A(40)B(30)C</code></td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="예약">예약</code> / <code data-cmd="reservation">reservation</code></td><td style="padding: 10px;">예약 모드로 진입하여 팀 구성을 예약할 수 있습니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="예약 A,B,C">예약 A,B,C</code></td><td style="padding: 10px;">A,B,C를 다음 팀 생성 시 하나의 팀으로 예약합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="예약 목록">예약 목록</code></td><td style="padding: 10px;">현재 등록된 예약 목록을 확인합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="예약 취소">예약 취소</code></td><td style="padding: 10px;">마지막에 등록한 예약을 취소합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="예약 우선 A,B,C">예약 우선 A,B,C</code></td><td style="padding: 10px;">A,B,C를 다음 예약보다 우선하여 예약 스택 맨 앞에 추가합니다.</td></tr>' +
+		'<tr><td style="padding: 10px;"><code data-cmd="예약 초기화">예약 초기화</code></td><td style="padding: 10px;">모든 예약을 제거합니다.</td></tr>' +
+		'</tbody></table></div>',
 		
 		// --- 비밀번호 관련 ---
 		passwordCreate: '비밀번호를 생성하시겠습니까?',

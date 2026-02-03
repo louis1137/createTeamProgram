@@ -1843,10 +1843,15 @@ statusCommand() {
 },
 
 helpCommand() {
-	this.log(this.comments.helpMessage);
-},
+		let message = this.comments.helpMessage;
+		// 인증되었을 때만 인증 필요 명령어 테이블 추가
+		if (this.authenticated) {
+			message += this.comments.helpMessageAuth;
+		}
+		this.log(message);
+	},
 
-passwordCommand(newPassword) {
+	passwordCommand(newPassword) {
 	
 	// 현재 비밀번호가 없는지 확인
 	if (!this.storedPassword || this.storedPassword === '') {
