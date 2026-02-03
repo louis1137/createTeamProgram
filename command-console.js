@@ -1951,7 +1951,7 @@ helpCommand() {
 				<tbody>`;
 		
 		state.people.forEach((person, index) => {
-			const genderIcon = person.gender === 'male' ? '♂?' : person.gender === 'female' ? '♀?' : '?';
+			const genderIcon = person.gender === 'male' ? '♂️' : person.gender === 'female' ? '♀️' : '?';
 			const weight = person.weight || 0;
 			const groups = state.requiredGroups
 				.filter(group => group.includes(person.id))
@@ -2006,7 +2006,7 @@ helpCommand() {
 				<tbody>`;
 		
 		state.inactivePeople.forEach((person, index) => {
-			const genderIcon = person.gender === 'male' ? '♂?' : person.gender === 'female' ? '♀?' : '?';
+			const genderIcon = person.gender === 'male' ? '♂️' : person.gender === 'female' ? '♀️' : '?';
 			const weight = person.weight || 0;
 			
 			output += `
