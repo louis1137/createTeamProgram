@@ -40,6 +40,7 @@ const state = {
 	activeHiddenGroupChainInfo: {}, // 체이닝 정보 맵 { primaryId: { partnerId: probability } }
 	pendingHiddenGroups: [], // {left: 정규화, right: 정규화, probability: 숫자} 형식의 보류 히든 그룹 배열
 	pendingHiddenGroupChains: [], // [{primary: 정규화, candidates: [{name, probability}]}] 형식 - 보류 체이닝
+	reservations: [], // [["A","B","C","D"], ["E","F"], ...] 형식의 예약 스택 (인덱스 0이 다음 사용될 예약)
 	genderBalanceEnabled: false,
 	weightBalanceEnabled: false,
 	maxTeamSizeEnabled: false,
@@ -776,6 +777,7 @@ function saveToLocalStorage() {
 			nextId: state.nextId,
 			forbiddenPairs: state.forbiddenPairs,
 			pendingConstraints: state.pendingConstraints,
+			reservations: state.reservations, // 예약 목록 저장
 			// hiddenGroups와 pendingHiddenGroups는 저장하지 않음 (새로고침 시 초기화)
 			// 설정 값 저장
 			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
@@ -832,6 +834,7 @@ function loadFromLocalStorage() {
 			state.nextId = data.nextId || 1;
 			state.forbiddenPairs = data.forbiddenPairs || [];
 			state.pendingConstraints = data.pendingConstraints || [];
+			state.reservations = data.reservations || []; // 예약 목록 복원
 			// hiddenGroups, pendingHiddenGroups, hiddenGroupChains, pendingHiddenGroupChains는 항상 빈 배열로 초기화 (저장하지 않음)
 			state.hiddenGroups = [];
 			state.pendingHiddenGroups = [];
@@ -2140,6 +2143,96 @@ function buildForbiddenMap() {
 	});
 }
 
+// 예약을 임시 히든 그룹으로 적용 (팀 생성 시에만 사용)
+function applyReservationAsHiddenGroup(reservationNames) {
+	if (!reservationNames || reservationNames.length === 0) return;
+	
+	// 예약된 이름들을 ID로 변환 (참가자 목록에 있는 것만)
+	const reservationIds = [];
+	const notFoundNames = [];
+	
+	reservationNames.forEach(name => {
+		const person = state.people.find(p => p.name === name);
+		if (person) {
+			reservationIds.push(person.id);
+		} else {
+			notFoundNames.push(name);
+		}
+	});
+	
+	// 참가자가 1명 이하면 예약 적용 불가
+	if (reservationIds.length <= 1) return;
+	
+	// 예약 그룹과 규칙의 상호작용 처리
+	// 규칙 A(확률)B가 있고 예약에 B가 포함되어 있으면, A도 예약 그룹에 확률적으로 추가
+	const additionalIds = [];
+	
+	// hiddenGroupChains 확인 (A(확률)B(확률)C 형태)
+	state.hiddenGroupChains.forEach(chain => {
+		const primaryPerson = state.people.find(p => p.name === chain.primary);
+		if (!primaryPerson) return;
+		
+		// chain의 candidates 중에 예약에 포함된 사람이 있는지 확인
+		for (const candidate of chain.candidates) {
+			const candidatePerson = state.people.find(p => p.name === candidate.name);
+			if (!candidatePerson) continue;
+			
+			// 예약에 candidate가 포함되어 있는지 확인
+			if (reservationIds.includes(candidatePerson.id)) {
+				// 확률 체크
+				const random = Math.random() * 100;
+				if (random < candidate.probability) {
+					// primary를 예약 그룹에 추가
+					if (!reservationIds.includes(primaryPerson.id) && !additionalIds.includes(primaryPerson.id)) {
+						additionalIds.push(primaryPerson.id);
+						
+						// 적용된 규칙 정보 저장
+						if (!window.appliedReservationRules) {
+							window.appliedReservationRules = [];
+						}
+						window.appliedReservationRules.push({
+							primaryName: chain.primary,
+							partnerName: candidate.name,
+							probability: candidate.probability
+						});
+					}
+					break; // 첫 번째 매칭 성공 시 중단
+				}
+			}
+		}
+	});
+	
+	// 추가 ID들을 예약 그룹에 포함
+	const finalReservationIds = [...reservationIds, ...additionalIds];
+	
+	// 예약된 참가자들을 activeHiddenGroupMap에 직접 추가 (히든 그룹으로 처리)
+	// 모든 예약 참가자를 서로 연결하여 하나의 클러스터로 만듦
+	finalReservationIds.forEach(id1 => {
+		if (!state.activeHiddenGroupMap[id1]) {
+			state.activeHiddenGroupMap[id1] = new Set();
+		}
+		finalReservationIds.forEach(id2 => {
+			if (id1 !== id2) {
+				state.activeHiddenGroupMap[id1].add(id2);
+			}
+		});
+	});
+	
+	// 예약 적용 정보 저장 (나중에 CMD 출력용)
+	window.appliedReservation = {
+		names: reservationNames,
+		foundNames: reservationIds.map(id => state.people.find(p => p.id === id).name),
+		additionalNames: additionalIds.map(id => state.people.find(p => p.id === id).name),
+		notFoundNames: notFoundNames
+	};
+}
+
+// 예약으로 추가된 임시 그룹 제거 (더 이상 필요 없음)
+function removeTemporaryReservationGroup() {
+	// activeHiddenGroupMap은 deactivateHiddenGroups에서 자동으로 초기화됨
+	// 별도 처리 불필요
+}
+
 // 팀 생성 시 히든 그룹 활성화 (확률 기반)
 function activateHiddenGroupsForTeamGeneration() {
 	state.activeHiddenGroupMap = {};
@@ -2260,6 +2353,10 @@ function deactivateHiddenGroups() {
 	
 	state.activeHiddenGroupMap = {};
 	state.activeHiddenGroupChainInfo = {};
+	
+	// 예약 정보 초기화 (팀 표시 완료 후)
+	window.appliedReservation = null;
+	window.appliedReservationRules = null;
 }
 
 // 히든 그룹 추가 (이름 기반)
@@ -3022,8 +3119,28 @@ function shuffleTeams() {
 		return;
 	}
 
-	const teams = generateTeams(preShufflePeopleForGeneration(validPeople));
+	// 예약 처리: 첫 번째 예약을 꺼내서 전달
+	let consumedReservation = null;
+	if (state.reservations.length > 0) {
+		consumedReservation = state.reservations.shift();  // 첫 번째 예약 꺼내기
+		saveToLocalStorage();
+	}
+
+	const teams = generateTeams(preShufflePeopleForGeneration(validPeople), consumedReservation);
 	if (!teams) return; // generateTeams가 불가능할 경우 오류를 표시함
+	
+	// 예약 소모 알림 (CMD 콘솔에 출력)
+	if (consumedReservation && typeof commandConsole !== 'undefined' && commandConsole.log) {
+		commandConsole.log(commandConsoleMessages.comments.reservationConsumed.replace('{members}', consumedReservation.join(', ')));
+	}
+	
+	// Firebase에 예약 소모 반영
+	if (consumedReservation && syncEnabled && currentRoomKey) {
+		database.ref(`rooms/${currentRoomKey}/reservations`).set(state.reservations)
+			.catch(error => {
+				console.error('예약 동기화 실패:', error);
+			});
+	}
 	
 	// 검증된 팀 저장
 	currentTeams = teams;
@@ -3070,11 +3187,16 @@ function preShufflePeopleForGeneration(people) {
 	}
 }
 
-function generateTeams(people) {
+function generateTeams(people, reservation = null) {
 	buildForbiddenMap();
 	
 	// 히든 그룹 확률 기반 활성화
 	activateHiddenGroupsForTeamGeneration();
+	
+	// 예약 처리: activateHiddenGroupsForTeamGeneration 이후에 적용
+	if (reservation) {
+		applyReservationAsHiddenGroup(reservation);
+	}
 
 	// 팀 순서 배열에서 마지막 팀 인덱스를 항상 맨 뒤로 보낼지 결정하는 공통 로직
 	function pushLastTeamToEndIfNeeded(teamOrder, teams) {
@@ -3910,12 +4032,59 @@ function logTeamResultsToConsole(teams) {
 	// 적용된 규칙이 있을 경우 추가 (인증된 사용자만)
 	let outputMessage = `${commandConsoleMessages.comments.generatedTeams}<br>${teamResults}`;
 	
-	if (commandConsole.authenticated && state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
-		const ruleResults = state.activeHiddenGroupChainInfo.map(info => {
-			return `- ${info.primaryName} → ${info.candidateName} (${info.probability}%)`;
+	// 적용된 예약 정보 출력
+	if (commandConsole.authenticated && window.appliedReservation) {
+		const reservation = window.appliedReservation;
+		let reservationInfo = `<br><br>${commandConsoleMessages.comments.reservationApplied}<br>`;
+		
+		// 적용된 참가자 목록
+		const appliedNames = [...reservation.foundNames];
+		if (reservation.additionalNames && reservation.additionalNames.length > 0) {
+			appliedNames.push(...reservation.additionalNames);
+		}
+		
+		reservationInfo += `  - ${appliedNames.join(', ')}`;
+		
+		// 적용되지 못한 참가자 표시
+		if (reservation.notFoundNames && reservation.notFoundNames.length > 0) {
+			reservationInfo += ` <span style="color: #ff6b6b;">(미참가: ${reservation.notFoundNames.join(', ')})</span>`;
+		}
+		
+		outputMessage += reservationInfo;
+	}
+	
+	// 적용된 규칙과 예약의 상호작용 출력
+	if (commandConsole.authenticated && window.appliedReservationRules && window.appliedReservationRules.length > 0) {
+		const ruleResults = window.appliedReservationRules.map(rule => {
+			return `  - ${rule.primaryName} → ${rule.partnerName} (${rule.probability}%)`;
 		}).join('<br>');
 		
 		outputMessage += `<br><br>${commandConsoleMessages.comments.appliedRules}<br>${ruleResults}`;
+	}
+	
+	// 일반 규칙 출력 (예약과 무관한 규칙)
+	if (commandConsole.authenticated && state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
+		// 예약 규칙과 중복되지 않는 것만 출력
+		const appliedRuleNames = window.appliedReservationRules ? window.appliedReservationRules.map(r => `${r.primaryName}-${r.partnerName}`) : [];
+		
+		const generalRules = state.activeHiddenGroupChainInfo.filter(info => {
+			const ruleName = `${info.primaryName}-${info.candidateName}`;
+			return !appliedRuleNames.includes(ruleName);
+		});
+		
+		if (generalRules.length > 0) {
+			const ruleResults = generalRules.map(info => {
+				return `  - ${info.primaryName} → ${info.candidateName} (${info.probability}%)`;
+			}).join('<br>');
+			
+			if (window.appliedReservationRules && window.appliedReservationRules.length > 0) {
+				// 이미 규칙 섹션이 있으면 추가
+				outputMessage += `<br>${ruleResults}`;
+			} else {
+				// 규칙 섹션 새로 생성
+				outputMessage += `<br><br>${commandConsoleMessages.comments.appliedRules}<br>${ruleResults}`;
+			}
+		}
 	}
 	
 	commandConsole.log(outputMessage);

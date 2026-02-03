@@ -53,7 +53,7 @@ const commandConsole = {
 				    this.inputMode === 'password-change' || this.inputMode === 'delete-confirm' ||
 				    this.inputMode === 'delete-password-confirm' || this.inputMode === 'password-delete-confirm' ||
 				    this.inputMode === 'matching' || this.inputMode === 'input-data' || 
-				    this.inputMode === 'profile-switch') {
+				    this.inputMode === 'profile-switch' || this.inputMode === 'reservation') {
 					e.preventDefault();
 					e.stopPropagation();
 					this.log(this.comments.cancel);
@@ -754,6 +754,28 @@ const commandConsole = {
 		}
 		this.input.value = '';
 		
+		if (this.inputMode === 'reservation') {
+			// 예약 모드: 예약 명령어 처리
+			// 예약 등록 처리
+			try {
+				const names = cmd.split(',').map(n => n.trim()).filter(n => n);
+				if (names.length === 0) {
+					this.error(commandConsoleMessages.comments.reservationInvalidFormat);
+				} else {
+					state.reservations.push(names);
+					this.success(commandConsoleMessages.comments.reservationAdded.replace('{members}', names.join(', ')));
+					saveToLocalStorage();
+				}
+			} catch (error) {
+				this.error(commandConsoleMessages.comments.reservationAddFailed.replace('{error}', error.message));
+			}
+			
+			// 예약 모드 유지 (취소 또는 ESC로만 종료 가능)
+			this.input.placeholder = this.placeholders.reservation;
+			setTimeout(() => this.input.focus(), 50);
+			return;
+		}
+		
 		if (this.inputMode === 'matching') {
 			// 규칙 모드: 히든 그룹 명령어 처리
 			this.log(`> ${cmd}`, 'command');
@@ -1222,6 +1244,10 @@ const commandConsole = {
 			case '입력':
 				this.inputCommand(args.join(' '));
 				break;
+			case 'reservation':
+			case '예약':
+				this.reservationCommand(args.join(' '));
+				break;
 			case 'delete':
 			case '삭제':
 			case 'delete-profile':
@@ -1259,6 +1285,7 @@ const commandConsole = {
 				hiddenGroupChains: state.hiddenGroupChains,
 				pendingHiddenGroups: state.pendingHiddenGroups,
 				pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+				reservations: state.reservations,
 				maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 				genderBalanceEnabled: state.genderBalanceEnabled,
 				weightBalanceEnabled: state.weightBalanceEnabled,
@@ -1335,9 +1362,13 @@ const commandConsole = {
 				case '제약':
 					this.syncConstraintCommand();
 					return;
+				case 'reservation':
+				case '예약':
+					this.syncReservationCommand();
+					return;
 				default:
 					// 잘못된 옵션
-					this.error(`❌ 알 수 없는 동기화 옵션: "${args}"<br>사용 가능한 옵션: 규칙, 확률, 옵션, 참가자, 미참가자, 제약`);
+					this.error(`❌ 알 수 없는 동기화 옵션: "${args}"<br>사용 가능한 옵션: 규칙, 확률, 옵션, 참가자, 미참가자, 제약, 예약`);
 					return;
 			}
 		} else {
@@ -1365,6 +1396,7 @@ const commandConsole = {
 					hiddenGroupChains: state.hiddenGroupChains,
 					pendingHiddenGroups: state.pendingHiddenGroups,
 					pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+					reservations: state.reservations,
 					maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 					genderBalanceEnabled: state.genderBalanceEnabled,
 					weightBalanceEnabled: state.weightBalanceEnabled,
@@ -1653,6 +1685,41 @@ const commandConsole = {
 			});
 	},
 	
+	syncReservationCommand() {
+		database.ref(`rooms/${currentRoomKey}`).once('value')
+			.then((snapshot) => {
+				const existingData = snapshot.val() || {};
+				
+				// 예약 데이터만 업데이트
+				const updates = {
+					reservations: state.reservations,
+					timestamp: Date.now()
+				};
+				
+				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+			})
+			.then(() => {
+				const syncTrigger = { timestamp: Date.now(), type: 'reservation' };
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				// 예약 데이터만 다시 로드
+				return database.ref(`rooms/${currentRoomKey}/reservations`).once('value');
+			})
+			.then((snapshot) => {
+				// 예약 데이터만 state에 반영
+				state.reservations = snapshot.val() || [];
+				
+				this.success(`✅ 동기화 및 저장 완료`);
+			})
+			.catch((error) => {
+				this.error(`❌ 예약 동기화 실패: ${error.message}`);
+			});
+	},
+	
 	clearCommand() {
 		if (!syncEnabled || !currentRoomKey) {
 			this.error(this.comments.firebaseMissing);
@@ -1677,6 +1744,7 @@ const commandConsole = {
 						hiddenGroupChains: [],
 						pendingHiddenGroups: [],
 						pendingHiddenGroupChains: [],
+						reservations: [],
 						maxTeamSizeEnabled: false,
 						genderBalanceEnabled: false,
 						weightBalanceEnabled: false,
@@ -2176,6 +2244,97 @@ const commandConsole = {
 			this.success(`${this.comments.participantAddComplete} ${data}`);
 		} else {
 			this.error(this.comments.participantAddDisabled);
+		}
+	},
+	
+	reservationCommand(args) {
+		// 인증 체크
+		if (!this.authenticated) {
+			this.error(this.comments.readOnlyFeatureDisabled);
+			this.log(this.comments.authenticationRequired);
+			return;
+		}
+		
+		const trimmedArgs = args.trim();
+		
+		// 예약 목록 보기
+		if (trimmedArgs === '목록') {
+			if (state.reservations.length === 0) {
+				this.log(commandConsoleMessages.comments.reservationEmpty);
+			} else {
+				this.log(commandConsoleMessages.comments.reservationList.replace('{count}', state.reservations.length));
+				state.reservations.forEach((reservation, index) => {
+					this.log(commandConsoleMessages.comments.reservationListItem
+						.replace('{index}', index + 1)
+						.replace('{members}', reservation.join(', ')));
+				});
+			}
+			return;
+		}
+		
+		// 예약 취소 (마지막 예약 제거)
+		if (trimmedArgs === '취소') {
+			if (state.reservations.length === 0) {
+				this.error(commandConsoleMessages.comments.reservationCancelFailed);
+			} else {
+				const removed = state.reservations.pop();
+				this.success(commandConsoleMessages.comments.reservationCanceled.replace('{members}', removed.join(', ')));
+				saveToLocalStorage();
+			}
+			return;
+		}
+		
+		// 예약 초기화
+		if (trimmedArgs === '초기화') {
+			state.reservations = [];
+			this.success(commandConsoleMessages.comments.reservationCleared);
+			saveToLocalStorage();
+			return;
+		}
+		
+		// 예약 우선 추가 (맨 앞에 삽입)
+		if (trimmedArgs.startsWith('우선 ')) {
+			const namesStr = trimmedArgs.substring(3).trim();
+			if (namesStr) {
+				const names = namesStr.split(',').map(n => n.trim()).filter(n => n);
+				if (names.length === 0) {
+					this.error(commandConsoleMessages.comments.reservationInvalidFormat);
+				} else {
+					state.reservations.unshift(names);  // 맨 앞에 추가
+					this.success(commandConsoleMessages.comments.reservationPriorityAdded.replace('{members}', names.join(', ')));
+					saveToLocalStorage();
+				}
+			}
+			return;
+		}
+		
+		// 예약 등록 (A,B,C,D 형태 감지)
+		if (trimmedArgs.includes(',') || trimmedArgs.length > 0) {
+			const names = trimmedArgs.split(',').map(n => n.trim()).filter(n => n);
+			if (names.length === 0) {
+				// 데이터가 없으면 예약 모드로 진입
+				this.log(commandConsoleMessages.comments.reservationModeEnter);
+				this.inputMode = 'reservation';
+				this.input.placeholder = this.placeholders.reservation;
+				this.addCancelButton();
+				setTimeout(() => this.input.focus(), 50);
+			} else {
+				// 바로 예약 등록
+				state.reservations.push(names);
+				this.success(commandConsoleMessages.comments.reservationAdded.replace('{members}', names.join(', ')));
+				saveToLocalStorage();
+			}
+			return;
+		}
+		
+		// 인자가 없으면 예약 모드 진입
+		if (trimmedArgs === '') {
+			this.log(commandConsoleMessages.comments.reservationModeEnter);
+			this.inputMode = 'reservation';
+			this.input.placeholder = this.placeholders.reservation;
+			this.addCancelButton();
+			setTimeout(() => this.input.focus(), 50);
+			return;
 		}
 	},
 	

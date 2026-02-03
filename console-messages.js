@@ -12,7 +12,8 @@ const commandConsoleMessages = {
 		inputData: '참가자 입력 (취소: ESC)',
 		participantData: '참가자 데이터 입력...',
 		matchingRule: '확률 규칙 입력...',
-		ruleInput: '확률 규칙 입력 (취소: ESC)...'
+		ruleInput: '확률 규칙 입력 (취소: ESC)...',
+		reservation: '예약 입력 (예: A,B,C,D)...'
 	},
 
 	comments: {
@@ -32,6 +33,7 @@ const commandConsoleMessages = {
 		'🔄 <code data-cmd="sync member">sync member</code> / <code data-cmd="동기화 참가자">동기화 참가자</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 목록만 서버에 저장하고 동기화합니다.<br><br>' +
 		'🔄 <code data-cmd="sync people">sync people</code> / <code data-cmd="동기화 미참가자">동기화 미참가자</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   미참가자 목록만 서버에 저장하고 동기화합니다.<br><br>' +
 		'🔄 <code data-cmd="sync constraint">sync constraint</code> / <code data-cmd="동기화 제약">동기화 제약</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   제약 조건만 서버에 저장하고 동기화합니다.<br><br>' +
+		'🔄 <code data-cmd="sync reservation">sync reservation</code> / <code data-cmd="동기화 예약">동기화 예약</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   예약 목록만 서버에 저장하고 동기화합니다.<br><br>' +
 			'🗑️ <code data-cmd="clear">clear</code> / <code data-cmd="초기화">초기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화합니다.<br>   ⚠️ 비밀번호와 프로필은 유지되며, 초기화된 데이터는 복구할 수 없습니다.<br><br>' +
 			'🗑️ <code data-cmd="delete">delete</code> / <code data-cmd="삭제">삭제</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 프로필을 완전히 삭제합니다.<br>   ⚠️ 비밀번호 확인과 프로필 이름 확인 후 삭제되며 복구할 수 없습니다.<br>   삭제 후 프로필 선택 화면으로 이동합니다.<br><br>' +
 			'📊 <code data-cmd="status">status</code> / <code data-cmd="상태">상태</code><br>   현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수,<br>   제약 조건 개수 등 현재 상태를 확인합니다.<br><br>' +
@@ -47,6 +49,12 @@ const commandConsoleMessages = {
 			'📊 <code data-cmd="규칙">규칙</code> / <code data-cmd="rule">rule</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록할 수 있는 모드로 들어갑니다.<br><br>' +
 			'✏️ <code data-cmd="input 데이터">input 데이터</code> / <code data-cmd="입력 데이터">입력 데이터</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 데이터를 직접 입력합니다.<br>   예시: <code data-cmd="입력 홍길동,김철수">입력 홍길동,김철수</code><br><br>' +
 			'✏️ <code data-cmd="input">input</code> / <code data-cmd="입력">입력</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 데이터를 직접 입력할 수 있는 모드로 들어갑니다.<br><br>' +
+			'📅 <code data-cmd="예약">예약</code> / <code data-cmd="reservation">reservation</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   예약 모드로 진입하여 팀 구성을 예약할 수 있습니다.<br><br>' +
+			'📅 <code data-cmd="예약 A,B,C,D">예약 A,B,C,D</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   A,B,C,D를 다음 팀 생성 시 하나의 팀으로 예약합니다.<br><br>' +
+			'📋 <code data-cmd="예약 목록">예약 목록</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 등록된 예약 목록을 확인합니다.<br><br>' +
+			'❌ <code data-cmd="예약 취소">예약 취소</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   마지막에 등록한 예약을 취소합니다.<br><br>' +
+			'⏫ <code data-cmd="예약 우선 A,B,C,D">예약 우선 A,B,C,D</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   A,B,C,D를 다음 예약보다 우선하여 예약 스택 맨 앞에 추가합니다.<br><br>' +
+			'🗑️ <code data-cmd="예약 초기화">예약 초기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   모든 예약을 제거합니다.<br><br>' +
 			'🎲 <code data-cmd="generate">generate</code> / <code data-cmd="생성">생성</code><br>   설정된 조건에 따라 랜덤 팀을 생성합니다.<br><br>' +
 			'❓ <code data-cmd="help">help</code> / <code data-cmd="도움">도움</code><br>   이 도움말을 표시합니다.<br><br>',
 		
@@ -138,6 +146,7 @@ const commandConsoleMessages = {
 		syncMemberComplete: '✅ 참가자 동기화 완료',
 		syncPeopleComplete: '✅ 미참가자 동기화 완료',
 		syncConstraintComplete: '✅ 제약 동기화 완료',
+		syncReservationComplete: '✅ 예약 동기화 완료',
 		loadComplete: '📥 데이터 로드 완료!',
 		dataLoadFailed: '데이터 로드 실패: ',
 		noSavedData: '저장된 데이터가 없습니다',
@@ -284,6 +293,24 @@ const commandConsoleMessages = {
 		
 		// --- 사운드 관련 ---
 		soundPlaybackFailed: '사운드 재생 실패:',
-		audioContextNotSupported: 'AudioContext not supported'
+		audioContextNotSupported: 'AudioContext not supported',
+		
+		// --- 예약 관련 ---
+		reservationModeEnter: '📅 예약 모드로 진입했습니다. 참가자를 입력하세요 (예: A,B,C,D)',
+		reservationAdded: '✅ 예약이 등록되었습니다: {members}',
+		reservationAddFailed: '예약 등록 실패: {error}',
+		reservationCanceled: '❌ 마지막 예약이 취소되었습니다: {members}',
+		reservationCancelFailed: '취소할 예약이 없습니다.',
+		reservationPriorityAdded: '⏫ 우선 예약이 등록되었습니다: {members}',
+		reservationCleared: '🗑️ 모든 예약이 초기화되었습니다.',
+		reservationList: '📋 예약 목록 ({count}개)',
+		reservationListItem: '  {index}. {members}',
+		reservationEmpty: '등록된 예약이 없습니다.',
+		reservationConsumed: '✅ 예약 1개 소모됨: {members}',
+		reservationConsumedByOther: '📢 다른 창에서 예약이 소모되었습니다: {members}',
+		reservationSyncNotification: '📢 예약 동기화: {action}',
+		reservationInvalidFormat: '예약 형식이 올바르지 않습니다. 예: A,B,C,D',
+		reservationApplied: '[적용된 예약]',
+		reservationAppliedFormat: '  - {members}'
 	}
 };
