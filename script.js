@@ -2160,8 +2160,15 @@ function applyReservationAsHiddenGroup(reservationNames) {
 		}
 	});
 	
+	// 팀 인원수보다 많은 경우 앞에서부터 membersPerTeam 만큼만 사용
+	const maxReservationSize = state.membersPerTeam || reservationIds.length;
+	const limitedReservationIds = reservationIds.slice(0, maxReservationSize);
+	const excludedNames = reservationIds.slice(maxReservationSize).map(id => 
+		state.people.find(p => p.id === id)?.name
+	).filter(Boolean);
+	
 	// 참가자가 1명 이하면 예약 적용 불가
-	if (reservationIds.length <= 1) return;
+	if (limitedReservationIds.length <= 1) return;
 	
 	// 예약 그룹과 규칙의 상호작용 처리
 	// 규칙 A(확률)B가 있고 예약에 B가 포함되어 있으면, A도 예약 그룹에 확률적으로 추가
@@ -2177,13 +2184,13 @@ function applyReservationAsHiddenGroup(reservationNames) {
 			const candidatePerson = state.people.find(p => p.name === candidate.name);
 			if (!candidatePerson) continue;
 			
-			// 예약에 candidate가 포함되어 있는지 확인
-			if (reservationIds.includes(candidatePerson.id)) {
+			// 예약에 candidate가 포함되어 있는지 확인 (제한된 예약 ID 기준)
+			if (limitedReservationIds.includes(candidatePerson.id)) {
 				// 확률 체크
 				const random = Math.random() * 100;
 				if (random < candidate.probability) {
 					// primary를 예약 그룹에 추가
-					if (!reservationIds.includes(primaryPerson.id) && !additionalIds.includes(primaryPerson.id)) {
+					if (!limitedReservationIds.includes(primaryPerson.id) && !additionalIds.includes(primaryPerson.id)) {
 						additionalIds.push(primaryPerson.id);
 						
 						// 적용된 규칙 정보 저장
@@ -2202,8 +2209,8 @@ function applyReservationAsHiddenGroup(reservationNames) {
 		}
 	});
 	
-	// 추가 ID들을 예약 그룹에 포함
-	const finalReservationIds = [...reservationIds, ...additionalIds];
+	// 추가 ID들을 예약 그룹에 포함 (제한된 예약 ID 사용)
+	const finalReservationIds = [...limitedReservationIds, ...additionalIds];
 	
 	// 예약된 참가자들을 activeHiddenGroupMap에 직접 추가 (히든 그룹으로 처리)
 	// 모든 예약 참가자를 서로 연결하여 하나의 클러스터로 만듦
@@ -2221,9 +2228,10 @@ function applyReservationAsHiddenGroup(reservationNames) {
 	// 예약 적용 정보 저장 (나중에 CMD 출력용)
 	window.appliedReservation = {
 		names: reservationNames,
-		foundNames: reservationIds.map(id => state.people.find(p => p.id === id).name),
+		foundNames: limitedReservationIds.map(id => state.people.find(p => p.id === id).name),
 		additionalNames: additionalIds.map(id => state.people.find(p => p.id === id).name),
-		notFoundNames: notFoundNames
+		notFoundNames: notFoundNames,
+		excludedNames: excludedNames // 팀 인원수 초과로 제외된 이름들
 	};
 }
 
@@ -3131,7 +3139,21 @@ function shuffleTeams() {
 	
 	// 예약 소모 알림 (CMD 콘솔에 출력)
 	if (consumedReservation && typeof commandConsole !== 'undefined' && commandConsole.log) {
-		commandConsole.log(commandConsoleMessages.comments.reservationConsumed.replace('{members}', consumedReservation.join(', ')));
+		// appliedReservation 정보 확인 (제외된 인원이 있는지 체크)
+		if (window.appliedReservation && window.appliedReservation.excludedNames && window.appliedReservation.excludedNames.length > 0) {
+			// 제외된 인원이 있는 경우
+			const appliedMembers = [...window.appliedReservation.foundNames, ...window.appliedReservation.additionalNames].join(', ');
+			const excludedMembers = window.appliedReservation.excludedNames.join(', ');
+			commandConsole.log(
+				commandConsoleMessages.comments.reservationConsumedPartial
+					.replace('{limit}', state.membersPerTeam)
+					.replace('{members}', appliedMembers)
+					.replace('{excluded}', excludedMembers)
+			);
+		} else {
+			// 제외된 인원이 없는 경우 (기존 동작)
+			commandConsole.log(commandConsoleMessages.comments.reservationConsumed.replace('{members}', consumedReservation.join(', ')));
+		}
 	}
 	
 	// Firebase에 예약 소모 반영

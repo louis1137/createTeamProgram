@@ -326,6 +326,7 @@ const commandConsoleMessages = {
 		reservationListItem: '  {index}. {members}',
 		reservationEmpty: '등록된 예약이 없습니다.',
 		reservationConsumed: '✅ 예약 1개 소모됨: {members}',
+		reservationConsumedPartial: '✅ 예약 1개 소모됨 (팀 인원수 {limit}명 제한): {members}<br>   ⚠️ 제외됨: {excluded}',
 		reservationConsumedByOther: '📢 다른 창에서 예약이 소모되었습니다: {members}',
 		reservationSyncNotification: '📢 예약 동기화: {action}',
 		reservationInvalidFormat: '예약 형식이 올바르지 않습니다. 예: A,B,C,D',
