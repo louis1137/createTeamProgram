@@ -70,38 +70,7 @@ function setupRealtimeSync() {
 	realtimeSyncActive = true;
 	syncListenerAttached = true;
 	
-	// reservations 실시간 감시 - 다른 창에서 예약이 소모되면 알림
-	let lastReservationCount = state.reservations ? state.reservations.length : 0;
-	database.ref(`rooms/${currentRoomKey}/reservations`).on('value', (snapshot) => {
-		const newReservations = snapshot.val() || [];
-		const newCount = newReservations.length;
-		
-		// 초기 로드가 아니고, 예약 개수가 변경된 경우
-		if (lastReservationCount !== null && newCount !== lastReservationCount) {
-			// 예약이 감소한 경우 (소모된 경우)
-			if (newCount < lastReservationCount) {
-				const consumedCount = lastReservationCount - newCount;
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					commandConsole.log(`📢 다른 창에서 예약 ${consumedCount}개가 소모되었습니다.`);
-				}
-			}
-			// 예약이 증가한 경우 (추가된 경우)
-			else if (newCount > lastReservationCount) {
-				const addedCount = newCount - lastReservationCount;
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					commandConsole.log(`📢 예약 ${addedCount}개가 추가되었습니다.`);
-				}
-			}
-			
-			// 상태 업데이트
-			state.reservations = newReservations;
-			saveToLocalStorage();
-		}
-		
-		lastReservationCount = newCount;
-	});
-	
-	// syncTrigger 감시 - 다른 창에서 동기화 명령어를 실행했을 때 감지
+	// syncTrigger 감시 - 명시적으로 동기화 명령어를 실행했을 때만 감지
 	database.ref(`rooms/${currentRoomKey}/syncTrigger`).on('value', (snapshot) => {
 		const syncTrigger = snapshot.val();
 		if (syncTrigger && syncTrigger !== lastSyncTrigger && lastSyncTrigger !== 0) {
@@ -206,11 +175,25 @@ function loadDataByType(type) {
 			});
 		
 		case 'reservation':
-			// 예약만 로드
-			return database.ref(`rooms/${currentRoomKey}/reservations`).once('value')
-				.then((snapshot) => {
-					state.reservations = snapshot.val() || [];
-				});
+		// 예약만 로드 (동기화 예약 명령어로 실행된 경우)
+		const oldReservationCount = state.reservations ? state.reservations.length : 0;
+		return database.ref(`rooms/${currentRoomKey}/reservations`).once('value')
+			.then((snapshot) => {
+				const newReservations = snapshot.val() || [];
+				const newCount = newReservations.length;
+				
+				// 예약 개수가 변경된 경우 알림 표시
+				if (oldReservationCount !== newCount) {
+				if (newCount > oldReservationCount) {
+						if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+							commandConsole.log(`📢 예약 ${addedCount}개가 추가되었습니다.`);
+						}
+					}
+				}
+				
+				state.reservations = newReservations;
+				saveToLocalStorage();
+			});
 		
 		case 'all':
 		default:

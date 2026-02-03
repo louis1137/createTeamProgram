@@ -96,7 +96,7 @@ const commandConsole = {
 					consoleEl.style.transform = `translate(${this.savedPosition.x}px, ${this.savedPosition.y}px)`;
 					this.dragState.xOffset = this.savedPosition.x;
 					this.dragState.yOffset = this.savedPosition.y;
-					toggleBtn.textContent = '?';
+					toggleBtn.textContent = '_';
 				} else {
 					// 최소화: 현재 위치와 크기 저장 후 우측 하단으로 이동, 헤더만 표시
 					this.savedPosition.x = this.dragState.xOffset;
@@ -1269,6 +1269,11 @@ const commandConsole = {
 			return;
 		}
 	
+		// 저장은 Firebase에 업로드만 하고 다른 창에 알림을 보내지 않음
+		if (typeof window !== 'undefined') {
+			window.lastReservationChangeByMe = true;
+		}
+		
 		// 먼저 현재 password를 읽어옴
 		database.ref(`rooms/${currentRoomKey}/password`).once('value')
 		.then((snapshot) => {
@@ -1302,17 +1307,25 @@ const commandConsole = {
 		})
 		.then(() => {
 			this.success(this.comments.saveComplete);
-		})
-		.catch((error) => {
-			this.error(`저장 실패: ${error.message}`);
-		});
-	},
-	
-	loadCommand() {
-		if (!syncEnabled || !currentRoomKey) {
-			this.error(this.comments.firebaseMissing);
-			return;
+		
+		// 플래그 해제 (약간의 지연 후)
+		setTimeout(() => {
+			if (typeof window !== 'undefined') {
+				window.lastReservationChangeByMe = false;
+			}
+		}, 100);
+	})
+	.catch((error) => {
+		this.error(`저장 실패: ${error.message}`);
+		
+		// 에러 시에도 플래그 해제
+		if (typeof window !== 'undefined') {
+			window.lastReservationChangeByMe = false;
 		}
+	});
+},
+
+loadCommand() {
 		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
 			.then((snapshot) => {
@@ -1332,6 +1345,13 @@ const commandConsole = {
 	syncCommand(args) {
 		if (!syncEnabled || !currentRoomKey) {
 			this.error(this.comments.firebaseMissing);
+			return;
+		}
+		
+		// 인증 체크
+		if (!this.authenticated) {
+			this.error(this.comments.readOnlyFeatureDisabled);
+			this.log(this.comments.authenticationRequired);
 			return;
 		}
 		
@@ -1380,6 +1400,18 @@ const commandConsole = {
 	
 	// 전체 동기화 (기존 sync 명령어)
 	syncAllCommand() {
+		// 인증 체크
+		if (!this.authenticated) {
+			this.error(this.comments.readOnlyFeatureDisabled);
+			this.log(this.comments.authenticationRequired);
+			return;
+		}
+		
+		// 전체 동기화 시에도 예약 알림을 보내지 않음 (syncTrigger로 전체 동기화 알림만 표시)
+		if (typeof window !== 'undefined') {
+			window.lastReservationChangeByMe = true;
+		}
+		
 		// 먼저 현재 상태를 저장
 		database.ref(`rooms/${currentRoomKey}/password`).once('value')
 			.then((snapshot) => {
@@ -1431,13 +1463,30 @@ const commandConsole = {
 					if (data) {
 						loadStateFromData(data);
 						this.success(`✅ 동기화 및 저장 완료`);
-					} else {
-					this.warn(this.comments.noSavedData + '.');
+				
+				// 플래그 해제 (약간의 지연 후)
+				setTimeout(() => {
+					if (typeof window !== 'undefined') {
+						window.lastReservationChangeByMe = false;
+					}
+				}, 100);
+			} else {
+				this.warn(this.comments.noSavedData + '.');
+				
+				// 플래그 해제
+				if (typeof window !== 'undefined') {
+					window.lastReservationChangeByMe = false;
 				}
-			})
-				.catch((error) => {
-					this.error(`❌ 동기화 실패: ${error.message}`);
-				});
+			}
+		})
+			.catch((error) => {
+				this.error(`❌ 동기화 실패: ${error.message}`);
+				
+				// 에러 시에도 플래그 해제
+				if (typeof window !== 'undefined') {
+					window.lastReservationChangeByMe = false;
+				}
+			});
 	},
 	
 	// 규칙만 동기화
@@ -1686,6 +1735,13 @@ const commandConsole = {
 	},
 	
 	syncReservationCommand() {
+		// 인증 체크
+		if (!this.authenticated) {
+			this.error(this.comments.readOnlyFeatureDisabled);
+			this.log(this.comments.authenticationRequired);
+			return;
+		}
+		
 		database.ref(`rooms/${currentRoomKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
@@ -1727,6 +1783,11 @@ const commandConsole = {
 		}
 		
 		if (confirm(this.comments.clearConfirmMessage)) {
+			// 초기화도 Firebase 업로드만 하고 다른 창에 알림을 보내지 않음
+			if (typeof window !== 'undefined') {
+				window.lastReservationChangeByMe = true;
+			}
+			
 			// 비밀번호 백업
 			database.ref(`rooms/${currentRoomKey}/password`).once('value')
 				.then((snapshot) => {
@@ -1759,35 +1820,36 @@ const commandConsole = {
 					// 로컬 state 초기화
 					clearState();
 					this.success(this.comments.clearComplete);
-				})
-				.catch((error) => {
-					this.error(`초기화 실패: ${error.message}`);
-				});
-		}
-	},
-	
-	statusCommand() {
-		this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개');
-	},
-	
-	
-	helpCommand() {
-		this.log(this.comments.helpMessage);
-	},
+			
+			// 플래그 해제 (약간의 지연 후)
+			setTimeout(() => {
+				if (typeof window !== 'undefined') {
+					window.lastReservationChangeByMe = false;
+				}
+			}, 100);
+		})
+		.catch((error) => {
+			this.error(`초기화 실패: ${error.message}`);
+			
+			// 에러 시에도 플래그 해제
+			if (typeof window !== 'undefined') {
+				window.lastReservationChangeByMe = false;
+			}
+		});
+	}
+},
+statusCommand() {
+	this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개');
+},
 
-	
-	profileCommand() {
-		this.log(this.comments.profileSwitch);
-		this.inputMode = 'profile-switch';
-		this.input.placeholder = this.placeholders.profile;
-		this.addCancelButton();
-		setTimeout(() => this.input.focus(), 50);
-	},
+helpCommand() {
+	this.log(this.comments.helpMessage);
+},
 
-	passwordCommand(newPassword) {
-		
-		// 현재 비밀번호가 없는지 확인
-		if (!this.storedPassword || this.storedPassword === '') {
+passwordCommand(newPassword) {
+	
+	// 현재 비밀번호가 없는지 확인
+	if (!this.storedPassword || this.storedPassword === '') {
 			// 비밀번호가 없으면 바로 새 비밀번호 입력 모드로
 			this.log(this.comments.passwordChangeNew);
 			this.inputMode = 'password-change-new';
@@ -2262,19 +2324,20 @@ const commandConsole = {
 			if (state.reservations.length === 0) {
 				this.log(commandConsoleMessages.comments.reservationEmpty);
 			} else {
-				this.log(commandConsoleMessages.comments.reservationList.replace('{count}', state.reservations.length));
-				state.reservations.forEach((reservation, index) => {
-					this.log(commandConsoleMessages.comments.reservationListItem
-						.replace('{index}', index + 1)
-						.replace('{members}', reservation.join(', ')));
-				});
-			}
-			return;
+			let listMessage = commandConsoleMessages.comments.reservationList.replace('{count}', state.reservations.length) + '<br>';
+			state.reservations.forEach((reservation, index) => {
+				listMessage += commandConsoleMessages.comments.reservationListItem
+					.replace('{index}', index + 1)
+					.replace('{members}', reservation.join(', ')) + '<br>';
+			});
+			this.log(listMessage);
 		}
-		
-		// 예약 취소 (마지막 예약 제거)
-		if (trimmedArgs === '취소') {
-			if (state.reservations.length === 0) {
+		return;
+	}
+	
+	// 예약 취소 (마지막 예약 제거)
+	if (trimmedArgs === '취소') {
+		if (state.reservations.length === 0) {
 				this.error(commandConsoleMessages.comments.reservationCancelFailed);
 			} else {
 				const removed = state.reservations.pop();

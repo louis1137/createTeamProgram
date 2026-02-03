@@ -1343,9 +1343,9 @@ border-left: 3px solid #ef4444;
 }
 
 .command-log-command {
-background: rgba(168, 85, 247, 0.1);
+background: transparent;
 border-left: 3px solid #333;
-color: #e9d5ff;
+color: #fff;
 }
 
 .log-time {

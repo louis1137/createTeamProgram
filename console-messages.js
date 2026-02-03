@@ -27,7 +27,7 @@ const commandConsoleMessages = {
 		helpMessage : '=== 📋 명령어 도움말 ===<br><br>' +
 			'💾 <code data-cmd="save">save</code> / <code data-cmd="저장">저장</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다.<br>   동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.<br><br>' +
 			'📥 <code data-cmd="load">load</code> / <code data-cmd="불러오기">불러오기</code><br>   서버에 저장된 데이터를 불러옵니다.<br>   최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.<br><br>' +
-			'🔄 <code data-cmd="sync">sync</code> / <code data-cmd="동기화">동기화</code><br>   서버의 최신 데이터를 불러와 현재 화면과 동기화합니다.<br>   다른 사용자가 변경한 내용을 즉시 반영합니다.<br><br>' +
+			'🔄 <code data-cmd="sync">sync</code> / <code data-cmd="동기화">동기화</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   서버의 최신 데이터를 불러와 현재 화면과 동기화합니다.<br>   다른 사용자가 변경한 내용을 즉시 반영합니다.<br><br>' +
 		'🔄 <code data-cmd="sync rule">sync rule</code> / <code data-cmd="동기화 규칙">동기화 규칙</code> / <code data-cmd="동기화 확률">동기화 확률</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙만 서버에 저장하고 동기화합니다.<br><br>' +
 		'🔄 <code data-cmd="sync option">sync option</code> / <code data-cmd="동기화 옵션">동기화 옵션</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   팀 생성 옵션만 서버에 저장하고 동기화합니다.<br>   (최대인원, 성별균형, 가중치균형, 팀 인원수)<br><br>' +
 		'🔄 <code data-cmd="sync member">sync member</code> / <code data-cmd="동기화 참가자">동기화 참가자</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 목록만 서버에 저장하고 동기화합니다.<br><br>' +
@@ -47,8 +47,8 @@ const commandConsoleMessages = {
 			'📊 <code data-cmd="확률">확률</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 그룹 및 설정된 확률 규칙을 확인합니다.<br><br>' +
 			'📊 <code data-cmd="규칙 명령어">규칙 명령어</code> / <code data-cmd="rule 명령어">rule 명령어</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록하거나 수정합니다.<br>   예시: <code data-cmd="규칙 A(40)B(30)C">규칙 A(40)B(30)C</code><br><br>' +
 			'📊 <code data-cmd="규칙">규칙</code> / <code data-cmd="rule">rule</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   확률 규칙을 등록할 수 있는 모드로 들어갑니다.<br><br>' +
-			'✏️ <code data-cmd="input 데이터">input 데이터</code> / <code data-cmd="입력 데이터">입력 데이터</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 데이터를 직접 입력합니다.<br>   예시: <code data-cmd="입력 홍길동,김철수">입력 홍길동,김철수</code><br><br>' +
-			'✏️ <code data-cmd="input">input</code> / <code data-cmd="입력">입력</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   참가자 데이터를 직접 입력할 수 있는 모드로 들어갑니다.<br><br>' +
+			'✏️ <code data-cmd="input 데이터">input 데이터</code> / <code data-cmd="입력 데이터">입력 데이터</code><br>   참가자 데이터를 직접 입력합니다.<br>   예시: <code data-cmd="입력 홍길동,김철수">입력 홍길동,김철수</code><br><br>' +
+			'✏️ <code data-cmd="input">input</code> / <code data-cmd="입력">입력</code><br>   참가자 데이터를 직접 입력할 수 있는 모드로 들어갑니다.<br><br>' +
 			'📅 <code data-cmd="예약">예약</code> / <code data-cmd="reservation">reservation</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   예약 모드로 진입하여 팀 구성을 예약할 수 있습니다.<br><br>' +
 			'📅 <code data-cmd="예약 A,B,C,D">예약 A,B,C,D</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   A,B,C,D를 다음 팀 생성 시 하나의 팀으로 예약합니다.<br><br>' +
 			'📋 <code data-cmd="예약 목록">예약 목록</code> <span style="color: #22c55e; font-weight: bold;">(인증필요)</span><br>   현재 등록된 예약 목록을 확인합니다.<br><br>' +

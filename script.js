@@ -3136,9 +3136,32 @@ function shuffleTeams() {
 	
 	// Firebase에 예약 소모 반영
 	if (consumedReservation && syncEnabled && currentRoomKey) {
+		// 자신이 예약을 소모했다는 플래그 설정 (Firebase 리스너가 알림을 보내지 않도록)
+		if (typeof window !== 'undefined') {
+			window.lastReservationChangeByMe = true;
+		}
 		database.ref(`rooms/${currentRoomKey}/reservations`).set(state.reservations)
+			.then(() => {
+				// syncTrigger 설정하여 다른 창에 알림
+				const syncTrigger = { timestamp: Date.now(), type: 'reservation' };
+				if (typeof lastSyncTrigger !== 'undefined') {
+					lastSyncTrigger = syncTrigger;
+				}
+				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+			})
+			.then(() => {
+				// 약간의 지연 후 플래그 해제
+				setTimeout(() => {
+					if (typeof window !== 'undefined') {
+						window.lastReservationChangeByMe = false;
+					}
+				}, 100);
+			})
 			.catch(error => {
 				console.error('예약 동기화 실패:', error);
+				if (typeof window !== 'undefined') {
+					window.lastReservationChangeByMe = false;
+				}
 			});
 	}
 	
