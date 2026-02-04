@@ -1930,6 +1930,21 @@ helpCommand() {
 		this.log(this.comments.loginInstructions);
 	},
 	
+	profileCommand() {
+		if (!syncEnabled || !currentRoomKey) {
+			this.error(this.comments.firebaseMissing);
+			return;
+		}
+		
+		// 프로필 전환 모드로 진입
+		this.log(this.comments.profileSwitch);
+		this.inputMode = 'profile-switch';
+		this.input.type = 'text';
+		this.input.placeholder = this.placeholders.profile;
+		this.addCancelButton();
+		setTimeout(() => this.input.focus(), 50);
+	},
+	
 	participantsCommand() {
 		if (state.people.length === 0) {
 			this.log(this.comments.noParticipants + '.');
