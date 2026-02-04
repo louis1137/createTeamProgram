@@ -194,7 +194,7 @@ const commandConsoleMessages = {
 		participantAddDisabled: '참가자 추가 기능을 사용할 수 없습니다.',
 		removeDuplicateSingle: '기존 참가자를 제거하고 새로 등록하시겠습니까?',
 		removeDuplicateMultiple: '기존 참가자들을 제거하고 새로 등록하시겠습니까?',
-		completePersonDeleteConfirm: '⚠️ 참가자 전체를 삭제하시겠습니까?',
+		completePersonDeleteConfirm: '⚠️ 이 참가자를 삭제하시겠습니까?',
 		nameRequired: '이름을 입력해주세요.',
 		addParticipant: '참가자를 추가해주세요.',
 		minOneName: '최소 1명 이상의 이름을 입력해주세요.',
