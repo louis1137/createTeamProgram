@@ -701,7 +701,7 @@ const commandConsole = {
 		this.output.appendChild(entry);
 		this.output.scrollTop = this.output.scrollHeight;
 		
-		// <code> 태그에 클릭 이벤트 추가 (명령어 자동 입력)
+		// <code> 태그에 클릭 이벤트 추가 (명령어 자동 실행)
 		entry.querySelectorAll('code[data-cmd]').forEach(code => {
 			code.style.cursor = 'pointer';
 			code.addEventListener('click', (e) => {
@@ -714,9 +714,12 @@ const commandConsole = {
 					this.input.placeholder = this.placeholders.input;
 					this.removeCancelButton();
 					
-					// 명령어 자동 입력
+					// 명령어 자동 입력 및 실행
 					this.input.value = cmdText;
 					this.input.focus();
+					
+					// 명령어 즉시 실행
+					this.executeCommand();
 				}
 			});
 		});
