@@ -498,6 +498,7 @@ const commandConsole = {
 					syncEnabled = true;
 					setupRealtimeSync();
 				}
+				this.log('🔄 실시간 동기화가 활성화되었습니다.');
 				
 				// 신규 프로필 생성 시 바로 빈 데이터로 초기화하여 동기화 시작
 				const initialData = {
@@ -858,7 +859,7 @@ const commandConsole = {
 								setupRealtimeSync();
 							}
 							
-							// 데이터 로드
+							// 데이터 로드 및 자동 동기화 설정
 							database.ref(`rooms/${currentRoomKey}`).once('value')
 								.then((snapshot) => {
 									const data = snapshot.val();
@@ -866,16 +867,24 @@ const commandConsole = {
 										// 저장된 데이터가 있으면 로드
 										loadStateFromData(data);
 										this.success(this.comments.profileSwitchSuccess.replace('{profile}', cmd));
+										this.log('🔄 실시간 동기화가 활성화되었습니다.');
 									} else {
 										// 데이터가 없으면 초기화
 										clearState();
 										this.success(this.comments.profileSwitchSuccess.replace('{profile}', cmd));
+										this.log('🔄 실시간 동기화가 활성화되었습니다.');
 									}
 								})
 								.catch((error) => {
 									this.error(this.comments.dataLoadFailed.replace('{error}', error.message));
 								});
 						} else {
+							// 동기화 먼저 활성화
+							if (!syncEnabled) {
+								syncEnabled = true;
+								setupRealtimeSync();
+							}
+							
 							// 데이터 먼저 로드
 							database.ref(`rooms/${currentRoomKey}`).once('value')
 								.then((snapshot) => {
@@ -886,6 +895,7 @@ const commandConsole = {
 									} else {
 										this.log(this.comments.profileFoundMessage.replace('{profile}', cmd));
 									}
+									this.log('🔄 실시간 동기화가 활성화되었습니다.');
 									this.log(this.comments.passwordInputAsk);
 									this.inputMode = 'password-ask-switch';
 									this.showConfirmButtons();
@@ -899,6 +909,12 @@ const commandConsole = {
 						}
 					} else {
 						// 초기 접속 모드
+						// 동기화 먼저 활성화
+						if (!syncEnabled) {
+							syncEnabled = true;
+							setupRealtimeSync();
+						}
+						
 						// 데이터 먼저 로드
 						database.ref(`rooms/${currentRoomKey}`).once('value')
 							.then((snapshot) => {
@@ -909,12 +925,7 @@ const commandConsole = {
 								} else {
 									this.log(this.comments.profileFoundMessage.replace('{profile}', cmd));
 								}
-								this.success(this.comments.syncActivated);
-								
-								if (!syncEnabled) {
-									syncEnabled = true;
-									setupRealtimeSync();
-								}
+								this.log('🔄 실시간 동기화가 활성화되었습니다.');
 								
 								this.log(this.comments.passwordAskInitial);
 								this.inputMode = 'password-ask-initial';
@@ -959,6 +970,12 @@ const commandConsole = {
 				const roomKeyDisplay = document.getElementById('roomKeyDisplay');
 				if (roomKeyDisplay) {
 					roomKeyDisplay.classList.add('authenticated');
+				}
+				
+				// 동기화가 비활성화되어 있으면 활성화
+				if (!syncEnabled) {
+					syncEnabled = true;
+					setupRealtimeSync();
 				}
 				
 				// 프로필 전환 모드든 초기 접속 모드든 데이터 로드
