@@ -185,6 +185,7 @@ function loadDataByType(type) {
 				// 예약 개수가 변경된 경우 알림 표시
 				if (oldReservationCount !== newCount) {
 				if (newCount > oldReservationCount) {
+						const addedCount = newCount - oldReservationCount;
 						if (typeof commandConsole !== 'undefined' && commandConsole.log) {
 							commandConsole.log(`📢 예약 ${addedCount}개가 추가되었습니다.`);
 						}
