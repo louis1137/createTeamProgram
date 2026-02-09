@@ -2031,7 +2031,27 @@ loadCommand(profileName = '') {
 			});
 	},
 	statusCommand() {
-		this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개');
+		const ruleCount =
+			(state.hiddenGroups?.length || 0) +
+			(state.hiddenGroupChains?.length || 0) +
+			(state.pendingHiddenGroups?.length || 0) +
+			(state.pendingHiddenGroupChains?.length || 0);
+		const reservationCount = state.reservations?.length || 0;
+		const statusLines = [
+			'=== 현재 상태 ===',
+			`Room Key: ${currentRoomKey || '없음'}`,
+			`Firebase: ${syncEnabled ? '활성화' : '비활성화'}`,
+			`참가자: ${state.people.length}명 <code data-cmd="참가자">참가자</code>`,
+			`미참가자: ${state.inactivePeople.length}명 <code data-cmd="미참가자">미참가자</code>`,
+			`제약: ${state.forbiddenPairs.length}개 <code data-cmd="제약">제약</code>`
+		];
+		
+		if (this.authenticated) {
+			statusLines.push(`규칙: ${ruleCount}개 <code data-cmd="확률">확률</code>`);
+			statusLines.push(`예약: ${reservationCount}개 <code data-cmd="예약 목록">예약 목록</code>`);
+		}
+		
+		this.log(statusLines.join('<br>'));
 	},
 
 	helpCommand() {
