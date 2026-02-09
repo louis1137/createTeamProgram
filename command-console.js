@@ -2065,8 +2065,8 @@ loadCommand(profileName = '') {
 
 	passwordCommand(newPassword) {
 	
-	// 현재 비밀번호가 없는지 확인
-	if (!this.storedPassword || this.storedPassword === '') {
+		// 현재 비밀번호가 없는지 확인
+		if (!this.storedPassword || this.storedPassword === '') {
 			// 비밀번호가 없으면 바로 새 비밀번호 입력 모드로
 			this.log(this.comments.passwordChangeNew);
 			this.inputMode = 'password-change-new';
