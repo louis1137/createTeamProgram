@@ -2463,6 +2463,20 @@ loadCommand(profileName = '') {
 			});
 		});
 
+		// 멤버A(leftKey) 기준으로 정렬 - 같은 멤버는 그룹화되어 표시
+		rows.sort((a, b) => {
+			// HTML 태그와 따옴표를 제거하여 순수 이름만 추출
+			const getCleanKey = (key) => {
+				if (!key) return '';
+				return key.replace(/<[^>]*>/g, '').replace(/'/g, '').replace(/\(보류\)/g, '').trim();
+			};
+			
+			const keyA = getCleanKey(a.leftKey);
+			const keyB = getCleanKey(b.leftKey);
+			
+			return keyA.localeCompare(keyB, 'ko');
+		});
+
 		output += `<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 			<thead>
 				<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
