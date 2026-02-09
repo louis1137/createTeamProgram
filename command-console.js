@@ -1203,7 +1203,7 @@ const commandConsole = {
 				break;
 			case 'load':
 			case '불러오기':
-				this.loadCommand();
+				this.loadCommand(args.join(' '));
 				break;
 			case 'sync':
 			case '동기화':
@@ -1345,17 +1345,58 @@ const commandConsole = {
 	});
 },
 
-loadCommand() {
+loadCommand(profileName = '') {
+		const targetProfile = (profileName || '').trim();
 		
-		database.ref(`rooms/${currentRoomKey}`).once('value')
+		if (!targetProfile) {
+			database.ref(`rooms/${currentRoomKey}`).once('value')
+				.then((snapshot) => {
+					const data = snapshot.val();
+					if (data) {
+						loadStateFromData(data);
+						this.success(this.comments.loadComplete);
+					} else {
+						this.warn(this.comments.noSavedData + '.');
+					}
+				})
+				.catch((error) => {
+					this.error(`로드 실패: ${error.message}`);
+				});
+			return;
+		}
+		
+		// 다른 프로필 데이터 가져와 현재 프로필에 로컬 반영 (저장/동기화 없음)
+		database.ref(`rooms/${targetProfile}`).once('value')
 			.then((snapshot) => {
 				const data = snapshot.val();
-				if (data) {
-					loadStateFromData(data);
-					this.success(this.comments.loadComplete);
-				} else {
-					this.warn(this.comments.noSavedData + '.');
+				if (!data) {
+					this.warn(this.comments.profileNotFoundSwitch.replace('{profile}', targetProfile));
+					return;
 				}
+				
+				const importedData = {
+					people: data.people || [],
+					inactivePeople: data.inactivePeople || [],
+					requiredGroups: data.requiredGroups || [],
+					nextId: data.nextId || 1,
+					forbiddenPairs: data.forbiddenPairs || [],
+					pendingConstraints: data.pendingConstraints || [],
+					hiddenGroups: data.hiddenGroups || [],
+					hiddenGroupChains: data.hiddenGroupChains || [],
+					pendingHiddenGroups: data.pendingHiddenGroups || [],
+					pendingHiddenGroupChains: data.pendingHiddenGroupChains || [],
+					reservations: data.reservations || [],
+					maxTeamSizeEnabled: data.maxTeamSizeEnabled || false,
+					genderBalanceEnabled: data.genderBalanceEnabled || false,
+					weightBalanceEnabled: data.weightBalanceEnabled || false,
+					membersPerTeam: data.membersPerTeam || 4
+				};
+				
+				loadStateFromData(importedData);
+				saveToLocalStorage();
+				tryResolvePendingConstraints();
+				tryResolveHiddenGroups();
+				this.success(this.comments.loadComplete);
 			})
 			.catch((error) => {
 				this.error(`로드 실패: ${error.message}`);
