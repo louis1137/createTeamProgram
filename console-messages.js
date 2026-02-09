@@ -166,7 +166,7 @@ const commandConsoleMessages = {
 		syncPeopleComplete: '✅ 미참가자 동기화 완료',
 		syncConstraintComplete: '✅ 제약 동기화 완료',
 		syncReservationComplete: '✅ 예약 동기화 완료',
-		loadComplete: '📥 데이터 로드 완료!',
+		loadComplete: '📥 데이터 로드 완료! (확인하기: <code data-cmd="상태">상태</code>)',
 		dataLoadFailed: '데이터 로드 실패: ',
 		noSavedData: '저장된 데이터가 없습니다',
 		localDataRestored: '✅ 로컬 데이터 복원: 참가자 {count}명',
