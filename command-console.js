@@ -1211,7 +1211,7 @@ const commandConsole = {
 				break;
 			case 'clear':
 			case '초기화':
-				this.clearCommand();
+				this.clearCommand(args.join(' '));
 				break;
 			case 'status':
 			case '상태':
@@ -1837,13 +1837,17 @@ loadCommand(profileName = '') {
 			});
 	},
 	
-	clearCommand() {
+	clearCommand(args = '') {
 		if (!syncEnabled || !currentRoomKey) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
 		
-		if (confirm(this.comments.clearConfirmMessage)) {
+		const trimmedArgs = (args || '').trim();
+		
+		if (!trimmedArgs) {
+			if (!confirm(this.comments.clearConfirmMessage)) return;
+			
 			// 초기화도 Firebase 업로드만 하고 다른 창에 알림을 보내지 않음
 			if (typeof window !== 'undefined') {
 				window.lastReservationChangeByMe = true;
@@ -1874,36 +1878,163 @@ loadCommand(profileName = '') {
 						password: savedPassword !== null ? savedPassword : '',
 						timestamp: Date.now()
 					};
-					
 					return database.ref(`rooms/${currentRoomKey}`).set(emptyData);
 				})
 				.then(() => {
 					// 로컬 state 초기화
 					clearState();
 					this.success(this.comments.clearComplete);
-			
-			// 플래그 해제 (약간의 지연 후)
-			setTimeout(() => {
+				})
+				.catch((error) => {
+					this.error(`초기화 실패: ${error.message}`);
+				})
+				.finally(() => {
+					// 플래그 해제 (약간의 지연 후)
+					setTimeout(() => {
+						if (typeof window !== 'undefined') {
+							window.lastReservationChangeByMe = false;
+						}
+					}, 100);
+				});
+			return;
+		}
+		
+		const tokens = trimmedArgs.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
+		const targets = new Set();
+		
+		const addTarget = (name) => targets.add(name);
+		tokens.forEach((token) => {
+			switch (token.toLowerCase()) {
+				case '참가자':
+				case 'member':
+				case '멤버':
+					addTarget('participants');
+					break;
+				case '미참가자':
+				case 'people':
+					addTarget('inactive');
+					break;
+				case '제약':
+				case 'constraint':
+					addTarget('constraints');
+					break;
+				case '옵션':
+				case 'option':
+					addTarget('options');
+					break;
+				case '확률':
+				case '규칙':
+				case 'rule':
+				case 'matching':
+					addTarget('rules');
+					break;
+				case '예약':
+				case 'reservation':
+					addTarget('reservations');
+					break;
+				default:
+					break;
+			}
+		});
+		
+		if (targets.size === 0) {
+			this.error('❌ 알 수 없는 초기화 대상입니다. 사용 가능한 대상: 참가자, 미참가자, 제약, 옵션, 확률, 규칙, 예약');
+			return;
+		}
+		
+		const labelMap = {
+			participants: '참가자',
+			inactive: '미참가자',
+			constraints: '제약',
+			options: '옵션',
+			rules: '규칙/확률',
+			reservations: '예약'
+		};
+		const targetLabels = Array.from(targets).map(key => labelMap[key]).join(', ');
+		if (!confirm(`⚠️ 선택 초기화를 진행합니다: ${targetLabels}\n진행하시겠습니까?`)) {
+			return;
+		}
+		
+		const updateData = { timestamp: Date.now() };
+		
+		if (targets.has('participants')) {
+			state.people = [];
+			state.nextId = 1;
+			updateData.people = [];
+			updateData.nextId = 1;
+		}
+		if (targets.has('inactive')) {
+			state.inactivePeople = [];
+			updateData.inactivePeople = [];
+		}
+		if (targets.has('constraints')) {
+			state.requiredGroups = [];
+			state.forbiddenPairs = [];
+			state.pendingConstraints = [];
+			state.forbiddenMap = {};
+			updateData.requiredGroups = [];
+			updateData.forbiddenPairs = [];
+			updateData.pendingConstraints = [];
+		}
+		if (targets.has('rules')) {
+			state.hiddenGroups = [];
+			state.hiddenGroupChains = [];
+			state.pendingHiddenGroups = [];
+			state.pendingHiddenGroupChains = [];
+			state.activeHiddenGroupMap = {};
+			state.activeHiddenGroupChainInfo = {};
+			updateData.hiddenGroups = [];
+			updateData.hiddenGroupChains = [];
+			updateData.pendingHiddenGroups = [];
+			updateData.pendingHiddenGroupChains = [];
+		}
+		if (targets.has('reservations')) {
+			state.reservations = [];
+			updateData.reservations = [];
+		}
+		if (targets.has('options')) {
+			state.maxTeamSizeEnabled = false;
+			state.genderBalanceEnabled = false;
+			state.weightBalanceEnabled = false;
+			state.membersPerTeam = 4;
+			updateData.maxTeamSizeEnabled = false;
+			updateData.genderBalanceEnabled = false;
+			updateData.weightBalanceEnabled = false;
+			updateData.membersPerTeam = 4;
+			if (elements.maxTeamSizeCheckbox) elements.maxTeamSizeCheckbox.checked = false;
+			if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.checked = false;
+			if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.checked = false;
+			if (elements.teamSizeInput) elements.teamSizeInput.value = 4;
+		}
+		
+		buildForbiddenMap();
+		renderPeople();
+		saveToLocalStorage();
+		tryResolvePendingConstraints();
+		tryResolveHiddenGroups();
+		
+		if (typeof window !== 'undefined') {
+			window.lastReservationChangeByMe = true;
+		}
+		
+		database.ref(`rooms/${currentRoomKey}`).update(updateData)
+			.then(() => {
+				this.success('🗑️ 선택한 항목이 초기화되었습니다.');
+			})
+			.catch((error) => {
+				this.error(`초기화 실패: ${error.message}`);
+			})
+			.finally(() => {
 				if (typeof window !== 'undefined') {
 					window.lastReservationChangeByMe = false;
 				}
-			}, 100);
-		})
-		.catch((error) => {
-			this.error(`초기화 실패: ${error.message}`);
-			
-			// 에러 시에도 플래그 해제
-			if (typeof window !== 'undefined') {
-				window.lastReservationChangeByMe = false;
-			}
-		});
-	}
-},
-statusCommand() {
-	this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개');
-},
+			});
+	},
+	statusCommand() {
+		this.log('=== 현재 상태 ===<br>Room Key: ' + (currentRoomKey || '없음') + '<br>Firebase: ' + (syncEnabled ? '활성화' : '비활성화') + '<br>참가자: ' + state.people.length + '명<br>미참가자: ' + state.inactivePeople.length + '명<br>제약: ' + state.forbiddenPairs.length + '개');
+	},
 
-helpCommand() {
+	helpCommand() {
 		let message = this.comments.helpMessage;
 		// 인증되었을 때만 인증 필요 명령어 테이블 추가
 		if (this.authenticated) {
@@ -2151,7 +2282,7 @@ helpCommand() {
 			const isRemoveCommand = /^([^()!]+)\(!\)/.test(ruleInput);
 			
 			// input 명령어를 통해 처리
-			this.inputCommand(ruleInput);
+			this.inputCommand(ruleInput, { isRuleInput: true });
 			
 			// 결과 메시지 출력
 			if (isRemoveCommand) {
@@ -2364,7 +2495,7 @@ helpCommand() {
 		this.log(output);
 	},
 	
-	inputCommand(data) {
+	inputCommand(data, options = {}) {
 		// 참가자 추가 폼에 입력하는 것과 동일하게 처리
 		if (!data || data.trim() === '') {
 			// 데이터가 없으면 입력 모드로 전환
@@ -2380,9 +2511,10 @@ helpCommand() {
 		if (typeof addPerson === 'function' && elements.nameInput) {
 			const originalValue = elements.nameInput.value;
 			elements.nameInput.value = data;
+			const isRuleInput = options.isRuleInput === true || this.inputMode === 'matching';
 			
 			// addPerson 함수 실행 (fromConsole=true 전달)
-			addPerson(true);
+			addPerson(true, { skipAutoDetect: isRuleInput });
 			
 			this.success(`${this.comments.participantAddComplete} ${data}`);
 		} else {

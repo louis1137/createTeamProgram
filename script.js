@@ -1292,7 +1292,7 @@ function shuffleOrder() {
 // 중복 확인 모달을 위한 전역 변수
 let pendingAddData = null;
 
-function addPerson(fromConsole = false) {
+function addPerson(fromConsole = false, options = {}) {
 	const input = elements.nameInput.value.trim();
 	if (input === '') {
 		if (!fromConsole) alert(commandConsoleMessages.comments.nameRequired);
@@ -1429,7 +1429,9 @@ function addPerson(fromConsole = false) {
 	}
 
 	// 입력 내용에서 성별/가중치 패턴 감지하여 자동 체크
-	autoDetectAndCheckOptions();
+	if (!options.skipAutoDetect) {
+		autoDetectAndCheckOptions();
+	}
 
 	// '/'로 분리하여 토큰 처리; '!'가 포함된 토큰은 제약, 아니면 이름/그룹으로 처리
 	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
