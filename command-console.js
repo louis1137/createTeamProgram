@@ -1306,6 +1306,7 @@ const commandConsole = {
 				nextId: state.nextId,
 				forbiddenPairs: state.forbiddenPairs,
 				pendingConstraints: state.pendingConstraints,
+				probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
 				hiddenGroups: state.hiddenGroups,
 				hiddenGroupChains: state.hiddenGroupChains,
 				pendingHiddenGroups: state.pendingHiddenGroups,
@@ -1381,6 +1382,7 @@ loadCommand(profileName = '') {
 					nextId: data.nextId || 1,
 					forbiddenPairs: data.forbiddenPairs || [],
 					pendingConstraints: data.pendingConstraints || [],
+					probabilisticForbiddenPairs: data.probabilisticForbiddenPairs || [],
 					hiddenGroups: data.hiddenGroups || [],
 					hiddenGroupChains: data.hiddenGroupChains || [],
 					pendingHiddenGroups: data.pendingHiddenGroups || [],
@@ -1485,6 +1487,7 @@ loadCommand(profileName = '') {
 					nextId: state.nextId,
 					forbiddenPairs: state.forbiddenPairs,
 					pendingConstraints: state.pendingConstraints,
+					probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
 					hiddenGroups: state.hiddenGroups,
 					hiddenGroupChains: state.hiddenGroupChains,
 					pendingHiddenGroups: state.pendingHiddenGroups,
@@ -1568,6 +1571,7 @@ loadCommand(profileName = '') {
 					hiddenGroupChains: state.hiddenGroupChains,
 					pendingHiddenGroups: state.pendingHiddenGroups,
 					pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+					probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
 					timestamp: Date.now()
 				};
 				
@@ -1586,15 +1590,18 @@ loadCommand(profileName = '') {
 					database.ref(`rooms/${currentRoomKey}/hiddenGroups`).once('value'),
 					database.ref(`rooms/${currentRoomKey}/hiddenGroupChains`).once('value'),
 					database.ref(`rooms/${currentRoomKey}/pendingHiddenGroups`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/pendingHiddenGroupChains`).once('value')
+					database.ref(`rooms/${currentRoomKey}/pendingHiddenGroupChains`).once('value'),
+					database.ref(`rooms/${currentRoomKey}/probabilisticForbiddenPairs`).once('value')
 				]);
 			})
-			.then(([hiddenGroupsSnap, hiddenGroupChainsSnap, pendingHiddenGroupsSnap, pendingHiddenGroupChainsSnap]) => {
+			.then(([hiddenGroupsSnap, hiddenGroupChainsSnap, pendingHiddenGroupsSnap, pendingHiddenGroupChainsSnap, probabilisticForbiddenPairsSnap]) => {
 				// 규칙 데이터만 state에 반영
 				state.hiddenGroups = hiddenGroupsSnap.val() || [];
 				state.hiddenGroupChains = hiddenGroupChainsSnap.val() || [];
 				state.pendingHiddenGroups = pendingHiddenGroupsSnap.val() || [];
 				state.pendingHiddenGroupChains = pendingHiddenGroupChainsSnap.val() || [];
+				state.probabilisticForbiddenPairs = probabilisticForbiddenPairsSnap.val() || [];
+				state.activeProbabilisticForbiddenPairs = [];
 				
 				// UI 업데이트는 필요 없음 (규칙은 UI에 직접 표시되지 않음)
 				this.success(`✅ 동기화 및 저장 완료`);
@@ -1866,6 +1873,7 @@ loadCommand(profileName = '') {
 						nextId: 1,
 						forbiddenPairs: [],
 						pendingConstraints: [],
+						probabilisticForbiddenPairs: [],
 						hiddenGroups: [],
 						hiddenGroupChains: [],
 						pendingHiddenGroups: [],
@@ -1983,10 +1991,12 @@ loadCommand(profileName = '') {
 			state.pendingHiddenGroupChains = [];
 			state.activeHiddenGroupMap = {};
 			state.activeHiddenGroupChainInfo = {};
+			state.probabilisticForbiddenPairs = [];
 			updateData.hiddenGroups = [];
 			updateData.hiddenGroupChains = [];
 			updateData.pendingHiddenGroups = [];
 			updateData.pendingHiddenGroupChains = [];
+			updateData.probabilisticForbiddenPairs = [];
 		}
 		if (targets.has('reservations')) {
 			state.reservations = [];
@@ -2035,7 +2045,8 @@ loadCommand(profileName = '') {
 			(state.hiddenGroups?.length || 0) +
 			(state.hiddenGroupChains?.length || 0) +
 			(state.pendingHiddenGroups?.length || 0) +
-			(state.pendingHiddenGroupChains?.length || 0);
+			(state.pendingHiddenGroupChains?.length || 0) +
+			(state.probabilisticForbiddenPairs?.length || 0);
 		const reservationCount = state.reservations?.length || 0;
 		const statusLines = [
 			'=== 현재 상태 ===',
@@ -2349,7 +2360,8 @@ loadCommand(profileName = '') {
 		}
 		
 		const totalHidden = state.hiddenGroups.length + state.hiddenGroupChains.length + 
-		                    state.pendingHiddenGroups.length + state.pendingHiddenGroupChains.length;
+		                    state.pendingHiddenGroups.length + state.pendingHiddenGroupChains.length +
+						(state.probabilisticForbiddenPairs?.length || 0);
 		
 		if (totalHidden === 0) {
 			this.log(this.comments.noProbabilityRules);
@@ -2358,159 +2370,143 @@ loadCommand(profileName = '') {
 		
 		let output = `<div style="margin: 10px 0;">
 			<div style="font-weight: bold; margin-bottom: 8px;">📊 ${this.comments.probabilityRules} (${this.comments.ruleSetup} : <code data-cmd="규칙">규칙</code>)</div>`;
-		
+
+		const rows = [];
+		const green = '#4ade80';
+		const red = '#f87171';
+		const dim = '#94a3b8';
+
 		// 확률 기반 그룹 (hiddenGroups)
-		if (state.hiddenGroups.length > 0) {
-			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">📊 ${this.comments.probabilityRules} (${state.hiddenGroups.length}개):</div>
-				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-					<thead>
-						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
-							<th style="padding: 6px; text-align: left;">${this.comments.memberA}</th>
-							<th style="padding: 6px; text-align: left;">${this.comments.memberB}</th>
-							<th style="padding: 6px; text-align: center; width: 80px;">${this.comments.probability}</th>
-						</tr>
-					</thead>
-					<tbody>`;
-			
-			state.hiddenGroups.forEach((group) => {
-				const personA = state.people.find(p => p.id === group[0]);
-				const personB = state.people.find(p => p.id === group[1]);
-				const probability = group[2];
-				
-				if (personA && personB) {
-					// probability가 1보다 크면 이미 퍼센트 값, 아니면 0~1 범위
-					const displayPercent = probability > 1 ? Math.round(probability) : Math.round(probability * 100);
-					output += `
-						<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-							<td style="padding: 6px;">'${personA.name}'</td>
-							<td style="padding: 6px;">'${personB.name}'</td>
-							<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
-						</tr>`;
-				}
-			});
-			
-			output += `
-					</tbody>
-				</table>
-			</div>`;
-		}
-		
-		// 확률 규칙 체인 (hiddenGroupChains) - rowspan 사용
-		if (state.hiddenGroupChains.length > 0) {
-			output += `<div style="margin: 10px 0;">
-				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-					<thead>
-						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
-							<th style="padding: 6px; text-align: left;">${this.comments.memberA}</th>
-							<th style="padding: 6px; text-align: left;">${this.comments.memberB}</th>
-							<th style="padding: 6px; text-align: center; width: 80px;">${this.comments.probability}</th>
-						</tr>
-					</thead>
-					<tbody>`;
-			
-			state.hiddenGroupChains.forEach((chain) => {
-				// 이름 기반으로 참가자 찾기
-				const primaryPerson = state.people.find(p => p.name === chain.primary);
-				const candidates = chain.candidates || [];
-				
-				// primary가 참가자 목록에 없어도 규칙은 표시
-				const primaryName = primaryPerson ? primaryPerson.name : chain.primary;
-				const primaryDisplay = primaryPerson ? `'${primaryName}'` : `<span style="color: #94a3b8;">'${primaryName}'</span>`;
-				
-				if (candidates.length > 0) {
-					candidates.forEach((candidate, idx) => {
-						// 이름 기반으로 후보 찾기
-						const candidatePerson = state.people.find(p => p.name === candidate.name);
-						const candidateName = candidatePerson ? candidatePerson.name : candidate.name;
-						const candidateDisplay = candidatePerson ? `'${candidateName}'` : `<span style="color: #94a3b8;">'${candidateName}'</span>`;
-						
-						// probability는 이미 퍼센트 값
-						const displayPercent = Math.round(candidate.probability);
-						if (idx === 0) {
-							// 첫 번째 행: primary 표시
-							output += `
-								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-									<td style="padding: 6px;">${primaryDisplay}</td>
-									<td style="padding: 6px;">${candidateDisplay}</td>
-									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
-								</tr>`;
-						} else {
-							// 나머지 행: 멤버 A는 공백
-							output += `
-								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-									<td style="padding: 6px;"></td>
-									<td style="padding: 6px;">${candidateDisplay}</td>
-									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
-								</tr>`;
-						}
+		state.hiddenGroups.forEach((group) => {
+			const personA = state.people.find(p => p.id === group[0]);
+			const personB = state.people.find(p => p.id === group[1]);
+			const probability = group[2];
+			if (personA && personB) {
+				const displayPercent = probability > 1 ? Math.round(probability) : Math.round(probability * 100);
+				rows.push({
+					leftKey: `'${personA.name}'`,
+					left: `'${personA.name}'`,
+					right: `'${personB.name}'`,
+					percent: displayPercent,
+					color: green
+				});
+			}
+		});
+
+		// 확률 규칙 체인 (hiddenGroupChains)
+		state.hiddenGroupChains.forEach((chain) => {
+			const primaryPerson = state.people.find(p => p.name === chain.primary);
+			const candidates = chain.candidates || [];
+			const primaryName = primaryPerson ? primaryPerson.name : chain.primary;
+			const primaryDisplay = primaryPerson ? `'${primaryName}'` : `<span style="color: ${dim};">'${primaryName}'</span>`;
+			if (candidates.length > 0) {
+				candidates.forEach((candidate, idx) => {
+					const candidatePerson = state.people.find(p => p.name === candidate.name);
+					const candidateName = candidatePerson ? candidatePerson.name : candidate.name;
+					const candidateDisplay = candidatePerson ? `'${candidateName}'` : `<span style="color: ${dim};">'${candidateName}'</span>`;
+					const displayPercent = Math.round(candidate.probability);
+					rows.push({
+						leftKey: primaryDisplay,
+						left: idx === 0 ? primaryDisplay : '',
+						right: candidateDisplay,
+						percent: displayPercent,
+						color: green
 					});
-				}
-			});
-			
-			output += `
-					</tbody>
-				</table>
-			</div>`;
-		}
-		
+				});
+			}
+		});
+
 		// 보류 확률 규칙 (pendingHiddenGroups)
-		if (state.pendingHiddenGroups.length > 0) {
-			output += `<div style="margin: 10px 0;">
-				<div style="font-weight: bold; margin-bottom: 5px;">? 보류 확률 규칙 (${state.pendingHiddenGroups.length}개):</div>`;
-			state.pendingHiddenGroups.forEach((group, index) => {
-				output += `<div style="padding: 4px 0;">${index + 1}. ${group.left} ↔ ${group.right} (${Math.round(group.probability * 100)}%)</div>`;
+		state.pendingHiddenGroups.forEach((group) => {
+			const displayPercent = Math.round(group.probability * 100);
+			rows.push({
+				leftKey: `<span style="color: ${dim};">'${group.left}' (보류)</span>`,
+				left: `<span style="color: ${dim};">'${group.left}' (보류)</span>`,
+				right: `<span style="color: ${dim};">'${group.right}'</span>`,
+				percent: displayPercent,
+				color: green
 			});
-			output += `</div>`;
-		}
-		
+		});
+
 		// 보류 확률 기반 그룹 체인 (pendingHiddenGroupChains)
-		if (state.pendingHiddenGroupChains.length > 0) {
-			output += `<div style="margin: 10px 0;">
-				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-					<thead>
-						<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
-							<th style="padding: 6px; text-align: left;">${this.comments.memberA}</th>
-							<th style="padding: 6px; text-align: left;">${this.comments.memberB}</th>
-							<th style="padding: 6px; text-align: center; width: 80px;">${this.comments.probability}</th>
-						</tr>
-					</thead>
-					<tbody>`;
-			
-			state.pendingHiddenGroupChains.forEach((chain) => {
-				const candidates = chain.candidates || [];
-				
-				if (candidates.length > 0) {
-					candidates.forEach((candidate, idx) => {
-						const displayPercent = candidate.probability > 1 ? Math.round(candidate.probability) : Math.round(candidate.probability * 100);
-						if (idx === 0) {
-							// 첫 번째 행: primary 표시
-							output += `
-								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-									<td style="padding: 6px;">'${chain.primary}'</td>
-									<td style="padding: 6px;">'${candidate.name}'</td>
-									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
-								</tr>`;
-						} else {
-							// 나머지 행: 멤버 A는 공백
-							output += `
-								<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-									<td style="padding: 6px;"></td>
-									<td style="padding: 6px;">'${candidate.name}'</td>
-									<td style="padding: 6px; text-align: center; color: #fbbf24;">${displayPercent}%</td>
-								</tr>`;
-						}
+		state.pendingHiddenGroupChains.forEach((chain) => {
+			const candidates = chain.candidates || [];
+			if (candidates.length > 0) {
+				candidates.forEach((candidate, idx) => {
+					const displayPercent = candidate.probability > 1 ? Math.round(candidate.probability) : Math.round(candidate.probability * 100);
+					const pendingLeft = `<span style="color: ${dim};">'${chain.primary}' (보류)</span>`;
+					rows.push({
+						leftKey: pendingLeft,
+						left: idx === 0 ? pendingLeft : '',
+						right: `<span style="color: ${dim};">'${candidate.name}'</span>`,
+						percent: displayPercent,
+						color: green
 					});
-				}
+				});
+			}
+		});
+
+		// 확률 제약 규칙 (probabilisticForbiddenPairs)
+		(state.probabilisticForbiddenPairs || []).forEach((rule) => {
+			const leftName = rule.leftRaw || rule.left;
+			const rightName = rule.rightRaw || rule.right;
+			const leftPerson = findPersonByName(leftName);
+			const rightPerson = findPersonByName(rightName);
+			const leftDisplay = leftPerson ? `'${leftPerson.name}'` : `<span style="color: ${dim};">'${leftName}'</span>`;
+			const rightDisplay = rightPerson ? `'${rightPerson.name}'` : `<span style="color: ${dim};">'${rightName}'</span>`;
+			rows.push({
+				leftKey: leftDisplay,
+				left: leftDisplay,
+				right: rightDisplay,
+				percent: Math.round(rule.probability),
+				color: red
 			});
-			
+		});
+
+		output += `<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+			<thead>
+				<tr style="background: rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.2);">
+					<th style="padding: 6px; text-align: left;">${this.comments.memberA}</th>
+					<th style="padding: 6px; text-align: left;">${this.comments.memberB}</th>
+					<th style="padding: 6px; text-align: center; width: 80px;">${this.comments.probability}</th>
+				</tr>
+			</thead>
+			<tbody>`;
+
+		let prevLeftKey = null;
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			let leftCell = '';
+			if (row.leftKey && row.leftKey !== prevLeftKey) {
+				let span = 1;
+				for (let j = i + 1; j < rows.length; j++) {
+					if (rows[j].leftKey && rows[j].leftKey === row.leftKey) {
+						span++;
+					} else {
+						break;
+					}
+				}
+				leftCell = `<td style="padding: 6px;" rowspan="${span}">${row.left}</td>`;
+				prevLeftKey = row.leftKey;
+			} else if (row.leftKey) {
+				leftCell = '';
+			} else if (row.left) {
+				leftCell = `<td style="padding: 6px;">${row.left}</td>`;
+			}
 			output += `
-					</tbody>
-				</table>
-			</div>`;
+				<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+					${leftCell}
+					<td style="padding: 6px;">${row.right}</td>
+					<td style="padding: 6px; text-align: center; color: ${row.color};">
+						<span style="color: ${row.color}; margin-right: 4px;">●</span>${row.percent}%
+					</td>
+				</tr>`;
 		}
-		
-		output += `</div>`;
+
+		output += `
+			</tbody>
+		</table>
+		</div>`;
 		
 		this.log(output);
 	},

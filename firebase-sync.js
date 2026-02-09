@@ -108,12 +108,15 @@ function loadDataByType(type) {
 				database.ref(`rooms/${currentRoomKey}/hiddenGroups`).once('value'),
 				database.ref(`rooms/${currentRoomKey}/hiddenGroupChains`).once('value'),
 				database.ref(`rooms/${currentRoomKey}/pendingHiddenGroups`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/pendingHiddenGroupChains`).once('value')
-			]).then(([hiddenGroupsSnap, hiddenGroupChainsSnap, pendingHiddenGroupsSnap, pendingHiddenGroupChainsSnap]) => {
+				database.ref(`rooms/${currentRoomKey}/pendingHiddenGroupChains`).once('value'),
+				database.ref(`rooms/${currentRoomKey}/probabilisticForbiddenPairs`).once('value')
+			]).then(([hiddenGroupsSnap, hiddenGroupChainsSnap, pendingHiddenGroupsSnap, pendingHiddenGroupChainsSnap, probabilisticForbiddenPairsSnap]) => {
 				state.hiddenGroups = hiddenGroupsSnap.val() || [];
 				state.hiddenGroupChains = hiddenGroupChainsSnap.val() || [];
 				state.pendingHiddenGroups = pendingHiddenGroupsSnap.val() || [];
 				state.pendingHiddenGroupChains = pendingHiddenGroupChainsSnap.val() || [];
+				state.probabilisticForbiddenPairs = probabilisticForbiddenPairsSnap.val() || [];
+				state.activeProbabilisticForbiddenPairs = [];
 			});
 		
 		case 'option':
@@ -222,6 +225,8 @@ function loadStateFromData(data) {
 	state.hiddenGroupChains = data.hiddenGroupChains || [];
 	state.pendingHiddenGroups = data.pendingHiddenGroups || [];
 	state.pendingHiddenGroupChains = data.pendingHiddenGroupChains || [];
+	state.probabilisticForbiddenPairs = data.probabilisticForbiddenPairs || [];
+	state.activeProbabilisticForbiddenPairs = [];
 	state.reservations = data.reservations || [];
 	state.maxTeamSizeEnabled = data.maxTeamSizeEnabled || false;
 	state.genderBalanceEnabled = data.genderBalanceEnabled || false;
@@ -251,6 +256,8 @@ function clearState() {
 	state.hiddenGroupChains = [];
 	state.pendingHiddenGroups = [];
 	state.pendingHiddenGroupChains = [];
+	state.probabilisticForbiddenPairs = [];
+	state.activeProbabilisticForbiddenPairs = [];
 	state.reservations = [];
 	state.activeHiddenGroupMap = {};
 	state.activeHiddenGroupChainInfo = {};

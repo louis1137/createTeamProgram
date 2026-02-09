@@ -34,10 +34,12 @@ const state = {
 	forbiddenPairs: [], // [idA, idB] 형식의 배열
 	forbiddenMap: {},   // forbiddenPairs에서 만들어진 빠른 조회용 맵
 	pendingConstraints: [], // {left: 정규화, right: 정규화} 형식의 보류 제약 배열
+	probabilisticForbiddenPairs: [], // {left: 정규화, right: 정규화, probability} 형식의 확률 제약
 	hiddenGroups: [], // [idA, idB, probability] 형식의 배열 - 확률 기반 히든 그룹
 	hiddenGroupChains: [], // [{primary: "이름", candidates: [{name: "이름", probability}]}] 형식 - 체이닝 히든 그룹 (규칙)
 	activeHiddenGroupMap: {}, // 현재 팀 생성에서 활성화된 히든 그룹 맵 (임시)
 	activeHiddenGroupChainInfo: {}, // 체이닝 정보 맵 { primaryId: { partnerId: probability } }
+	activeProbabilisticForbiddenPairs: [], // 현재 팀 생성에서 활성화된 확률 제약 쌍
 	pendingHiddenGroups: [], // {left: 정규화, right: 정규화, probability: 숫자} 형식의 보류 히든 그룹 배열
 	pendingHiddenGroupChains: [], // [{primary: 정규화, candidates: [{name, probability}]}] 형식 - 보류 체이닝
 	reservations: [], // [["A","B","C","D"], ["E","F"], ...] 형식의 예약 스택 (인덱스 0이 다음 사용될 예약)
@@ -840,6 +842,8 @@ function loadFromLocalStorage() {
 			state.pendingHiddenGroups = [];
 			state.hiddenGroupChains = [];
 			state.pendingHiddenGroupChains = [];
+			state.probabilisticForbiddenPairs = [];
+			state.activeProbabilisticForbiddenPairs = [];
 			
 			// 설정 값 복원
 			if (typeof data.maxTeamSizeEnabled !== 'undefined') {
@@ -1449,6 +1453,23 @@ function addPerson(fromConsole = false, options = {}) {
 	tokens.forEach(token => {
 		// cmd 콘솔에서만 확률 규칙 처리
 		if (fromConsole) {
+				// 확률 제약 등록: A(!10)B
+				const probabilisticForbiddenPattern = /^([^()!]+)\(!\s*(\d+)\s*\)([^()!]+)$/;
+				const probabilisticMatch = token.match(probabilisticForbiddenPattern);
+				if (probabilisticMatch) {
+					const leftName = probabilisticMatch[1].trim();
+					const probability = parseInt(probabilisticMatch[2], 10);
+					const rightName = probabilisticMatch[3].trim();
+					if (leftName && rightName && probability >= 0 && probability <= 100) {
+						const res = addProbabilisticForbiddenPairByNames(leftName, rightName, probability);
+						if (res.ok) {
+							saveToLocalStorage();
+							constraintsTouched = true;
+						}
+					}
+					return; // 확률 제약 처리 완료
+				}
+
 			// 체이닝 제거 패턴: A(!), A(!)B, A(!)B(!)C
 			const removeChainPattern = /^([^()!]+)\(!\)(.*)$/;
 			const removeMatch = token.match(removeChainPattern);
@@ -1466,6 +1487,7 @@ function addPerson(fromConsole = false, options = {}) {
 				if (!rest) {
 					// A(!) - 모든 체이닝 제거
 					state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
+					const removedProb = removeProbabilisticForbiddenByName(primaryName);
 					saveToLocalStorage();
 					constraintsTouched = true;
 					console.log(commandConsoleMessages.comments.chainRuleDeleted.replace('{name}', primaryName));
@@ -1475,6 +1497,7 @@ function addPerson(fromConsole = false, options = {}) {
 					
 					let removedCount = 0;
 					const removedNames = [];
+					const removedProbTargets = [];
 					removeTargets.forEach(targetName => {
 						const beforeLen = existingChain.candidates.length;
 						existingChain.candidates = existingChain.candidates.filter(c => c.name !== targetName);
@@ -1483,6 +1506,8 @@ function addPerson(fromConsole = false, options = {}) {
 							removedCount++;
 							removedNames.push(targetName);
 						}
+						const probRemoved = removeProbabilisticForbiddenPairByNames(primaryName, targetName);
+						if (probRemoved > 0) removedProbTargets.push(targetName);
 					});
 					
 					// 후보가 모두 제거되면 체인 자체를 제거
@@ -1495,7 +1520,7 @@ function addPerson(fromConsole = false, options = {}) {
 						console.log(commandConsoleMessages.comments.chainCandidateDeleteFailed);
 					}
 					
-					if (removedCount > 0) {
+					if (removedCount > 0 || removedProbTargets.length > 0) {
 						saveToLocalStorage();
 						constraintsTouched = true;
 					}
@@ -1534,6 +1559,13 @@ function addPerson(fromConsole = false, options = {}) {
 					// 규칙으로 등록 (참가자 존재 여부와 무관)
 					const primaryName = firstPart.trim();
 					const candidates = parts.map(p => ({ name: p.name.trim(), probability: p.probability }));
+					// 동일한 확률 제약이 있으면 제거 (A(!10)B -> A(10)B)
+					candidates.forEach(candidate => {
+						const removedProb = removeProbabilisticForbiddenPairByNames(primaryName, candidate.name);
+						if (removedProb > 0) {
+							constraintsTouched = true;
+						}
+					});
 					
 					// 기존 체인이 있으면 후보를 병합
 					const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryName);
@@ -1567,6 +1599,11 @@ function addPerson(fromConsole = false, options = {}) {
 				const probability = parseInt(hiddenGroupMatch[2]);
 				const rightName = hiddenGroupMatch[3].trim();
 				if (leftName && rightName && probability >= 0 && probability <= 100) {
+					// 동일한 확률 제약이 있으면 제거 (A(!10)B -> A(10)B)
+					const removedProb = removeProbabilisticForbiddenPairByNames(leftName, rightName);
+					if (removedProb > 0) {
+						constraintsTouched = true;
+					}
 					// 규칙으로 등록 (참가자 존재 여부와 무관)
 					const existingChain = state.hiddenGroupChains.find(chain => chain.primary === leftName);
 					if (existingChain) {
@@ -2033,6 +2070,122 @@ function addForbiddenPairByNames(nameA, nameB) {
 	return { ok: true, added: !exists };
 } 
 
+function removeProbabilisticForbiddenPairByNames(nameA, nameB) {
+	const left = normalizeName(nameA);
+	const right = normalizeName(nameB);
+	const before = state.probabilisticForbiddenPairs.length;
+	state.probabilisticForbiddenPairs = state.probabilisticForbiddenPairs.filter(p =>
+		!((p.left === left && p.right === right) || (p.left === right && p.right === left))
+	);
+	return before - state.probabilisticForbiddenPairs.length;
+}
+
+function removeProbabilisticForbiddenByName(name) {
+	const n = normalizeName(name);
+	const before = state.probabilisticForbiddenPairs.length;
+	state.probabilisticForbiddenPairs = state.probabilisticForbiddenPairs.filter(p =>
+		p.left !== n && p.right !== n
+	);
+	return before - state.probabilisticForbiddenPairs.length;
+}
+
+function removeHiddenRulePairByNames(nameA, nameB) {
+	const left = normalizeName(nameA);
+	const right = normalizeName(nameB);
+	let removed = 0;
+
+	// hiddenGroupChains (등록 규칙)
+	const chain = state.hiddenGroupChains.find(c => normalizeName(c.primary) === left);
+	if (chain) {
+		const beforeLen = chain.candidates.length;
+		chain.candidates = chain.candidates.filter(c => normalizeName(c.name) !== right);
+		if (chain.candidates.length === 0) {
+			state.hiddenGroupChains = state.hiddenGroupChains.filter(c => c !== chain);
+		}
+		if (beforeLen !== chain.candidates.length) removed++;
+	}
+	const reverseChain = state.hiddenGroupChains.find(c => normalizeName(c.primary) === right);
+	if (reverseChain) {
+		const beforeLen = reverseChain.candidates.length;
+		reverseChain.candidates = reverseChain.candidates.filter(c => normalizeName(c.name) !== left);
+		if (reverseChain.candidates.length === 0) {
+			state.hiddenGroupChains = state.hiddenGroupChains.filter(c => c !== reverseChain);
+		}
+		if (beforeLen !== reverseChain.candidates.length) removed++;
+	}
+
+	// pendingHiddenGroups (보류 규칙)
+	const beforePending = state.pendingHiddenGroups.length;
+	state.pendingHiddenGroups = state.pendingHiddenGroups.filter(p =>
+		!((normalizeName(p.left) === left && normalizeName(p.right) === right) ||
+		  (normalizeName(p.left) === right && normalizeName(p.right) === left))
+	);
+	if (state.pendingHiddenGroups.length !== beforePending) removed++;
+
+	// pendingHiddenGroupChains (보류 체인)
+	const pendingChain = state.pendingHiddenGroupChains.find(c => normalizeName(c.primary) === left);
+	if (pendingChain) {
+		const beforeLen = pendingChain.candidates.length;
+		pendingChain.candidates = pendingChain.candidates.filter(c => normalizeName(c.name) !== right);
+		if (pendingChain.candidates.length === 0) {
+			state.pendingHiddenGroupChains = state.pendingHiddenGroupChains.filter(c => c !== pendingChain);
+		}
+		if (beforeLen !== pendingChain.candidates.length) removed++;
+	}
+	const reversePendingChain = state.pendingHiddenGroupChains.find(c => normalizeName(c.primary) === right);
+	if (reversePendingChain) {
+		const beforeLen = reversePendingChain.candidates.length;
+		reversePendingChain.candidates = reversePendingChain.candidates.filter(c => normalizeName(c.name) !== left);
+		if (reversePendingChain.candidates.length === 0) {
+			state.pendingHiddenGroupChains = state.pendingHiddenGroupChains.filter(c => c !== reversePendingChain);
+		}
+		if (beforeLen !== reversePendingChain.candidates.length) removed++;
+	}
+
+	// hiddenGroups (id 기반 규칙)
+	const pa = findPersonByName(nameA);
+	const pb = findPersonByName(nameB);
+	if (pa && pb) {
+		const beforeHidden = state.hiddenGroups.length;
+		state.hiddenGroups = state.hiddenGroups.filter(([a, b]) =>
+			!((a === pa.id && b === pb.id) || (a === pb.id && b === pa.id))
+		);
+		if (state.hiddenGroups.length !== beforeHidden) removed++;
+	}
+
+	return removed;
+}
+
+// 확률 제약 등록 (이름 기반, 참가자 없어도 등록 가능)
+function addProbabilisticForbiddenPairByNames(nameA, nameB, probability) {
+	const left = normalizeName(nameA);
+	const right = normalizeName(nameB);
+	if (!left || !right) return { ok: false, message: commandConsoleMessages.comments.nameRequired };
+	if (left === right) return { ok: false, message: commandConsoleMessages.comments.samePersonConstraintError };
+	const prob = Math.max(0, Math.min(100, parseInt(probability, 10) || 0));
+
+	// 동일한 일반 규칙이 있으면 제거 (A(10)B -> A(!10)B)
+	removeHiddenRulePairByNames(nameA, nameB);
+
+	const existing = state.probabilisticForbiddenPairs.find(p =>
+		(p.left === left && p.right === right) || (p.left === right && p.right === left)
+	);
+	if (existing) {
+		existing.probability = prob;
+		existing.leftRaw = (nameA || '').trim();
+		existing.rightRaw = (nameB || '').trim();
+		return { ok: true, updated: true };
+	}
+	state.probabilisticForbiddenPairs.push({
+		left,
+		right,
+		leftRaw: (nameA || '').trim(),
+		rightRaw: (nameB || '').trim(),
+		probability: prob
+	});
+	return { ok: true, added: true };
+}
+
 // 이름 기반 보류 제약 추가 (참가자가 없어도 추가 가능)
 function addPendingConstraint(leftName, rightName) {
 	const l = normalizeName(leftName);
@@ -2241,6 +2394,30 @@ function applyReservationAsHiddenGroup(reservationNames) {
 function removeTemporaryReservationGroup() {
 	// activeHiddenGroupMap은 deactivateHiddenGroups에서 자동으로 초기화됨
 	// 별도 처리 불필요
+}
+
+// 팀 생성 시 확률 제약 활성화 (확률 기반 금지)
+function activateProbabilisticForbiddenPairsForTeamGeneration() {
+	state.activeProbabilisticForbiddenPairs = [];
+	state.probabilisticForbiddenPairs.forEach(rule => {
+		const personA = findPersonByName(rule.left);
+		const personB = findPersonByName(rule.right);
+		if (!personA || !personB) return;
+		const random = Math.random() * 100;
+		if (random < rule.probability) {
+			if (!state.forbiddenMap[personA.id]) state.forbiddenMap[personA.id] = new Set();
+			if (!state.forbiddenMap[personB.id]) state.forbiddenMap[personB.id] = new Set();
+			state.forbiddenMap[personA.id].add(personB.id);
+			state.forbiddenMap[personB.id].add(personA.id);
+			state.activeProbabilisticForbiddenPairs.push({
+				aId: personA.id,
+				bId: personB.id,
+				probability: rule.probability,
+				aName: personA.name,
+				bName: personB.name
+			});
+		}
+	});
 }
 
 // 팀 생성 시 히든 그룹 활성화 (확률 기반)
@@ -3236,6 +3413,7 @@ function preShufflePeopleForGeneration(people) {
 
 function generateTeams(people, reservation = null) {
 	buildForbiddenMap();
+	activateProbabilisticForbiddenPairsForTeamGeneration();
 	
 	// 히든 그룹 확률 기반 활성화
 	activateHiddenGroupsForTeamGeneration();
@@ -4131,6 +4309,19 @@ function logTeamResultsToConsole(teams) {
 				// 규칙 섹션 새로 생성
 				outputMessage += `<br><br>${commandConsoleMessages.comments.appliedRules}<br>${ruleResults}`;
 			}
+		}
+	}
+
+	// 확률 제약 규칙 출력 (A(!10)B)
+	if (commandConsole.authenticated && state.activeProbabilisticForbiddenPairs && state.activeProbabilisticForbiddenPairs.length > 0) {
+		const probRules = state.activeProbabilisticForbiddenPairs.map(rule => {
+			return `  - ${rule.aName} ⛔ ${rule.bName} (${Math.round(rule.probability)}%)`;
+		}).join('<br>');
+		
+		if (outputMessage.includes(commandConsoleMessages.comments.appliedRules)) {
+			outputMessage += `<br>${probRules}`;
+		} else {
+			outputMessage += `<br><br>${commandConsoleMessages.comments.appliedRules}<br>${probRules}`;
 		}
 	}
 	
