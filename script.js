@@ -1453,6 +1453,51 @@ function addPerson(fromConsole = false, options = {}) {
 	tokens.forEach(token => {
 		// cmd 콘솔에서만 확률 규칙 처리
 		if (fromConsole) {
+				// 확률 제약 체이닝 체크: A(!50)B(!50)C(!50)D 패턴
+				const probabilisticChainPattern = /^([^(]+)(?:\(!\s*(\d+)\s*\)([^(]*?))+$/;
+				if (probabilisticChainPattern.test(token)) {
+					// 체인 파싱
+					const parts = [];
+					let current = token;
+					let firstPart = null;
+					
+					// 첫 번째 부분 추출
+					const firstMatch = current.match(/^([^(]+)\(!/);
+					if (firstMatch) {
+						firstPart = firstMatch[1].trim();
+						current = current.substring(firstMatch[1].length);
+					}
+					
+					// 나머지 (!확률)이름 패턴 반복 추출
+					const pairPattern = /\(!\s*(\d+)\s*\)([^(]*?)(?=\(!|$)/g;
+					let match;
+					while ((match = pairPattern.exec(current)) !== null) {
+						const prob = parseInt(match[1]);
+						const name = match[2].trim();
+						// 이름이 있고 확률이 유효한 경우만 추가
+						if (name && prob >= 0 && prob <= 100) {
+							parts.push({ name, probability: prob });
+						}
+					}
+					
+					if (firstPart && parts.length > 0) {
+						// 각 쌍에 대해 확률 제약 등록
+						const primaryName = firstPart.trim();
+						let addedCount = 0;
+						parts.forEach(part => {
+							const res = addProbabilisticForbiddenPairByNames(primaryName, part.name, part.probability);
+							if (res.ok) {
+								addedCount++;
+							}
+						});
+						if (addedCount > 0) {
+							saveToLocalStorage();
+							constraintsTouched = true;
+						}
+						return; // 확률 제약 체인 처리 완료
+					}
+				}
+				
 				// 확률 제약 등록: A(!10)B
 				const probabilisticForbiddenPattern = /^([^()!]+)\(!\s*(\d+)\s*\)([^()!]+)$/;
 				const probabilisticMatch = token.match(probabilisticForbiddenPattern);
@@ -3413,15 +3458,6 @@ function preShufflePeopleForGeneration(people) {
 
 function generateTeams(people, reservation = null) {
 	buildForbiddenMap();
-	activateProbabilisticForbiddenPairsForTeamGeneration();
-	
-	// 히든 그룹 확률 기반 활성화
-	activateHiddenGroupsForTeamGeneration();
-	
-	// 예약 처리: activateHiddenGroupsForTeamGeneration 이후에 적용
-	if (reservation) {
-		applyReservationAsHiddenGroup(reservation);
-	}
 
 	// 팀 순서 배열에서 마지막 팀 인덱스를 항상 맨 뒤로 보낼지 결정하는 공통 로직
 	function pushLastTeamToEndIfNeeded(teamOrder, teams) {
@@ -3491,6 +3527,13 @@ function generateTeams(people, reservation = null) {
 	};
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		// 각 시도마다 확률적 제약과 히든 그룹을 새로 샘플링
+		activateProbabilisticForbiddenPairsForTeamGeneration();
+		activateHiddenGroupsForTeamGeneration();
+		if (reservation) {
+			applyReservationAsHiddenGroup(reservation);
+		}
+		
 		// 나머지 사람들만 셔플
 		const shuffledPeople = [...remainingPeople].sort(() => Math.random() - 0.5);
 		// 나머지 사람들로 만들 팀들만 생성
