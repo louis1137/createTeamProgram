@@ -1374,10 +1374,28 @@ const commandConsole = {
 },
 
 loadCommand(profileName = '') {
+		if (!currentRoomKey) {
+			this.error('⚠️ 현재 프로필이 없어서 실행할 수 없습니다. 먼저 프로필을 선택하세요.');
+			return;
+		}
+
 		const targetProfile = (profileName || '').trim();
+		const ensureSource = (profileKey) => {
+			if (typeof resolveProfileRecord !== 'function') {
+				return Promise.resolve({ exists: true, source: 'rooms', data: null });
+			}
+			return resolveProfileRecord(profileKey)
+				.then((result) => {
+					if (result && typeof setCurrentProfileSource === 'function') {
+						setCurrentProfileSource(result.source);
+					}
+					return result;
+				});
+		};
 		
 		if (!targetProfile) {
-			database.ref(`rooms/${currentRoomKey}`).once('value')
+			ensureSource(currentRoomKey)
+				.then(() => database.ref(`rooms/${currentRoomKey}`).once('value'))
 				.then((snapshot) => {
 					const data = snapshot.val();
 					if (data) {
@@ -1394,13 +1412,13 @@ loadCommand(profileName = '') {
 		}
 		
 		// 다른 프로필 데이터 가져와 현재 프로필에 로컬 반영 (저장/동기화 없음)
-		database.ref(`rooms/${targetProfile}`).once('value')
-			.then((snapshot) => {
-				const data = snapshot.val();
-				if (!data) {
+		ensureSource(targetProfile)
+			.then((result) => {
+				if (!result || !result.exists || !result.data) {
 					this.warn(this.comments.profileNotFoundSwitch.replace('{profile}', targetProfile));
 					return;
 				}
+				const data = result.data;
 				
 				const importedData = {
 					people: data.people || [],
@@ -2136,7 +2154,12 @@ loadCommand(profileName = '') {
 	},
 	
 	loginCommand() {
-		if (!syncEnabled || !currentRoomKey) {
+		if (!currentRoomKey) {
+			this.error('⚠️ 현재 프로필이 없어서 실행할 수 없습니다. 먼저 프로필을 선택하세요.');
+			return;
+		}
+
+		if (!syncEnabled) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
@@ -2156,7 +2179,12 @@ loadCommand(profileName = '') {
 	},
 	
 	logoutCommand() {
-		if (!syncEnabled || !currentRoomKey) {
+		if (!currentRoomKey) {
+			this.error('⚠️ 현재 프로필이 없어서 실행할 수 없습니다. 먼저 프로필을 선택하세요.');
+			return;
+		}
+
+		if (!syncEnabled) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
