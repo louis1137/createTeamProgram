@@ -15,6 +15,15 @@ const commandConsole = {
 	// 외부 파일에서 메시지 불러오기
 	placeholders: commandConsoleMessages.placeholders,
 	comments: commandConsoleMessages.comments,
+
+	isUsersMode() {
+		if (!currentProfileKey) return true;
+		return (typeof getCurrentProfileSource === 'function' && getCurrentProfileSource() === 'users');
+	},
+
+	hasWriteAccess() {
+		return this.authenticated || this.isUsersMode();
+	},
 	
 	init() {
 		this.output = document.getElementById('commandOutput');
@@ -827,6 +836,7 @@ const commandConsole = {
 				const profileNodeData = profileSnapshot.val();
 				const userData = userSnapshot.val();
 				const source = legacyProfileData !== null ? 'profile' : (profileNodeData !== null ? 'profiles' : (userData !== null ? 'users' : 'profiles'));
+				const isUsersSource = source === 'users';
 				const profileData = legacyProfileData !== null ? legacyProfileData : (profileNodeData !== null ? profileNodeData : userData);
 				const isProfileSwitch = this.inputMode === 'profile-switch';
 				
@@ -838,9 +848,9 @@ const commandConsole = {
 					const password = profileData.password || '';
 					this.tempProfile = cmd;
 					currentProfileKey = cmd;
-					this.storedPassword = password;
-					this.authenticated = false;
-					authenticatedPassword = ''; // 프로필 전환 시 인증 초기화
+					this.storedPassword = isUsersSource ? '' : password;
+					this.authenticated = isUsersSource;
+					authenticatedPassword = isUsersSource ? 'users-auto-auth' : ''; // 프로필 전환 시 인증 초기화
 					
 					const url = new URL(window.location);
 					url.searchParams.set('key', cmd);
@@ -849,14 +859,19 @@ const commandConsole = {
 					const profileKeyDisplay = document.getElementById('profileKeyDisplay');
 					if (profileKeyDisplay) {
 						profileKeyDisplay.textContent = `Profile: ${cmd}`;
-						// 프로필 전환 시에는 항상 인증되지 않은 상태
-						profileKeyDisplay.classList.remove('authenticated');
+						if (isUsersSource) {
+							profileKeyDisplay.classList.add('authenticated');
+						} else {
+							// 프로필 전환 시에는 항상 인증되지 않은 상태
+							profileKeyDisplay.classList.remove('authenticated');
+						}
 					}
 					
 					if (isProfileSwitch) {
 						// 프로필 전환 모드: 비밀번호 없으면 바로 전환, 있으면 인증 요청
-						if (password === '') {
+						if (isUsersSource || password === '') {
 							this.authenticated = true;
+							if (isUsersSource) authenticatedPassword = 'users-auto-auth';
 							this.inputMode = 'normal';
 							this.input.type = 'text';
 							this.input.placeholder = this.placeholders.input;
@@ -933,16 +948,26 @@ const commandConsole = {
 									this.log(this.comments.profileFoundMessage.replace('{profile}', cmd));
 								}
 								this.log('🔄 실시간 동기화가 활성화되었습니다.');
-								
-								this.log(this.comments.passwordAskInitial);
-								this.inputMode = 'password-ask-initial';
-								this.showConfirmButtons();
+								if (isUsersSource || password === '') {
+									this.authenticated = true;
+									if (isUsersSource) authenticatedPassword = 'users-auto-auth';
+									this.inputMode = 'normal';
+									this.input.type = 'text';
+									this.input.placeholder = this.placeholders.input;
+									this.log(this.comments.consoleReady);
+								} else {
+									this.log(this.comments.passwordAskInitial);
+									this.inputMode = 'password-ask-initial';
+									this.showConfirmButtons();
+								}
 							})
 							.catch((error) => {
 								this.error(this.comments.dataLoadFailed.replace('{error}', error.message));
-								this.log(this.comments.passwordAskInitial);
-								this.inputMode = 'password-ask-initial';
-								this.showConfirmButtons();
+								if (!(isUsersSource || password === '')) {
+									this.log(this.comments.passwordAskInitial);
+									this.inputMode = 'password-ask-initial';
+									this.showConfirmButtons();
+								}
 							});
 					}
 				} else {
@@ -1190,7 +1215,15 @@ const commandConsole = {
 		return;
 	}
 		
-	if (!this.authenticated && currentProfileKey) {
+	if (currentProfileKey && typeof getCurrentProfileSource === 'function' && getCurrentProfileSource() === 'users' && !this.authenticated) {
+		this.authenticated = true;
+		this.storedPassword = '';
+		authenticatedPassword = 'users-auto-auth';
+		const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+		if (profileKeyDisplay) profileKeyDisplay.classList.add('authenticated');
+	}
+
+	if (!this.hasWriteAccess() && currentProfileKey) {
 		// 읽기 모드에서는 save와 입력 관련 명령어만 차단
 		const [command] = cmd.split(' ');
 		const writeCommands = ['save', '저장', 'input', '입력', 'clear', '초기화'];
@@ -1455,7 +1488,7 @@ loadCommand(profileName = '') {
 		}
 		
 		// 인증 체크
-		if (!this.authenticated) {
+		if (!this.hasWriteAccess()) {
 			this.error(this.comments.readOnlyFeatureDisabled);
 			this.log(this.comments.authenticationRequired);
 			return;
@@ -1507,7 +1540,7 @@ loadCommand(profileName = '') {
 	// 전체 동기화 (기존 sync 명령어)
 	syncAllCommand() {
 		// 인증 체크
-		if (!this.authenticated) {
+		if (!this.hasWriteAccess()) {
 			this.error(this.comments.readOnlyFeatureDisabled);
 			this.log(this.comments.authenticationRequired);
 			return;
@@ -1599,7 +1632,7 @@ loadCommand(profileName = '') {
 	// 규칙만 동기화
 	syncRuleCommand() {
 		// 인증 체크
-		if (!authenticatedPassword) {
+		if (!this.hasWriteAccess()) {
 			this.error('❌ 인증이 필요합니다. <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 먼저 로그인하세요.');
 			return;
 		}
@@ -1657,7 +1690,7 @@ loadCommand(profileName = '') {
 	// 옵션만 동기화
 	syncOptionCommand() {
 		// 인증 체크
-		if (!authenticatedPassword) {
+		if (!this.hasWriteAccess()) {
 			this.error('❌ 인증이 필요합니다. <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어로 먼저 로그인하세요.');
 			return;
 		}
@@ -1847,7 +1880,7 @@ loadCommand(profileName = '') {
 	
 	syncReservationCommand() {
 		// 인증 체크
-		if (!this.authenticated) {
+		if (!this.hasWriteAccess()) {
 			this.error(this.comments.readOnlyFeatureDisabled);
 			this.log(this.comments.authenticationRequired);
 			return;
@@ -2157,6 +2190,16 @@ loadCommand(profileName = '') {
 			return;
 		}
 
+		if (typeof getCurrentProfileSource === 'function' && getCurrentProfileSource() === 'users') {
+			this.authenticated = true;
+			this.storedPassword = '';
+			authenticatedPassword = 'users-auto-auth';
+			const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+			if (profileKeyDisplay) profileKeyDisplay.classList.add('authenticated');
+			this.log(this.comments.loginSuccess);
+			return;
+		}
+
 		if (!syncEnabled) {
 			this.error(this.comments.firebaseMissing);
 			return;
@@ -2179,6 +2222,16 @@ loadCommand(profileName = '') {
 	logoutCommand() {
 		if (!currentProfileKey) {
 			this.error('⚠️ 현재 프로필이 없어서 실행할 수 없습니다. 먼저 프로필을 선택하세요.');
+			return;
+		}
+
+		if (typeof getCurrentProfileSource === 'function' && getCurrentProfileSource() === 'users') {
+			this.authenticated = true;
+			this.storedPassword = '';
+			authenticatedPassword = 'users-auto-auth';
+			const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+			if (profileKeyDisplay) profileKeyDisplay.classList.add('authenticated');
+			this.log('ℹ️ users 상태에서는 항상 인증 모드가 유지됩니다.');
 			return;
 		}
 
@@ -2352,7 +2405,7 @@ loadCommand(profileName = '') {
 	},
 	
 	matchingCommand(ruleInput) {
-		if (!this.authenticated) {
+		if (!this.hasWriteAccess()) {
 			this.error(this.comments.ruleReadOnlyError);
 			this.log(this.comments.authenticationRequired);
 			return;
@@ -2406,7 +2459,7 @@ loadCommand(profileName = '') {
 	},
 	
 	hiddenCommand() {
-		if (!this.authenticated) {
+		if (!this.hasWriteAccess()) {
 			this.error(this.comments.ruleReadOnlyError);
 			this.log(this.comments.authenticationRequired);
 			return;
@@ -2607,7 +2660,7 @@ loadCommand(profileName = '') {
 	
 	reservationCommand(args) {
 		// 인증 체크
-		if (!this.authenticated) {
+		if (!this.hasWriteAccess()) {
 			this.error(this.comments.readOnlyFeatureDisabled);
 			this.log(this.comments.authenticationRequired);
 			return;
@@ -2703,7 +2756,7 @@ loadCommand(profileName = '') {
 			return;
 		}
 		
-		if (!this.authenticated) {
+		if (!this.hasWriteAccess()) {
 			this.error(this.comments.deleteReadOnlyError);
 			this.log(this.comments.authenticationRequired);
 			return;

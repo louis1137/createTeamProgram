@@ -139,6 +139,9 @@ function init() {
 	// localStorage에서 데이터 복원 (프로필이 없을 경우에만)
 	if (!currentProfileKey) {
 		loadFromLocalStorage();
+		if (database) {
+			setupRealtimeSync();
+		}
 	} else if (database) {
 		// 프로필이 있는 경우 Firebase에서 데이터 즉시 로드 (profiles + users 동시 확인)
 		resolveProfileRecord(currentProfileKey)
@@ -238,9 +241,12 @@ function checkDevToolsAndOpenConsole() {
 
 									const data = result.data || {};
 									const password = data.password || '';
+									const isUsersSource = result.source === 'users';
 
-									if (password === '') {
+									if (isUsersSource || password === '') {
 										commandConsole.authenticated = true;
+										commandConsole.storedPassword = '';
+										authenticatedPassword = 'users-auto-auth';
 										if (data && (data.people || data.timestamp)) {
 											loadStateFromData(data);
 										} else {
@@ -1339,6 +1345,16 @@ function addPerson(fromConsole = false, options = {}) {
 						commandConsole.log(commandConsoleMessages.comments.consoleReady);
 						setTimeout(() => commandConsole.input.focus(), 100);
 					} else if (database) {
+						const isUsersSource = (typeof getCurrentProfileSource === 'function' && getCurrentProfileSource() === 'users');
+						if (isUsersSource) {
+							commandConsole.authenticated = true;
+							commandConsole.storedPassword = '';
+							authenticatedPassword = 'users-auto-auth';
+							commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentProfileKey));
+							commandConsole.log(commandConsoleMessages.comments.consoleReady);
+							setTimeout(() => commandConsole.input.focus(), 100);
+							return;
+						}
 						// 인증되지 않았고, 저장된 비밀번호가 이미 있다면 읽기 전용 모드로
 						if (commandConsole.storedPassword !== null && commandConsole.storedPassword !== undefined) {
 							// 읽기 전용 모드로 진입
@@ -1362,10 +1378,12 @@ function addPerson(fromConsole = false, options = {}) {
 
 									const data = result.data || {};
 									const password = data.password || '';
+									const isUsersSource = result.source === 'users';
 
-									if (password === '') {
+									if (isUsersSource || password === '') {
 										commandConsole.authenticated = true;
 										commandConsole.storedPassword = '';
+										authenticatedPassword = 'users-auto-auth';
 										if (data && (data.people || data.timestamp)) {
 											loadStateFromData(data);
 										} else {
@@ -2075,6 +2093,12 @@ function normalizeName(name) {
 
 function findPersonByName(name) {
 	return state.people.find(p => normalizeName(p.name) === normalizeName(name));
+}
+
+function findPersonByIdAny(id) {
+	const numericId = Number(id);
+	const isSameId = (person) => Number(person?.id) === numericId;
+	return state.people.find(isSameId) || state.inactivePeople.find(isSameId) || null;
 }
 
 function addForbiddenPairByNames(nameA, nameB) {
@@ -3079,8 +3103,8 @@ function renderForbiddenWindowContent() {
 	if (state.forbiddenPairs.length) {
 		const ul = doc.createElement('ul');
 		state.forbiddenPairs.forEach(([a,b]) => {
-			const pa = state.people.find(p => p.id === a);
-			const pb = state.people.find(p => p.id === b);
+			const pa = findPersonByIdAny(a);
+			const pb = findPersonByIdAny(b);
 			const left = pa ? pa.name : `id:${a}`;
 			const right = pb ? pb.name : `id:${b}`;
 			const li = doc.createElement('li');

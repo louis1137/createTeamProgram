@@ -203,10 +203,22 @@ function initFirebase() {
 let realtimeSyncActive = false;
 let lastSyncTrigger = 0;
 let syncListenerAttached = false; // 리스너 중복 등록 방지
+let syncTriggerInitialized = false;
+let lastSyncSignature = '';
+
+function getSyncSignature(syncTrigger) {
+	if (syncTrigger && typeof syncTrigger === 'object') {
+		if (syncTrigger.tick) {
+			return `tick:${syncTrigger.tick}`;
+		}
+		return JSON.stringify(syncTrigger);
+	}
+	return String(syncTrigger ?? '');
+}
 
 // 실시간 동기화 설정
 function setupRealtimeSync() {
-	if (!database || !currentProfileKey) return;
+	if (!database || (!currentProfileKey && !currentUserCode)) return;
 	
 	// 이미 리스너가 등록되어 있으면 중복 등록 방지
 	if (syncListenerAttached) return;
@@ -219,19 +231,23 @@ function setupRealtimeSync() {
 	realtimeSyncActive = true;
 	syncListenerAttached = true;
 	
-	// syncTrigger 감시 - 명시적으로 동기화 명령어를 실행했을 때만 감지
-	database.ref(`profiles/${currentProfileKey}/syncTrigger`).on('value', (snapshot) => {
-		const syncTrigger = snapshot.val();
-		if (syncTrigger && syncTrigger !== lastSyncTrigger && lastSyncTrigger !== 0) {
-			// 새로운 동기화 트리거 감지
+	const triggerPaths = currentProfileKey
+		? [
+			`profiles/${currentProfileKey}/syncTrigger`,
+			`users/${currentProfileKey}/syncTrigger`,
+			`profile/${currentProfileKey}/syncTrigger`
+		]
+		: [`users/${currentUserCode}/syncTrigger`];
+
+	const handleSyncTrigger = (syncTrigger) => {
+		const signature = getSyncSignature(syncTrigger);
+		const hasChanged = Boolean(syncTrigger) && signature !== lastSyncSignature;
+		const hasTick = Boolean(syncTrigger && typeof syncTrigger === 'object' && syncTrigger.tick);
+		if ((syncTriggerInitialized || hasTick) && syncTrigger && hasChanged) {
 			const syncType = typeof syncTrigger === 'object' ? syncTrigger.type : 'all';
-			const syncTimestamp = typeof syncTrigger === 'object' ? syncTrigger.timestamp : syncTrigger;
-			
 			if (typeof commandConsole !== 'undefined' && commandConsole.log) {
 				commandConsole.log('🔄 동기화 중...');
 			}
-			
-			// 동기화 타입에 따라 선택적으로 데이터 로드
 			loadDataByType(syncType)
 				.then(() => {
 					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
@@ -245,11 +261,33 @@ function setupRealtimeSync() {
 				});
 		}
 		lastSyncTrigger = syncTrigger;
+		if (syncTrigger) {
+			lastSyncSignature = signature;
+		}
+		syncTriggerInitialized = true;
+	};
+
+	// syncTrigger 감시 - 명시적으로 동기화 명령어를 실행했을 때만 감지
+	triggerPaths.forEach((path) => {
+		database.ref(path).on('value', (snapshot) => {
+		const syncTrigger = snapshot.val();
+			handleSyncTrigger(syncTrigger);
+		});
 	});
 }
 
 // 동기화 타입에 따라 선택적으로 데이터 로드
 function loadDataByType(type) {
+	if (!currentProfileKey && currentUserCode) {
+		return database.ref(`users/${currentUserCode}`).once('value')
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (data) {
+					loadStateFromData(data);
+				}
+			});
+	}
+
 	switch(type) {
 		case 'rule':
 			// 규칙만 로드

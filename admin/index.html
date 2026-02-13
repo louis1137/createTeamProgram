@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Admin Dashboard</title>
+	<link rel="stylesheet" href="admin.css">
+	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+	<script src="admin.js" defer></script>
+</head>
+<body>
+	<div class="app-shell">
+		<header class="topbar">
+			<div>
+				<h1>Firebase Admin Dashboard</h1>
+				<p>Realtime DB profiles / users 관리</p>
+			</div>
+			<div class="top-actions">
+				<button id="themeToggleBtn" class="btn btn-secondary" type="button">라이트 모드</button>
+				<button id="refreshListsBtn" class="btn" type="button">리스트 새로고침</button>
+			</div>
+		</header>
+
+		<main class="dashboard-grid">
+			<aside class="left-panel">
+				<section class="accordion" data-accordion="profiles">
+					<button class="accordion-header" type="button" aria-expanded="true">
+						<span>Profiles</span>
+						<span class="count" id="profilesCount">0</span>
+					</button>
+					<div class="accordion-body" id="profilesList"></div>
+				</section>
+
+				<section class="accordion" data-accordion="users">
+					<button class="accordion-header" type="button" aria-expanded="true">
+						<span>Users</span>
+						<span class="count" id="usersCount">0</span>
+					</button>
+					<div class="accordion-body" id="usersList"></div>
+				</section>
+			</aside>
+
+			<section class="right-panel">
+				<div class="editor-header">
+					<div>
+						<h2 id="editorTitle">항목을 선택하세요</h2>
+						<p id="editorSubtitle">왼쪽 리스트에서 profiles 또는 users를 선택하면 편집할 수 있습니다.</p>
+					</div>
+					<div class="editor-actions">
+						<button id="syncBtn" class="btn btn-secondary" type="button" disabled>동기화</button>
+						<button id="saveBtn" class="btn" type="button" disabled>저장</button>
+					</div>
+				</div>
+
+				<form id="editorForm" class="form-grid" autocomplete="off">
+					<div class="field-row">
+						<label for="fieldKey">키</label>
+						<input id="fieldKey" type="text" readonly>
+					</div>
+
+					<div class="field-row">
+						<label for="fieldCreatedAt">생성일시</label>
+						<input id="fieldCreatedAt" type="text" readonly>
+					</div>
+
+					<div class="field-row">
+						<label for="fieldLastAccess">최근접속</label>
+						<input id="fieldLastAccess" type="text" readonly>
+					</div>
+
+					<div class="field-row">
+						<label for="fieldTimestamp">수정시각</label>
+						<input id="fieldTimestamp" type="text" readonly>
+					</div>
+
+					<div class="field-row password-row" id="passwordRow">
+						<label for="fieldPassword">비밀번호</label>
+						<div class="password-wrap">
+							<input id="fieldPassword" type="password">
+							<button id="passwordToggleBtn" class="password-eye-btn" type="button" aria-label="비밀번호 보기/숨기기">👁</button>
+						</div>
+					</div>
+
+					<div class="field-row member-table-row" id="memberTableRow">
+						<div class="member-table-label-group">
+							<label class="member-table-label">멤버</label>
+							<button id="memberExpandBtn" class="member-expand-btn" type="button">모두 보기</button>
+						</div>
+						<div class="member-table-section">
+							<div class="member-table-panel" id="participantsPanel">
+								<div class="member-table-title"><span>참가자 <span id="participantsCountText">0명</span></span><button class="member-add-btn" type="button" data-list="people" aria-label="참가자 추가">+</button></div>
+								<table class="member-table">
+									<thead>
+										<tr>
+											<th>이름</th>
+											<th>성별</th>
+											<th>가중치</th>
+											<th>삭제</th>
+										</tr>
+									</thead>
+									<tbody id="participantsTableBody"></tbody>
+								</table>
+							</div>
+
+							<div class="member-table-panel" id="inactivePanel">
+								<div class="member-table-title"><span>미참가자 <span id="inactiveCountText">0명</span></span><button class="member-add-btn" type="button" data-list="inactivePeople" aria-label="미참가자 추가">+</button></div>
+								<table class="member-table">
+									<thead>
+										<tr>
+											<th>이름</th>
+											<th>성별</th>
+											<th>가중치</th>
+											<th>삭제</th>
+										</tr>
+									</thead>
+									<tbody id="inactiveTableBody"></tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+
+					<div class="field-row option-field-row">
+						<label class="option-inline-title" for="fieldMaxTeamSizeEnabled">옵션 상태</label>
+						<div class="option-inline-row">
+							<label class="option-inline-item" for="fieldMaxTeamSizeEnabled">
+								<input id="fieldMaxTeamSizeEnabled" type="checkbox">
+								<span>최대인원으로 팀 생성</span>
+							</label>
+							<label class="option-inline-item" for="fieldGenderBalanceEnabled">
+								<input id="fieldGenderBalanceEnabled" type="checkbox">
+								<span>성비 균등</span>
+							</label>
+							<label class="option-inline-item" for="fieldWeightBalanceEnabled">
+								<input id="fieldWeightBalanceEnabled" type="checkbox">
+								<span>가중치 균등</span>
+							</label>
+							<div class="option-inline-item option-number">
+								<label for="fieldMembersPerTeam">팀 인원수</label>
+								<input id="fieldMembersPerTeam" type="number" min="1" step="1">
+							</div>
+						</div>
+					</div>
+
+					<div class="field-row constraint-table-row" id="constraintTableRow">
+						<div class="constraint-label-group">
+							<label class="constraint-table-label">제약</label>
+							<button id="constraintExpandBtn" class="member-expand-btn" type="button">모두 보기</button>
+						</div>
+						<div class="constraint-table-section">
+							<div class="member-table-panel" id="constraintPanel">
+								<div class="member-table-title"><span>제약 목록</span><button id="constraintAddBtn" class="member-add-btn" type="button" aria-label="제약 추가">+</button></div>
+								<table class="member-table constraint-table">
+									<thead>
+										<tr>
+											<th>멤버1</th>
+											<th>멤버2</th>
+											<th>삭제</th>
+										</tr>
+									</thead>
+									<tbody id="constraintTableBody"></tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+
+				</form>
+			</section>
+		</main>
+	</div>
+
+	<div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

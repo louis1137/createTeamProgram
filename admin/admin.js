@@ -1,0 +1,882 @@
+const firebaseConfig = {
+	apiKey: "AIzaSyAdUEAHg08-FheJjawYwIPRov4105qdG0o",
+	authDomain: "createteamprogram.firebaseapp.com",
+	databaseURL: "https://createteamprogram-default-rtdb.asia-southeast1.firebasedatabase.app",
+	projectId: "createteamprogram",
+	storageBucket: "createteamprogram.firebasestorage.app",
+	messagingSenderId: "108758586522",
+	appId: "1:108758586522:web:75386ff04fa79121a0bb23",
+	measurementId: "G-N7D10Q7MNF"
+};
+
+let database = null;
+let selected = { type: null, key: null };
+let toastTimer = null;
+let memberDraft = { people: [], inactivePeople: [] };
+let constraintDraft = [];
+
+const fieldIds = {
+	key: 'fieldKey',
+	membersPerTeam: 'fieldMembersPerTeam',
+	genderBalanceEnabled: 'fieldGenderBalanceEnabled',
+	maxTeamSizeEnabled: 'fieldMaxTeamSizeEnabled',
+	weightBalanceEnabled: 'fieldWeightBalanceEnabled',
+	createdAt: 'fieldCreatedAt',
+	lastAccess: 'fieldLastAccess',
+	password: 'fieldPassword',
+	timestamp: 'fieldTimestamp'
+};
+
+const fieldEnabledByType = {
+	profiles: {
+		createdAt: false,
+		lastAccess: false
+	},
+	users: {
+		timestamp: false
+	}
+};
+
+function getDbTimestamp() {
+	const now = new Date();
+	const y = now.getFullYear();
+	const m = String(now.getMonth() + 1).padStart(2, '0');
+	const d = String(now.getDate()).padStart(2, '0');
+	const hh = String(now.getHours()).padStart(2, '0');
+	const mm = String(now.getMinutes()).padStart(2, '0');
+	const ss = String(now.getSeconds()).padStart(2, '0');
+	return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+}
+
+function buildSyncTriggerPayload(type = 'all') {
+	return {
+		timestamp: getDbTimestamp(),
+		tick: Date.now(),
+		type
+	};
+}
+
+async function broadcastSyncTrigger(key, type = 'all') {
+	if (!key) {
+		return;
+	}
+	const payload = buildSyncTriggerPayload(type);
+	const refs = [
+		database.ref(`profiles/${key}/syncTrigger`),
+		database.ref(`users/${key}/syncTrigger`),
+		database.ref(`profile/${key}/syncTrigger`)
+	];
+	await Promise.allSettled(refs.map((ref) => ref.set(payload)));
+}
+
+async function broadcastProfilePayload(key, payload) {
+	if (!key || !payload) {
+		return;
+	}
+	const refs = [
+		database.ref(`profiles/${key}`),
+		database.ref(`users/${key}`),
+		database.ref(`profile/${key}`)
+	];
+	await Promise.allSettled(refs.map((ref) => ref.update(payload)));
+}
+
+function getEl(id) {
+	return document.getElementById(id);
+}
+
+function showToast(message) {
+	const toast = getEl('toast');
+	toast.textContent = message;
+	toast.classList.add('show');
+	if (toastTimer) {
+		clearTimeout(toastTimer);
+	}
+	toastTimer = setTimeout(() => {
+		toast.classList.remove('show');
+	}, 1800);
+}
+
+function initFirebase() {
+	const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+	database = app.database();
+}
+
+function setButtonsEnabled(enabled) {
+	getEl('saveBtn').disabled = !enabled;
+	getEl('syncBtn').disabled = !enabled;
+}
+
+function normalizeMember(item, index) {
+	return {
+		id: typeof item?.id === 'number' ? item.id : index + 1,
+		name: item?.name || '',
+		gender: item?.gender === 'female' ? 'female' : 'male',
+		weight: Number.isFinite(Number(item?.weight)) ? Number(item.weight) : 0
+	};
+}
+
+function cloneMembers(data) {
+	const people = Array.isArray(data?.people) ? data.people.map((item, index) => normalizeMember(item, index)) : [];
+	const inactivePeople = Array.isArray(data?.inactivePeople) ? data.inactivePeople.map((item, index) => normalizeMember(item, index)) : [];
+	memberDraft = { people, inactivePeople };
+}
+
+function normalizeConstraint(item) {
+	if (Array.isArray(item)) {
+		return {
+			member1: String(item[0] ?? ''),
+			member2: String(item[1] ?? '')
+		};
+	}
+	if (item && typeof item === 'object') {
+		return {
+			member1: String(item.member1 ?? item.left ?? item.a ?? ''),
+			member2: String(item.member2 ?? item.right ?? item.b ?? '')
+		};
+	}
+	return { member1: '', member2: '' };
+}
+
+function normalizeName(name) {
+	return String(name ?? '').trim().toLowerCase();
+}
+
+function toList(value) {
+	if (Array.isArray(value)) {
+		return value;
+	}
+	if (value && typeof value === 'object') {
+		return Object.values(value);
+	}
+	return [];
+}
+
+function buildMemberMaps(data) {
+	const idToName = new Map();
+	const nameToId = new Map();
+	const allMembers = [
+		...toList(data?.people),
+		...toList(data?.inactivePeople)
+	];
+	allMembers.forEach((person) => {
+		if (!person || typeof person !== 'object') {
+			return;
+		}
+		const id = Number(person.id);
+		const name = String(person.name ?? '').trim();
+		if (Number.isInteger(id) && name) {
+			idToName.set(id, name);
+			nameToId.set(normalizeName(name), id);
+		}
+	});
+	return { idToName, nameToId };
+}
+
+function mapConstraintValueToName(value, idToName) {
+	const numberValue = Number(value);
+	if (Number.isInteger(numberValue) && idToName.has(numberValue)) {
+		return idToName.get(numberValue) || '';
+	}
+	return String(value ?? '');
+}
+
+function cloneConstraints(data) {
+	const { idToName } = buildMemberMaps(data || {});
+	const forbiddenPairs = toList(data?.forbiddenPairs);
+	const pendingConstraints = toList(data?.pendingConstraints);
+	const appliedRows = forbiddenPairs.map((item) => {
+		const normalized = normalizeConstraint(item);
+		return {
+			member1: mapConstraintValueToName(normalized.member1, idToName),
+			member2: mapConstraintValueToName(normalized.member2, idToName)
+		};
+	});
+	const pendingRows = pendingConstraints.map((item) => normalizeConstraint(item));
+	constraintDraft = [...appliedRows, ...pendingRows];
+}
+
+function getGenderLabel(gender) {
+	return gender === 'female' ? '♀️' : '♂️';
+}
+
+function updateMemberSummary() {
+	const participantsCount = getEl('participantsCountText');
+	const inactiveCount = getEl('inactiveCountText');
+	if (participantsCount) {
+		participantsCount.textContent = `${memberDraft.people.length}명`;
+	}
+	if (inactiveCount) {
+		inactiveCount.textContent = `${memberDraft.inactivePeople.length}명`;
+	}
+}
+
+function renderMemberTableRows(containerId, listKey) {
+	const container = getEl(containerId);
+	if (!container) {
+		return;
+	}
+	const rows = memberDraft[listKey];
+	if (!rows.length) {
+		container.innerHTML = `<tr><td class="member-empty" colspan="4">데이터가 없습니다.</td></tr>`;
+		return;
+	}
+	container.innerHTML = rows.map((person, index) => {
+		return `<tr data-list="${listKey}" data-index="${index}">
+			<td><input class="member-input" type="text" data-role="name" value="${person.name.replace(/"/g, '&quot;')}"></td>
+			<td><button class="gender-toggle-btn" type="button" data-role="gender">${getGenderLabel(person.gender)}</button></td>
+			<td><input class="member-input" type="number" data-role="weight" min="0" step="1" value="${person.weight}"></td>
+			<td><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
+		</tr>`;
+	}).join('');
+}
+
+function renderMemberTables() {
+	renderMemberTableRows('participantsTableBody', 'people');
+	renderMemberTableRows('inactiveTableBody', 'inactivePeople');
+	updateMemberSummary();
+	refreshMemberExpandButton();
+	applyMemberExpandedState();
+}
+
+function renderConstraintTableRows() {
+	const container = getEl('constraintTableBody');
+	if (!container) {
+		return;
+	}
+	if (!constraintDraft.length) {
+		container.innerHTML = `<tr><td class="member-empty" colspan="3">데이터가 없습니다.</td></tr>`;
+		return;
+	}
+	container.innerHTML = constraintDraft.map((item, index) => {
+		const member1 = (item.member1 || '').replace(/"/g, '&quot;');
+		const member2 = (item.member2 || '').replace(/"/g, '&quot;');
+		return `<tr data-index="${index}">
+			<td><input class="member-input" type="text" data-role="member1" value="${member1}"></td>
+			<td><input class="member-input" type="text" data-role="member2" value="${member2}"></td>
+			<td><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
+		</tr>`;
+	}).join('');
+}
+
+function renderConstraintTable() {
+	renderConstraintTableRows();
+	refreshConstraintExpandButton();
+	applyConstraintExpandedState();
+}
+
+function createEmptyConstraint() {
+	return { member1: '', member2: '' };
+}
+
+function scrollConstraintTableToBottom() {
+	const tbody = getEl('constraintTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		tbody.scrollTop = tbody.scrollHeight;
+	});
+}
+
+function focusLastConstraintInput() {
+	const tbody = getEl('constraintTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		const inputs = tbody.querySelectorAll('input[data-role="member1"]');
+		const targetInput = inputs.length ? inputs[inputs.length - 1] : null;
+		if (targetInput instanceof HTMLInputElement) {
+			targetInput.focus();
+			targetInput.select();
+		}
+	});
+}
+
+function createEmptyMember() {
+	const allMembers = [...memberDraft.people, ...memberDraft.inactivePeople];
+	const nextId = allMembers.reduce((maxId, item) => {
+		const idValue = Number(item?.id || 0);
+		return Math.max(maxId, idValue);
+	}, 0) + 1;
+	return {
+		id: nextId,
+		name: '',
+		gender: 'male',
+		weight: 0
+	};
+}
+
+function scrollMemberTableToBottom(listKey) {
+	const tbodyId = listKey === 'people' ? 'participantsTableBody' : 'inactiveTableBody';
+	const tbody = getEl(tbodyId);
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		tbody.scrollTop = tbody.scrollHeight;
+	});
+}
+
+function focusLastMemberNameInput(listKey) {
+	const tbodyId = listKey === 'people' ? 'participantsTableBody' : 'inactiveTableBody';
+	const tbody = getEl(tbodyId);
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		const inputs = tbody.querySelectorAll('input[data-role="name"]');
+		const targetInput = inputs.length ? inputs[inputs.length - 1] : null;
+		if (targetInput instanceof HTMLInputElement) {
+			targetInput.focus();
+			targetInput.select();
+		}
+	});
+}
+
+function refreshMemberExpandButton() {
+	const button = getEl('memberExpandBtn');
+	const row = getEl('memberTableRow');
+	if (!(button instanceof HTMLButtonElement) || !row) {
+		return;
+	}
+	button.textContent = row.classList.contains('expanded') ? '숨기기' : '모두 보기';
+}
+
+function refreshConstraintExpandButton() {
+	const button = getEl('constraintExpandBtn');
+	const row = getEl('constraintTableRow');
+	if (!(button instanceof HTMLButtonElement) || !row) {
+		return;
+	}
+	button.textContent = row.classList.contains('expanded') ? '숨기기' : '모두 보기';
+}
+
+function applyMemberExpandedState() {
+	const row = getEl('memberTableRow');
+	if (!row) {
+		return;
+	}
+	const isExpanded = row.classList.contains('expanded');
+	row.querySelectorAll('.member-table tbody').forEach((tbody) => {
+		if (!(tbody instanceof HTMLElement)) {
+			return;
+		}
+		if (isExpanded) {
+			tbody.style.maxHeight = 'none';
+			tbody.style.overflowY = 'visible';
+			tbody.style.overflowX = 'visible';
+			tbody.style.height = 'auto';
+		} else {
+			tbody.style.maxHeight = 'var(--member-tbody-max-h)';
+			tbody.style.overflowY = 'auto';
+			tbody.style.overflowX = 'hidden';
+			tbody.style.height = '';
+		}
+	});
+}
+
+function applyConstraintExpandedState() {
+	const row = getEl('constraintTableRow');
+	if (!row) {
+		return;
+	}
+	const tbody = getEl('constraintTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	const isExpanded = row.classList.contains('expanded');
+	if (isExpanded) {
+		tbody.style.maxHeight = 'none';
+		tbody.style.overflowY = 'visible';
+		tbody.style.overflowX = 'visible';
+		tbody.style.height = 'auto';
+	} else {
+		tbody.style.maxHeight = 'var(--member-tbody-max-h)';
+		tbody.style.overflowY = 'auto';
+		tbody.style.overflowX = 'hidden';
+		tbody.style.height = '';
+	}
+}
+
+function setFieldAvailability(type) {
+	const disabledMap = fieldEnabledByType[type] || {};
+	Object.values(fieldIds).forEach((id) => {
+		if (id === fieldIds.key) {
+			return;
+		}
+		const element = getEl(id);
+		if (!element) {
+			return;
+		}
+		const fieldName = Object.keys(fieldIds).find((key) => fieldIds[key] === id);
+		if (!fieldName) {
+			return;
+		}
+		element.disabled = disabledMap[fieldName] === false;
+	});
+}
+
+function updateConditionalRows(type) {
+	const passwordRow = getEl('passwordRow');
+	if (!passwordRow) {
+		return;
+	}
+	passwordRow.style.display = type === 'users' ? 'none' : 'flex';
+}
+
+function readFormData() {
+	return {
+		membersPerTeam: Number(getEl(fieldIds.membersPerTeam).value || 0),
+		genderBalanceEnabled: getEl(fieldIds.genderBalanceEnabled).checked,
+		maxTeamSizeEnabled: getEl(fieldIds.maxTeamSizeEnabled).checked,
+		weightBalanceEnabled: getEl(fieldIds.weightBalanceEnabled).checked,
+		createdAt: getEl(fieldIds.createdAt).value.trim(),
+		lastAccess: getEl(fieldIds.lastAccess).value.trim(),
+		password: getEl(fieldIds.password).value,
+		timestamp: getEl(fieldIds.timestamp).value.trim()
+	};
+}
+
+function writeFormData(key, type, data) {
+	getEl(fieldIds.key).value = key || '';
+	getEl(fieldIds.membersPerTeam).value = Number.isFinite(data.membersPerTeam) ? data.membersPerTeam : '';
+	getEl(fieldIds.genderBalanceEnabled).checked = Boolean(data.genderBalanceEnabled);
+	getEl(fieldIds.maxTeamSizeEnabled).checked = Boolean(data.maxTeamSizeEnabled);
+	getEl(fieldIds.weightBalanceEnabled).checked = Boolean(data.weightBalanceEnabled);
+	getEl(fieldIds.createdAt).value = data.createdAt || '';
+	getEl(fieldIds.lastAccess).value = data.lastAccess || '';
+	getEl(fieldIds.password).value = data.password || '';
+	getEl(fieldIds.timestamp).value = data.timestamp || '';
+	cloneMembers(data || {});
+	cloneConstraints(data || {});
+	renderMemberTables();
+	renderConstraintTable();
+	setFieldAvailability(type);
+	updateConditionalRows(type);
+}
+
+function applySelectionStyles() {
+	document.querySelectorAll('.item-btn').forEach((btn) => {
+		const match = btn.dataset.type === selected.type && btn.dataset.key === selected.key;
+		btn.classList.toggle('active', match);
+	});
+}
+
+function setEditorHeader() {
+	const title = getEl('editorTitle');
+	const subtitle = getEl('editorSubtitle');
+	if (!selected.type || !selected.key) {
+		title.textContent = '항목을 선택하세요';
+		subtitle.textContent = '왼쪽 리스트에서 profiles 또는 users를 선택하면 편집할 수 있습니다.';
+		updateConditionalRows(null);
+		return;
+	}
+	title.textContent = `${selected.type}/${selected.key}`;
+	subtitle.textContent = '수정 후 저장을 누르고, 동기화로 최신 상태를 맞출 수 있습니다.';
+	updateConditionalRows(selected.type);
+}
+
+function buildItemButton(type, key, data) {
+	const button = document.createElement('button');
+	button.type = 'button';
+	button.className = 'item-btn';
+	button.dataset.type = type;
+	button.dataset.key = key;
+	const dateValue = data?.timestamp || data?.lastAccess || data?.createdAt || '';
+	button.innerHTML = `<span class="item-title">${key}</span><span class="item-meta">${dateValue || 'no timestamp'}</span>`;
+	button.addEventListener('click', async () => {
+		selected = { type, key };
+		setButtonsEnabled(true);
+		setEditorHeader();
+		applySelectionStyles();
+		await loadSelectedItem();
+	});
+	return button;
+}
+
+function renderList(type, values) {
+	const listElement = getEl(type === 'profiles' ? 'profilesList' : 'usersList');
+	const countElement = getEl(type === 'profiles' ? 'profilesCount' : 'usersCount');
+	listElement.innerHTML = '';
+	const entries = Object.entries(values || {});
+	countElement.textContent = String(entries.length);
+	if (!entries.length) {
+		const empty = document.createElement('div');
+		empty.className = 'empty-state';
+		empty.textContent = '데이터가 없습니다.';
+		listElement.appendChild(empty);
+		return;
+	}
+	entries.sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+	entries.forEach(([key, value]) => {
+		listElement.appendChild(buildItemButton(type, key, value));
+	});
+	applySelectionStyles();
+}
+
+async function loadLists() {
+	const [profilesSnapshot, usersSnapshot] = await Promise.all([
+		database.ref('profiles').once('value'),
+		database.ref('users').once('value')
+	]);
+	renderList('profiles', profilesSnapshot.val() || {});
+	renderList('users', usersSnapshot.val() || {});
+}
+
+async function loadSelectedItem() {
+	if (!selected.type || !selected.key) {
+		return;
+	}
+	const snapshot = await database.ref(`${selected.type}/${selected.key}`).once('value');
+	const data = snapshot.val();
+	if (!data) {
+		showToast('선택 항목이 존재하지 않습니다.');
+		writeFormData(selected.key, selected.type, {});
+		return;
+	}
+	writeFormData(selected.key, selected.type, data);
+}
+
+function buildPayloadFromForm(type) {
+	const form = readFormData();
+	const { nameToId } = buildMemberMaps(memberDraft);
+	const forbiddenPairs = [];
+	const pendingConstraints = [];
+	const dedupeForbidden = new Set();
+	const dedupePending = new Set();
+
+	constraintDraft.forEach((item) => {
+		const member1 = String(item.member1 ?? '').trim();
+		const member2 = String(item.member2 ?? '').trim();
+		if (!member1 || !member2) {
+			return;
+		}
+
+		const id1 = nameToId.get(normalizeName(member1));
+		const id2 = nameToId.get(normalizeName(member2));
+		if (Number.isInteger(id1) && Number.isInteger(id2) && id1 !== id2) {
+			const a = Math.min(id1, id2);
+			const b = Math.max(id1, id2);
+			const key = `${a}:${b}`;
+			if (!dedupeForbidden.has(key)) {
+				dedupeForbidden.add(key);
+				forbiddenPairs.push([a, b]);
+			}
+			return;
+		}
+
+		const left = normalizeName(member1);
+		const right = normalizeName(member2);
+		if (!left || !right || left === right) {
+			return;
+		}
+		const leftRightKey = `${left}:${right}`;
+		const rightLeftKey = `${right}:${left}`;
+		if (dedupePending.has(leftRightKey) || dedupePending.has(rightLeftKey)) {
+			return;
+		}
+		dedupePending.add(leftRightKey);
+		pendingConstraints.push({ left, right });
+	});
+
+	const payload = {
+		membersPerTeam: form.membersPerTeam,
+		genderBalanceEnabled: form.genderBalanceEnabled,
+		maxTeamSizeEnabled: form.maxTeamSizeEnabled,
+		weightBalanceEnabled: form.weightBalanceEnabled,
+		password: form.password,
+		people: memberDraft.people,
+		inactivePeople: memberDraft.inactivePeople,
+		forbiddenPairs,
+		pendingConstraints
+	};
+
+	if (type === 'profiles') {
+		payload.timestamp = form.timestamp || getDbTimestamp();
+	}
+	if (type === 'users') {
+		payload.createdAt = form.createdAt || getDbTimestamp();
+		payload.lastAccess = form.lastAccess || getDbTimestamp();
+	}
+	return payload;
+}
+
+function removeEmptyNameRows() {
+	const filterByName = (list) => {
+		return list.filter((member) => {
+			return typeof member?.name === 'string' && member.name.trim().length > 0;
+		});
+	};
+
+	const beforeCount = memberDraft.people.length + memberDraft.inactivePeople.length;
+	memberDraft.people = filterByName(memberDraft.people);
+	memberDraft.inactivePeople = filterByName(memberDraft.inactivePeople);
+	const afterCount = memberDraft.people.length + memberDraft.inactivePeople.length;
+
+	if (beforeCount !== afterCount) {
+		renderMemberTables();
+	}
+}
+
+function removeEmptyConstraintRows() {
+	const before = constraintDraft.length;
+	constraintDraft = constraintDraft.filter((item) => {
+		return item.member1.trim().length > 0 && item.member2.trim().length > 0;
+	});
+	if (before !== constraintDraft.length) {
+		renderConstraintTable();
+	}
+}
+
+async function saveSelected() {
+	if (!selected.type || !selected.key) {
+		return;
+	}
+	removeEmptyNameRows();
+	removeEmptyConstraintRows();
+	const payload = buildPayloadFromForm(selected.type);
+	await broadcastProfilePayload(selected.key, payload);
+	await broadcastSyncTrigger(selected.key, 'all');
+	await loadSelectedItem();
+	await loadLists();
+	showToast('저장 완료');
+}
+
+async function syncSelected() {
+	if (!selected.type || !selected.key) {
+		return;
+	}
+	removeEmptyNameRows();
+	removeEmptyConstraintRows();
+	const payload = buildPayloadFromForm(selected.type);
+	await broadcastProfilePayload(selected.key, payload);
+	await broadcastSyncTrigger(selected.key, 'all');
+	await loadSelectedItem();
+	showToast('동기화 완료');
+}
+
+function initAccordion() {
+	document.querySelectorAll('.accordion-header').forEach((header) => {
+		header.addEventListener('click', () => {
+			const expanded = header.getAttribute('aria-expanded') === 'true';
+			header.setAttribute('aria-expanded', String(!expanded));
+		});
+	});
+}
+
+function initTheme() {
+	const savedTheme = localStorage.getItem('adminTheme') || 'dark';
+	document.documentElement.setAttribute('data-theme', savedTheme);
+	const toggleButton = getEl('themeToggleBtn');
+	const updateText = () => {
+		const theme = document.documentElement.getAttribute('data-theme');
+		toggleButton.textContent = theme === 'dark' ? '라이트 모드' : '다크 모드';
+	};
+	updateText();
+	toggleButton.addEventListener('click', () => {
+		const current = document.documentElement.getAttribute('data-theme');
+		const next = current === 'dark' ? 'light' : 'dark';
+		document.documentElement.setAttribute('data-theme', next);
+		localStorage.setItem('adminTheme', next);
+		updateText();
+	});
+}
+
+function bindEvents() {
+	getEl('refreshListsBtn').addEventListener('click', async () => {
+		await loadLists();
+		showToast('리스트 갱신 완료');
+	});
+	getEl('saveBtn').addEventListener('click', async () => {
+		try {
+			await saveSelected();
+		} catch (error) {
+			showToast(`저장 실패: ${error.message}`);
+		}
+	});
+	getEl('syncBtn').addEventListener('click', async () => {
+		try {
+			await syncSelected();
+		} catch (error) {
+			showToast(`동기화 실패: ${error.message}`);
+		}
+	});
+	getEl('passwordToggleBtn').addEventListener('click', () => {
+		const input = getEl(fieldIds.password);
+		const button = getEl('passwordToggleBtn');
+		const isMasked = input.type === 'password';
+		input.type = isMasked ? 'text' : 'password';
+		button.textContent = isMasked ? '🙈' : '👁';
+	});
+
+	const handleMemberInput = (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) {
+			return;
+		}
+		const row = target.closest('tr[data-list][data-index]');
+		if (!row) {
+			return;
+		}
+		const listKey = row.getAttribute('data-list');
+		const index = Number(row.getAttribute('data-index'));
+		if ((listKey !== 'people' && listKey !== 'inactivePeople') || !Number.isInteger(index)) {
+			return;
+		}
+		const person = memberDraft[listKey][index];
+		if (!person) {
+			return;
+		}
+		if (target.matches('input[data-role="name"]')) {
+			person.name = target.value;
+		}
+		if (target.matches('input[data-role="weight"]')) {
+			person.weight = Number(target.value || 0);
+		}
+	};
+
+	const handleGenderToggle = (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) {
+			return;
+		}
+		const row = target.closest('tr[data-list][data-index]');
+		if (!row) {
+			return;
+		}
+		const listKey = row.getAttribute('data-list');
+		const index = Number(row.getAttribute('data-index'));
+		if ((listKey !== 'people' && listKey !== 'inactivePeople') || !Number.isInteger(index)) {
+			return;
+		}
+		const person = memberDraft[listKey][index];
+		if (!person) {
+			return;
+		}
+
+		if (target.matches('button[data-role="gender"]')) {
+			person.gender = person.gender === 'male' ? 'female' : 'male';
+			target.textContent = getGenderLabel(person.gender);
+			return;
+		}
+
+		if (target.matches('button[data-role="delete"]')) {
+			memberDraft[listKey].splice(index, 1);
+			renderMemberTables();
+		}
+	};
+
+	const participantsBody = getEl('participantsTableBody');
+	const inactiveBody = getEl('inactiveTableBody');
+	if (participantsBody && inactiveBody) {
+		[participantsBody, inactiveBody].forEach((tbody) => {
+			tbody.addEventListener('input', handleMemberInput);
+			tbody.addEventListener('click', handleGenderToggle);
+		});
+	}
+
+	document.querySelectorAll('.member-add-btn').forEach((button) => {
+		button.addEventListener('click', () => {
+			const listKey = button.getAttribute('data-list');
+			if (listKey !== 'people' && listKey !== 'inactivePeople') {
+				return;
+			}
+			memberDraft[listKey].push(createEmptyMember());
+			renderMemberTables();
+			scrollMemberTableToBottom(listKey);
+			focusLastMemberNameInput(listKey);
+		});
+	});
+
+	const constraintTableBody = getEl('constraintTableBody');
+	if (constraintTableBody) {
+		constraintTableBody.addEventListener('input', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) {
+				return;
+			}
+			const row = target.closest('tr[data-index]');
+			if (!row) {
+				return;
+			}
+			const index = Number(row.getAttribute('data-index'));
+			if (!Number.isInteger(index) || !constraintDraft[index]) {
+				return;
+			}
+			if (target.matches('input[data-role="member1"]')) {
+				constraintDraft[index].member1 = target.value;
+			}
+			if (target.matches('input[data-role="member2"]')) {
+				constraintDraft[index].member2 = target.value;
+			}
+		});
+
+		constraintTableBody.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement) || !target.matches('button[data-role="delete"]')) {
+				return;
+			}
+			const row = target.closest('tr[data-index]');
+			if (!row) {
+				return;
+			}
+			const index = Number(row.getAttribute('data-index'));
+			if (!Number.isInteger(index) || !constraintDraft[index]) {
+				return;
+			}
+			constraintDraft.splice(index, 1);
+			renderConstraintTable();
+		});
+	}
+
+	const constraintAddBtn = getEl('constraintAddBtn');
+	if (constraintAddBtn instanceof HTMLButtonElement) {
+		constraintAddBtn.addEventListener('click', () => {
+			constraintDraft.push(createEmptyConstraint());
+			renderConstraintTable();
+			scrollConstraintTableToBottom();
+			focusLastConstraintInput();
+		});
+	}
+
+	const memberExpandBtn = getEl('memberExpandBtn');
+	const memberTableRow = getEl('memberTableRow');
+	if (memberExpandBtn instanceof HTMLButtonElement && memberTableRow) {
+		memberExpandBtn.addEventListener('click', () => {
+			memberTableRow.classList.toggle('expanded');
+			applyMemberExpandedState();
+			refreshMemberExpandButton();
+		});
+	}
+
+	const constraintExpandBtn = getEl('constraintExpandBtn');
+	const constraintTableRow = getEl('constraintTableRow');
+	if (constraintExpandBtn instanceof HTMLButtonElement && constraintTableRow) {
+		constraintExpandBtn.addEventListener('click', () => {
+			constraintTableRow.classList.toggle('expanded');
+			applyConstraintExpandedState();
+			refreshConstraintExpandButton();
+		});
+	}
+
+	applyMemberExpandedState();
+	refreshMemberExpandButton();
+	applyConstraintExpandedState();
+	refreshConstraintExpandButton();
+}
+
+async function bootstrap() {
+	initFirebase();
+	initAccordion();
+	initTheme();
+	bindEvents();
+	setButtonsEnabled(false);
+	setEditorHeader();
+	await loadLists();
+}
+
+bootstrap().catch((error) => {
+	showToast(`초기화 실패: ${error.message}`);
+});
