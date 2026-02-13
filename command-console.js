@@ -478,6 +478,9 @@ const commandConsole = {
 	handleConfirmResponse(confirmed) {
 		if (this.inputMode === 'profile-create-confirm') {
 			if (confirmed) {
+				if (typeof setCurrentProfileSource === 'function') {
+					setCurrentProfileSource('profiles');
+				}
 				currentProfileKey = this.tempProfile;
 				
 				const url = new URL(window.location);
@@ -544,13 +547,6 @@ const commandConsole = {
 				if (currentProfileKey) {
 					// 이미 프로필이 있으면 현재 프로필 유지
 					this.log(this.comments.profileCreateCanceled.replace('{currentProfileKey}', currentProfileKey));
-
-					// 전환 취소 시 파라미터 없는(프로필 없음) 상태로 전환
-					const url = new URL(window.location);
-					url.searchParams.delete('key');
-					window.history.pushState({}, '', url);
-
-					currentProfileKey = '';
 
 					// 전환을 취소하면 현재 프로필을 유지하고 명령어 입력 모드로 복귀
 					this.inputMode = 'normal';
@@ -821,21 +817,23 @@ const commandConsole = {
 				return;
 			}
 			
-			// 프로필 전체 데이터 확인 (profiles + users)
+			// 프로필 전체 데이터 확인 (profile + profiles + users)
 			Promise.all([
+				database.ref(`profile/${cmd}`).once('value'),
 				database.ref(`profiles/${cmd}`).once('value'),
 				database.ref(`users/${cmd}`).once('value')
-			]).then(([profileSnapshot, userSnapshot]) => {
+			]).then(([legacyProfileSnapshot, profileSnapshot, userSnapshot]) => {
+				const legacyProfileData = legacyProfileSnapshot.val();
 				const profileNodeData = profileSnapshot.val();
 				const userData = userSnapshot.val();
-				const usingUserProfile = profileNodeData === null && userData !== null;
-				const profileData = profileNodeData !== null ? profileNodeData : userData;
+				const source = legacyProfileData !== null ? 'profile' : (profileNodeData !== null ? 'profiles' : (userData !== null ? 'users' : 'profiles'));
+				const profileData = legacyProfileData !== null ? legacyProfileData : (profileNodeData !== null ? profileNodeData : userData);
 				const isProfileSwitch = this.inputMode === 'profile-switch';
 				
 				// 프로필이 존재하는지 확인 (password 또는 다른 데이터가 있으면 존재)
 				if (profileData !== null) {
 					if (typeof setCurrentProfileSource === 'function') {
-						setCurrentProfileSource(usingUserProfile ? 'users' : 'profiles');
+						setCurrentProfileSource(source);
 					}
 					const password = profileData.password || '';
 					this.tempProfile = cmd;

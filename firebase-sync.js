@@ -21,7 +21,11 @@ let syncEnabled = false;
 let authenticatedPassword = ''; // 인증된 비밀번호 저장
 
 function setCurrentProfileSource(source) {
-	currentProfileSource = source === 'users' ? 'users' : 'profiles';
+	if (source === 'users' || source === 'profile' || source === 'profiles') {
+		currentProfileSource = source;
+		return;
+	}
+	currentProfileSource = 'profiles';
 }
 
 function getCurrentProfileSource() {
@@ -34,11 +38,18 @@ function resolveProfileRecord(profileKey) {
 	}
 
 	return Promise.all([
+		database.ref(`profile/${profileKey}`).once('value'),
 		database.ref(`profiles/${profileKey}`).once('value'),
 		database.ref(`users/${profileKey}`).once('value')
-	]).then(([profileSnapshot, userSnapshot]) => {
+	]).then(([legacyProfileSnapshot, profileSnapshot, userSnapshot]) => {
+		const legacyProfileData = legacyProfileSnapshot.val();
 		const profileData = profileSnapshot.val();
 		const userData = userSnapshot.val();
+
+		if (legacyProfileData !== null) {
+			setCurrentProfileSource('profile');
+			return { exists: true, source: 'profile', data: legacyProfileData };
+		}
 
 		if (profileData !== null) {
 			setCurrentProfileSource('profiles');
@@ -140,13 +151,23 @@ function initFirebase() {
 			const originalRef = database.ref.bind(database);
 			database.ref = (path) => {
 				if (typeof path !== 'string') return originalRef(path);
-				if (currentProfileSource === 'users' && currentProfileKey) {
+				if (currentProfileKey) {
 					const profilePrefix = `profiles/${currentProfileKey}`;
-					if (path === profilePrefix) {
-						return originalRef(`users/${currentProfileKey}`);
+					if (currentProfileSource === 'users') {
+						if (path === profilePrefix) {
+							return originalRef(`users/${currentProfileKey}`);
+						}
+						if (path.startsWith(`${profilePrefix}/`)) {
+							return originalRef(`users/${currentProfileKey}/${path.slice(profilePrefix.length + 1)}`);
+						}
 					}
-					if (path.startsWith(`${profilePrefix}/`)) {
-						return originalRef(`users/${currentProfileKey}/${path.slice(profilePrefix.length + 1)}`);
+					if (currentProfileSource === 'profile') {
+						if (path === profilePrefix) {
+							return originalRef(`profile/${currentProfileKey}`);
+						}
+						if (path.startsWith(`${profilePrefix}/`)) {
+							return originalRef(`profile/${currentProfileKey}/${path.slice(profilePrefix.length + 1)}`);
+						}
 					}
 				}
 				return originalRef(path);
