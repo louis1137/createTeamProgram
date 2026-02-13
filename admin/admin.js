@@ -135,6 +135,9 @@ function initFirebase() {
 function setButtonsEnabled(enabled) {
 	getEl('saveBtn').disabled = !enabled;
 	getEl('syncBtn').disabled = !enabled;
+	document.querySelectorAll('.row-action-btn').forEach((button) => {
+		button.disabled = !enabled;
+	});
 }
 
 function normalizeMember(item, index) {
@@ -1327,6 +1330,93 @@ function buildPayloadFromForm(type) {
 	return payload;
 }
 
+function getSectionFieldKeys(section) {
+	if (section === 'member') {
+		return ['people', 'inactivePeople'];
+	}
+	if (section === 'option') {
+		return ['membersPerTeam', 'genderBalanceEnabled', 'maxTeamSizeEnabled', 'weightBalanceEnabled'];
+	}
+	if (section === 'constraint') {
+		return ['forbiddenPairs', 'pendingConstraints'];
+	}
+	if (section === 'rule') {
+		return ['hiddenGroupChains', 'probabilisticForbiddenPairs'];
+	}
+	if (section === 'reservation') {
+		return ['reservations'];
+	}
+	return [];
+}
+
+function buildSectionPayload(type, section) {
+	const fullPayload = buildPayloadFromForm(type);
+	const keys = getSectionFieldKeys(section);
+	const sectionPayload = {};
+	keys.forEach((key) => {
+		if (Object.prototype.hasOwnProperty.call(fullPayload, key)) {
+			sectionPayload[key] = fullPayload[key];
+		}
+	});
+	return sectionPayload;
+}
+
+function sanitizeDraftBySection(section) {
+	if (section === 'member') {
+		removeEmptyNameRows();
+		return;
+	}
+	if (section === 'constraint') {
+		removeEmptyConstraintRows();
+		return;
+	}
+	if (section === 'rule') {
+		removeEmptyRuleRows();
+		return;
+	}
+	if (section === 'reservation') {
+		removeEmptyReservationRows();
+	}
+}
+
+function getSectionSyncType(section) {
+	if (section === 'member') {
+		return 'member';
+	}
+	if (section === 'option') {
+		return 'option';
+	}
+	if (section === 'constraint') {
+		return 'constraint';
+	}
+	if (section === 'rule') {
+		return 'rule';
+	}
+	if (section === 'reservation') {
+		return 'reservation';
+	}
+	return 'all';
+}
+
+function getSectionLabel(section) {
+	if (section === 'member') {
+		return '멤버';
+	}
+	if (section === 'option') {
+		return '옵션';
+	}
+	if (section === 'constraint') {
+		return '제약';
+	}
+	if (section === 'rule') {
+		return '규칙';
+	}
+	if (section === 'reservation') {
+		return '예약';
+	}
+	return '항목';
+}
+
 function removeEmptyNameRows() {
 	const filterByName = (list) => {
 		return list.filter((member) => {
@@ -1405,6 +1495,29 @@ async function syncSelected() {
 	showToast('동기화 완료');
 }
 
+async function executeSectionAction(section, action) {
+	if (!selected.type || !selected.key) {
+		return;
+	}
+	sanitizeDraftBySection(section);
+	const sectionPayload = buildSectionPayload(selected.type, section);
+	if (!Object.keys(sectionPayload).length) {
+		showToast('저장할 항목이 없습니다.');
+		return;
+	}
+	const syncType = getSectionSyncType(section);
+	const label = getSectionLabel(section);
+	await savePayloadByType(selected.type, selected.key, sectionPayload);
+	await broadcastSyncTrigger(selected.type, selected.key, syncType);
+	await loadSelectedItem();
+	if (action === 'sync') {
+		showToast(`${label} 동기화 완료`);
+		return;
+	}
+	await loadLists();
+	showToast(`${label} 저장 완료`);
+}
+
 function initAccordion() {
 	document.querySelectorAll('.accordion-header').forEach((header) => {
 		header.addEventListener('click', () => {
@@ -1454,6 +1567,22 @@ function bindEvents() {
 		} catch (error) {
 			showToast(`동기화 실패: ${error.message}`);
 		}
+	});
+	document.querySelectorAll('[data-row-action][data-section]').forEach((button) => {
+		button.addEventListener('click', async () => {
+			const section = button.getAttribute('data-section');
+			const action = button.getAttribute('data-row-action');
+			if (!section || (action !== 'save' && action !== 'sync')) {
+				return;
+			}
+			try {
+				await executeSectionAction(section, action);
+			} catch (error) {
+				const label = getSectionLabel(section);
+				const actionLabel = action === 'sync' ? '동기화' : '저장';
+				showToast(`${label} ${actionLabel} 실패: ${error.message}`);
+			}
+		});
 	});
 	getEl('passwordToggleBtn').addEventListener('click', () => {
 		const input = getEl(fieldIds.password);

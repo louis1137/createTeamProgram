@@ -88,58 +88,70 @@
 							<button id="memberExpandBtn" class="member-expand-btn" type="button">모두 보기</button>
 						</div>
 						<div class="member-table-section">
-							<div class="member-table-panel" id="participantsPanel">
-								<div class="member-table-title"><span>참가자 <span id="participantsCountText">0명</span></span><button class="member-add-btn" type="button" data-list="people" aria-label="참가자 추가">+</button></div>
-								<table class="member-table">
-									<thead>
-										<tr>
-											<th class="drag-col"></th>
-											<th>이름</th>
-											<th>성별</th>
-											<th>가중치</th>
-											<th>삭제</th>
-										</tr>
-									</thead>
-									<tbody id="participantsTableBody"></tbody>
-								</table>
-							</div>
+							<div class="member-table-panels">
+								<div class="member-table-panel" id="participantsPanel">
+									<div class="member-table-title"><span>참가자 <span id="participantsCountText">0명</span></span><button class="member-add-btn" type="button" data-list="people" aria-label="참가자 추가">+</button></div>
+									<table class="member-table">
+										<thead>
+											<tr>
+												<th class="drag-col"></th>
+												<th>이름</th>
+												<th>성별</th>
+												<th>가중치</th>
+												<th>삭제</th>
+											</tr>
+										</thead>
+										<tbody id="participantsTableBody"></tbody>
+									</table>
+								</div>
 
-							<div class="member-table-panel" id="inactivePanel">
-								<div class="member-table-title"><span>미참가자 <span id="inactiveCountText">0명</span></span><button class="member-add-btn" type="button" data-list="inactivePeople" aria-label="미참가자 추가">+</button></div>
-								<table class="member-table">
-									<thead>
-										<tr>
-											<th class="drag-col"></th>
-											<th>이름</th>
-											<th>성별</th>
-											<th>가중치</th>
-											<th>삭제</th>
-										</tr>
-									</thead>
-									<tbody id="inactiveTableBody"></tbody>
-								</table>
+								<div class="member-table-panel" id="inactivePanel">
+									<div class="member-table-title"><span>미참가자 <span id="inactiveCountText">0명</span></span><button class="member-add-btn" type="button" data-list="inactivePeople" aria-label="미참가자 추가">+</button></div>
+									<table class="member-table">
+										<thead>
+											<tr>
+												<th class="drag-col"></th>
+												<th>이름</th>
+												<th>성별</th>
+												<th>가중치</th>
+												<th>삭제</th>
+											</tr>
+										</thead>
+										<tbody id="inactiveTableBody"></tbody>
+									</table>
+								</div>
+							</div>
+							<div class="row-section-actions">
+								<button class="btn btn-secondary row-action-btn" type="button" data-row-action="sync" data-section="member">동기화</button>
+								<button class="btn row-action-btn" type="button" data-row-action="save" data-section="member">저장</button>
 							</div>
 						</div>
 					</div>
 
 					<div class="field-row option-field-row">
 						<label class="option-inline-title" for="fieldMaxTeamSizeEnabled">옵션 상태</label>
-						<div class="option-inline-row">
-							<label class="option-inline-item" for="fieldMaxTeamSizeEnabled">
-								<input id="fieldMaxTeamSizeEnabled" type="checkbox">
-								<span>최대인원으로 팀 생성</span>
-							</label>
-							<label class="option-inline-item" for="fieldGenderBalanceEnabled">
-								<input id="fieldGenderBalanceEnabled" type="checkbox">
-								<span>성비 균등</span>
-							</label>
-							<label class="option-inline-item" for="fieldWeightBalanceEnabled">
-								<input id="fieldWeightBalanceEnabled" type="checkbox">
-								<span>가중치 균등</span>
-							</label>
-							<div class="option-inline-item option-number">
-								<label for="fieldMembersPerTeam">팀 인원수</label>
-								<input id="fieldMembersPerTeam" type="number" min="1" step="1">
+						<div class="option-field-body">
+							<div class="option-inline-row">
+								<label class="option-inline-item" for="fieldMaxTeamSizeEnabled">
+									<input id="fieldMaxTeamSizeEnabled" type="checkbox">
+									<span>최대인원으로 팀 생성</span>
+								</label>
+								<label class="option-inline-item" for="fieldGenderBalanceEnabled">
+									<input id="fieldGenderBalanceEnabled" type="checkbox">
+									<span>성비 균등</span>
+								</label>
+								<label class="option-inline-item" for="fieldWeightBalanceEnabled">
+									<input id="fieldWeightBalanceEnabled" type="checkbox">
+									<span>가중치 균등</span>
+								</label>
+								<div class="option-inline-item option-number">
+									<label for="fieldMembersPerTeam">팀 인원수</label>
+									<input id="fieldMembersPerTeam" type="number" min="1" step="1">
+								</div>
+							</div>
+							<div class="row-section-actions">
+								<button class="btn btn-secondary row-action-btn" type="button" data-row-action="sync" data-section="option">동기화</button>
+								<button class="btn row-action-btn" type="button" data-row-action="save" data-section="option">저장</button>
 							</div>
 						</div>
 					</div>
@@ -164,6 +176,10 @@
 									<tbody id="constraintTableBody"></tbody>
 								</table>
 							</div>
+							<div class="row-section-actions">
+								<button class="btn btn-secondary row-action-btn" type="button" data-row-action="sync" data-section="constraint">동기화</button>
+								<button class="btn row-action-btn" type="button" data-row-action="save" data-section="constraint">저장</button>
+							</div>
 						</div>
 					</div>
 
@@ -187,6 +203,10 @@
 									<tbody id="ruleTableBody"></tbody>
 								</table>
 							</div>
+							<div class="row-section-actions">
+								<button class="btn btn-secondary row-action-btn" type="button" data-row-action="sync" data-section="rule">동기화</button>
+								<button class="btn row-action-btn" type="button" data-row-action="save" data-section="rule">저장</button>
+							</div>
 						</div>
 					</div>
 
@@ -207,6 +227,10 @@
 									</thead>
 									<tbody id="reservationTableBody"></tbody>
 								</table>
+							</div>
+							<div class="row-section-actions">
+								<button class="btn btn-secondary row-action-btn" type="button" data-row-action="sync" data-section="reservation">동기화</button>
+								<button class="btn row-action-btn" type="button" data-row-action="save" data-section="reservation">저장</button>
 							</div>
 						</div>
 					</div>

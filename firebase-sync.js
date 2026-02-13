@@ -351,9 +351,11 @@ function loadDataByType(type) {
 			// 참가자만 로드
 			return Promise.all([
 				database.ref(`profiles/${currentProfileKey}/people`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/inactivePeople`).once('value'),
 				database.ref(`profiles/${currentProfileKey}/nextId`).once('value')
-			]).then(([peopleSnap, nextIdSnap]) => {
+			]).then(([peopleSnap, inactivePeopleSnap, nextIdSnap]) => {
 				state.people = peopleSnap.val() || [];
+				state.inactivePeople = inactivePeopleSnap.val() || [];
 				state.nextId = nextIdSnap.val() || 1;
 				
 				buildForbiddenMap();

@@ -259,6 +259,14 @@ body {
 	align-items: center;
 }
 
+.option-field-body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+
 .option-inline-title {
 	font-weight: 600;
 }
@@ -279,6 +287,7 @@ body {
 
 .member-table-section {
 	display: flex;
+	flex-direction: column;
 	gap: 10px;
 }
 
@@ -307,6 +316,28 @@ body {
 .member-table-row .member-table-section {
 	flex: 1;
 	min-width: 0;
+}
+
+.member-table-panels {
+	display: flex;
+	gap: 10px;
+}
+
+.member-table-panels .member-table-panel {
+	flex: 1;
+	min-width: 0;
+}
+
+.row-section-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.row-action-btn {
+	padding: 6px 10px;
+	font-size: 12px;
 }
 
 .member-table-panel {
@@ -906,6 +937,10 @@ tr:hover .drag-cell {
 	}
 
 	.member-table-section {
+		flex-direction: column;
+	}
+
+	.member-table-panels {
 		flex-direction: column;
 	}
 
