@@ -14,6 +14,8 @@ let selected = { type: null, key: null };
 let toastTimer = null;
 let memberDraft = { people: [], inactivePeople: [] };
 let constraintDraft = [];
+let ruleDraft = [];
+let reservationDraft = [];
 
 const fieldIds = {
 	key: 'fieldKey',
@@ -142,6 +144,14 @@ function normalizeName(name) {
 	return String(name ?? '').trim().toLowerCase();
 }
 
+function normalizeProbability(value) {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) {
+		return 100;
+	}
+	return Math.min(100, Math.max(0, Math.round(parsed)));
+}
+
 function toList(value) {
 	if (Array.isArray(value)) {
 		return value;
@@ -194,6 +204,66 @@ function cloneConstraints(data) {
 	});
 	const pendingRows = pendingConstraints.map((item) => normalizeConstraint(item));
 	constraintDraft = [...appliedRows, ...pendingRows];
+}
+
+function cloneRules(data) {
+	const hiddenGroupChains = toList(data?.hiddenGroupChains);
+	const rows = [];
+	hiddenGroupChains.forEach((chain) => {
+		if (!chain || typeof chain !== 'object') {
+			return;
+		}
+		const primary = String(chain.primary ?? '').trim();
+		const candidates = toList(chain.candidates);
+		candidates.forEach((candidate) => {
+			const isObjectCandidate = candidate && typeof candidate === 'object';
+			const member2 = String(isObjectCandidate ? candidate.name : candidate ?? '').trim();
+			const probability = normalizeProbability(isObjectCandidate ? candidate.probability : 100);
+			if (!member2) {
+				return;
+			}
+			rows.push({ member1: primary, member2, probability });
+		});
+	});
+	ruleDraft = rows.sort((a, b) => {
+		const byMember1 = normalizeName(a.member1).localeCompare(normalizeName(b.member1), 'ko');
+		if (byMember1 !== 0) {
+			return byMember1;
+		}
+		return normalizeName(a.member2).localeCompare(normalizeName(b.member2), 'ko');
+	});
+}
+
+function normalizeReservation(item) {
+	if (Array.isArray(item)) {
+		return item.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
+	}
+	if (typeof item === 'string') {
+		const text = item.trim();
+		if (!text) {
+			return [];
+		}
+		return text.split(',').map((name) => name.trim()).filter((name) => name.length > 0);
+	}
+	if (item && typeof item === 'object') {
+		const names = toList(item.names ?? item.members ?? item.people);
+		return names.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
+	}
+	return [];
+}
+
+function cloneReservations(data) {
+	const source = toList(data?.reservations);
+	reservationDraft = source
+		.map((item) => normalizeReservation(item))
+		.filter((row) => row.length > 0);
+}
+
+function parseReservationText(text) {
+	return String(text ?? '')
+		.split(',')
+		.map((name) => name.trim())
+		.filter((name) => name.length > 0);
 }
 
 function getGenderLabel(gender) {
@@ -265,6 +335,119 @@ function renderConstraintTable() {
 	applyConstraintExpandedState();
 }
 
+function escapeAttr(value) {
+	return String(value ?? '').replace(/"/g, '&quot;');
+}
+
+function renderRuleTableRows() {
+	const container = getEl('ruleTableBody');
+	if (!container) {
+		return;
+	}
+	if (!ruleDraft.length) {
+		container.innerHTML = `<tr><td class="member-empty" colspan="4">데이터가 없습니다.</td></tr>`;
+		return;
+	}
+
+	let html = '';
+	let index = 0;
+	while (index < ruleDraft.length) {
+		const current = ruleDraft[index];
+		const member1 = String(current.member1 ?? '').trim();
+
+		if (!member1) {
+			const probability = normalizeProbability(ruleDraft[index].probability);
+			html += `<tr data-index="${index}">
+				<td class="rule-member1-cell"><input class="member-input" type="text" data-role="member1-single" value="${escapeAttr(ruleDraft[index].member1)}"></td>
+				<td class="rule-member2-cell"><input class="member-input" type="text" data-role="member2" value="${escapeAttr(ruleDraft[index].member2)}"></td>
+				<td class="rule-probability-cell"><input class="member-input" type="number" min="0" max="100" step="1" data-role="probability" value="${probability}"></td>
+				<td class="rule-delete-cell"><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
+			</tr>`;
+			index += 1;
+			continue;
+		}
+
+		let span = 1;
+		while (index + span < ruleDraft.length) {
+			const nextMember1 = String(ruleDraft[index + span].member1 ?? '').trim();
+			if (nextMember1 !== member1) {
+				break;
+			}
+			span += 1;
+		}
+
+		for (let offset = 0; offset < span; offset += 1) {
+			const rowIndex = index + offset;
+			const row = ruleDraft[rowIndex];
+			const probability = normalizeProbability(row.probability);
+			html += `<tr data-index="${rowIndex}">`;
+			if (offset === 0) {
+				html += `<td class="rule-member1-cell" rowspan="${span}"><input class="member-input" type="text" data-role="member1-group" data-group-start="${index}" data-group-size="${span}" value="${escapeAttr(member1)}"></td>`;
+			}
+			html += `<td class="rule-member2-cell"><input class="member-input" type="text" data-role="member2" value="${escapeAttr(row.member2)}"></td>
+			<td class="rule-probability-cell"><input class="member-input" type="number" min="0" max="100" step="1" data-role="probability" value="${probability}"></td>
+			<td class="rule-delete-cell"><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
+			</tr>`;
+		}
+
+		index += span;
+	}
+
+	container.innerHTML = html;
+}
+
+function renderRuleTable() {
+	renderRuleTableRows();
+}
+
+function renderReservationTableRows() {
+	const container = getEl('reservationTableBody');
+	if (!container) {
+		return;
+	}
+	if (!reservationDraft.length) {
+		container.innerHTML = `<tr><td class="member-empty" colspan="2">데이터가 없습니다.</td></tr>`;
+		return;
+	}
+
+	container.innerHTML = reservationDraft.map((names, index) => {
+		const text = names.join(', ');
+		return `<tr data-index="${index}">
+			<td><input class="member-input" type="text" data-role="reservationText" value="${escapeAttr(text)}"></td>
+			<td><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
+		</tr>`;
+	}).join('');
+}
+
+function renderReservationTable() {
+	renderReservationTableRows();
+}
+
+function scrollReservationTableToBottom() {
+	const tbody = getEl('reservationTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		tbody.scrollTop = tbody.scrollHeight;
+	});
+}
+
+function focusLastReservationInput() {
+	const tbody = getEl('reservationTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		const inputs = tbody.querySelectorAll('input[data-role="reservationText"]');
+		const targetInput = inputs.length ? inputs[inputs.length - 1] : null;
+		if (targetInput instanceof HTMLInputElement) {
+			targetInput.focus();
+			targetInput.select();
+		}
+	});
+}
+
 function createEmptyConstraint() {
 	return { member1: '', member2: '' };
 }
@@ -286,6 +469,31 @@ function focusLastConstraintInput() {
 	}
 	requestAnimationFrame(() => {
 		const inputs = tbody.querySelectorAll('input[data-role="member1"]');
+		const targetInput = inputs.length ? inputs[inputs.length - 1] : null;
+		if (targetInput instanceof HTMLInputElement) {
+			targetInput.focus();
+			targetInput.select();
+		}
+	});
+}
+
+function scrollRuleTableToBottom() {
+	const tbody = getEl('ruleTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		tbody.scrollTop = tbody.scrollHeight;
+	});
+}
+
+function focusLastRuleMember1Input() {
+	const tbody = getEl('ruleTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	requestAnimationFrame(() => {
+		const inputs = tbody.querySelectorAll('input[data-role="member1-single"], input[data-role="member1-group"]');
 		const targetInput = inputs.length ? inputs[inputs.length - 1] : null;
 		if (targetInput instanceof HTMLInputElement) {
 			targetInput.focus();
@@ -335,12 +543,47 @@ function focusLastMemberNameInput(listKey) {
 	});
 }
 
+function getMemberTbodyMaxHeightPx() {
+	const rootStyles = getComputedStyle(document.documentElement);
+	const value = rootStyles.getPropertyValue('--member-tbody-max-h').trim();
+	const parsed = Number.parseFloat(value.replace('px', ''));
+	return Number.isFinite(parsed) ? parsed : 400;
+}
+
+function isOverflowingForCollapsedView(tbody) {
+	if (!(tbody instanceof HTMLElement)) {
+		return false;
+	}
+	const maxHeightPx = getMemberTbodyMaxHeightPx();
+	return tbody.scrollHeight > maxHeightPx + 1;
+}
+
+function shouldShowMemberExpandButton(row) {
+	if (!(row instanceof HTMLElement)) {
+		return false;
+	}
+	const tbodies = Array.from(row.querySelectorAll('.member-table tbody'));
+	return tbodies.some((tbody) => isOverflowingForCollapsedView(tbody));
+}
+
+function shouldShowConstraintExpandButton() {
+	const tbody = getEl('constraintTableBody');
+	return isOverflowingForCollapsedView(tbody);
+}
+
 function refreshMemberExpandButton() {
 	const button = getEl('memberExpandBtn');
 	const row = getEl('memberTableRow');
 	if (!(button instanceof HTMLButtonElement) || !row) {
 		return;
 	}
+	const shouldShow = shouldShowMemberExpandButton(row);
+	if (!shouldShow) {
+		row.classList.remove('expanded');
+		button.style.display = 'none';
+		return;
+	}
+	button.style.display = '';
 	button.textContent = row.classList.contains('expanded') ? '숨기기' : '모두 보기';
 }
 
@@ -350,6 +593,13 @@ function refreshConstraintExpandButton() {
 	if (!(button instanceof HTMLButtonElement) || !row) {
 		return;
 	}
+	const shouldShow = shouldShowConstraintExpandButton();
+	if (!shouldShow) {
+		row.classList.remove('expanded');
+		button.style.display = 'none';
+		return;
+	}
+	button.style.display = '';
 	button.textContent = row.classList.contains('expanded') ? '숨기기' : '모두 보기';
 }
 
@@ -451,8 +701,12 @@ function writeFormData(key, type, data) {
 	getEl(fieldIds.timestamp).value = data.timestamp || '';
 	cloneMembers(data || {});
 	cloneConstraints(data || {});
+	cloneRules(data || {});
+	cloneReservations(data || {});
 	renderMemberTables();
 	renderConstraintTable();
+	renderRuleTable();
+	renderReservationTable();
 	setFieldAvailability(type);
 	updateConditionalRows(type);
 }
@@ -544,6 +798,7 @@ function buildPayloadFromForm(type) {
 	const { nameToId } = buildMemberMaps(memberDraft);
 	const forbiddenPairs = [];
 	const pendingConstraints = [];
+	const hiddenGroupChainsMap = new Map();
 	const dedupeForbidden = new Set();
 	const dedupePending = new Set();
 
@@ -581,6 +836,40 @@ function buildPayloadFromForm(type) {
 		pendingConstraints.push({ left, right });
 	});
 
+	ruleDraft.forEach((item) => {
+		const member1 = String(item.member1 ?? '').trim();
+		const member2 = String(item.member2 ?? '').trim();
+		if (!member1 || !member2) {
+			return;
+		}
+		let chain = hiddenGroupChainsMap.get(member1);
+		if (!chain) {
+			chain = {
+				primary: member1,
+				candidateKeys: new Set(),
+				candidates: []
+			};
+			hiddenGroupChainsMap.set(member1, chain);
+		}
+		const candidateKey = normalizeName(member2);
+		if (chain.candidateKeys.has(candidateKey)) {
+			return;
+		}
+		chain.candidateKeys.add(candidateKey);
+		chain.candidates.push({ name: member2, probability: normalizeProbability(item.probability) });
+	});
+
+	const hiddenGroupChains = Array.from(hiddenGroupChainsMap.values()).map((chain) => {
+		return {
+			primary: chain.primary,
+			candidates: chain.candidates
+		};
+	});
+
+	const reservations = reservationDraft
+		.map((row) => row.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0))
+		.filter((row) => row.length > 0);
+
 	const payload = {
 		membersPerTeam: form.membersPerTeam,
 		genderBalanceEnabled: form.genderBalanceEnabled,
@@ -590,7 +879,9 @@ function buildPayloadFromForm(type) {
 		people: memberDraft.people,
 		inactivePeople: memberDraft.inactivePeople,
 		forbiddenPairs,
-		pendingConstraints
+		pendingConstraints,
+		hiddenGroupChains,
+		reservations
 	};
 
 	if (type === 'profiles') {
@@ -630,12 +921,34 @@ function removeEmptyConstraintRows() {
 	}
 }
 
+function removeEmptyRuleRows() {
+	const before = ruleDraft.length;
+	ruleDraft = ruleDraft.filter((item) => {
+		return item.member1.trim().length > 0 && item.member2.trim().length > 0;
+	});
+	if (before !== ruleDraft.length) {
+		renderRuleTable();
+	}
+}
+
+function removeEmptyReservationRows() {
+	const before = reservationDraft.length;
+	reservationDraft = reservationDraft
+		.map((row) => row.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0))
+		.filter((row) => row.length > 0);
+	if (before !== reservationDraft.length) {
+		renderReservationTable();
+	}
+}
+
 async function saveSelected() {
 	if (!selected.type || !selected.key) {
 		return;
 	}
 	removeEmptyNameRows();
 	removeEmptyConstraintRows();
+	removeEmptyRuleRows();
+	removeEmptyReservationRows();
 	const payload = buildPayloadFromForm(selected.type);
 	await broadcastProfilePayload(selected.key, payload);
 	await broadcastSyncTrigger(selected.key, 'all');
@@ -650,6 +963,8 @@ async function syncSelected() {
 	}
 	removeEmptyNameRows();
 	removeEmptyConstraintRows();
+	removeEmptyRuleRows();
+	removeEmptyReservationRows();
 	const payload = buildPayloadFromForm(selected.type);
 	await broadcastProfilePayload(selected.key, payload);
 	await broadcastSyncTrigger(selected.key, 'all');
@@ -687,6 +1002,10 @@ function initTheme() {
 function bindEvents() {
 	getEl('refreshListsBtn').addEventListener('click', async () => {
 		await loadLists();
+		if (selected.type && selected.key) {
+			await loadSelectedItem();
+			applySelectionStyles();
+		}
 		showToast('리스트 갱신 완료');
 	});
 	getEl('saveBtn').addEventListener('click', async () => {
@@ -838,6 +1157,143 @@ function bindEvents() {
 			renderConstraintTable();
 			scrollConstraintTableToBottom();
 			focusLastConstraintInput();
+		});
+	}
+
+	const ruleTableBody = getEl('ruleTableBody');
+	if (ruleTableBody) {
+		ruleTableBody.addEventListener('input', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) {
+				return;
+			}
+			const row = target.closest('tr[data-index]');
+			if (!row) {
+				return;
+			}
+			const index = Number(row.getAttribute('data-index'));
+			if (!Number.isInteger(index) || !ruleDraft[index]) {
+				return;
+			}
+			if (target.matches('input[data-role="member2"]')) {
+				ruleDraft[index].member2 = target.value;
+			}
+			if (target.matches('input[data-role="probability"]')) {
+				ruleDraft[index].probability = target.value;
+			}
+			if (target.matches('input[data-role="member1-single"]')) {
+				ruleDraft[index].member1 = target.value;
+			}
+		});
+
+		ruleTableBody.addEventListener('change', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement) || !target.matches('input[data-role="member1-group"]')) {
+				return;
+			}
+			const start = Number(target.getAttribute('data-group-start'));
+			const size = Number(target.getAttribute('data-group-size'));
+			if (!Number.isInteger(start) || !Number.isInteger(size) || size <= 0) {
+				return;
+			}
+			for (let offset = 0; offset < size; offset += 1) {
+				const rowIndex = start + offset;
+				if (!ruleDraft[rowIndex]) {
+					continue;
+				}
+				ruleDraft[rowIndex].member1 = target.value;
+			}
+			renderRuleTable();
+		});
+
+		ruleTableBody.addEventListener('change', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement) || !target.matches('input[data-role="probability"]')) {
+				return;
+			}
+			const row = target.closest('tr[data-index]');
+			if (!row) {
+				return;
+			}
+			const index = Number(row.getAttribute('data-index'));
+			if (!Number.isInteger(index) || !ruleDraft[index]) {
+				return;
+			}
+			ruleDraft[index].probability = normalizeProbability(target.value);
+			renderRuleTable();
+		});
+
+		ruleTableBody.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement) || !target.matches('button[data-role="delete"]')) {
+				return;
+			}
+			const row = target.closest('tr[data-index]');
+			if (!row) {
+				return;
+			}
+			const index = Number(row.getAttribute('data-index'));
+			if (!Number.isInteger(index) || !ruleDraft[index]) {
+				return;
+			}
+			ruleDraft.splice(index, 1);
+			renderRuleTable();
+		});
+	}
+
+	const ruleAddBtn = getEl('ruleAddBtn');
+	if (ruleAddBtn instanceof HTMLButtonElement) {
+		ruleAddBtn.addEventListener('click', () => {
+			ruleDraft.push({ member1: '', member2: '', probability: 100 });
+			renderRuleTable();
+			scrollRuleTableToBottom();
+			focusLastRuleMember1Input();
+		});
+	}
+
+	const reservationTableBody = getEl('reservationTableBody');
+	if (reservationTableBody) {
+		reservationTableBody.addEventListener('input', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement) || !target.matches('input[data-role="reservationText"]')) {
+				return;
+			}
+			const row = target.closest('tr[data-index]');
+			if (!row) {
+				return;
+			}
+			const index = Number(row.getAttribute('data-index'));
+			if (!Number.isInteger(index) || !reservationDraft[index]) {
+				return;
+			}
+			reservationDraft[index] = parseReservationText(target.value);
+		});
+
+		reservationTableBody.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement) || !target.matches('button[data-role="delete"]')) {
+				return;
+			}
+			const row = target.closest('tr[data-index]');
+			if (!row) {
+				return;
+			}
+			const index = Number(row.getAttribute('data-index'));
+			if (!Number.isInteger(index) || !reservationDraft[index]) {
+				return;
+			}
+			reservationDraft.splice(index, 1);
+			renderReservationTable();
+		});
+	}
+
+	const reservationAddBtn = getEl('reservationAddBtn');
+	if (reservationAddBtn instanceof HTMLButtonElement) {
+		reservationAddBtn.addEventListener('click', () => {
+			reservationDraft.push([]);
+			renderReservationTable();
+			scrollReservationTableToBottom();
+			focusLastReservationInput();
 		});
 	}
 

@@ -20,6 +20,25 @@ let currentUserCode = null;
 let syncEnabled = false;
 let authenticatedPassword = ''; // 인증된 비밀번호 저장
 
+function normalizeReservations(value) {
+	const toRow = (item) => {
+		if (Array.isArray(item)) {
+			return item.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
+		}
+		if (typeof item === 'string') {
+			return item.split(',').map((name) => name.trim()).filter((name) => name.length > 0);
+		}
+		return [];
+	};
+	if (Array.isArray(value)) {
+		return value.map(toRow).filter((row) => row.length > 0);
+	}
+	if (value && typeof value === 'object') {
+		return Object.values(value).map(toRow).filter((row) => row.length > 0);
+	}
+	return [];
+}
+
 function setCurrentProfileSource(source) {
 	if (source === 'users' || source === 'profile' || source === 'profiles') {
 		currentProfileSource = source;
@@ -369,7 +388,7 @@ function loadDataByType(type) {
 		const oldReservationCount = state.reservations ? state.reservations.length : 0;
 		return database.ref(`profiles/${currentProfileKey}/reservations`).once('value')
 			.then((snapshot) => {
-				const newReservations = snapshot.val() || [];
+				const newReservations = normalizeReservations(snapshot.val());
 				const newCount = newReservations.length;
 				
 				// 예약 개수가 변경된 경우 알림 표시
@@ -414,7 +433,7 @@ function loadStateFromData(data) {
 	state.pendingHiddenGroupChains = data.pendingHiddenGroupChains || [];
 	state.probabilisticForbiddenPairs = data.probabilisticForbiddenPairs || [];
 	state.activeProbabilisticForbiddenPairs = [];
-	state.reservations = data.reservations || [];
+	state.reservations = normalizeReservations(data.reservations);
 	state.maxTeamSizeEnabled = data.maxTeamSizeEnabled || false;
 	state.genderBalanceEnabled = data.genderBalanceEnabled || false;
 	state.weightBalanceEnabled = data.weightBalanceEnabled || false;

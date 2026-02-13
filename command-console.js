@@ -790,10 +790,11 @@ const commandConsole = {
 			this.log(`> ${cmd}`, 'command');
 			
 			// 규칙 제거 명령어 체크
-			const isRemoveCommand = /^([^()!]+)\(!\)/.test(cmd);
+			const isRemoveCommand = /^([^()!]+)\(!\)/.test(cmd) || /^([^()!,]+)!/.test(cmd);
 			
 			// input 명령어를 통해 처리
 			this.inputCommand(cmd);
+			saveToLocalStorage();
 			
 			// 결과 메시지 출력
 			if (isRemoveCommand) {
@@ -2659,30 +2660,50 @@ loadCommand(profileName = '') {
 	},
 	
 	reservationCommand(args) {
-		// 인증 체크
-		if (!this.hasWriteAccess()) {
-			this.error(this.comments.readOnlyFeatureDisabled);
-			this.log(this.comments.authenticationRequired);
-			return;
-		}
-		
-		const trimmedArgs = args.trim();
+		const normalizeReservations = (value) => {
+			const toRow = (item) => {
+				if (Array.isArray(item)) {
+					return item.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
+				}
+				if (typeof item === 'string') {
+					return item.split(',').map((name) => name.trim()).filter((name) => name.length > 0);
+				}
+				return [];
+			};
+			if (Array.isArray(value)) {
+				return value.map(toRow).filter((row) => row.length > 0);
+			}
+			if (value && typeof value === 'object') {
+				return Object.values(value).map(toRow).filter((row) => row.length > 0);
+			}
+			return [];
+		};
+
+		state.reservations = normalizeReservations(state.reservations);
+		const trimmedArgs = String(args || '').trim();
 		
 		// 예약 목록 보기
 		if (trimmedArgs === '목록') {
 			if (state.reservations.length === 0) {
 				this.log(commandConsoleMessages.comments.reservationEmpty);
 			} else {
-			let listMessage = commandConsoleMessages.comments.reservationList.replace('{count}', state.reservations.length) + '<br>';
-			state.reservations.forEach((reservation, index) => {
-				listMessage += commandConsoleMessages.comments.reservationListItem
-					.replace('{index}', index + 1)
-					.replace('{members}', reservation.join(', ')) + '<br>';
-			});
-			this.log(listMessage);
+				let listMessage = commandConsoleMessages.comments.reservationList.replace('{count}', state.reservations.length) + '<br>';
+				state.reservations.forEach((reservation, index) => {
+					listMessage += commandConsoleMessages.comments.reservationListItem
+						.replace('{index}', index + 1)
+						.replace('{members}', reservation.join(', ')) + '<br>';
+				});
+				this.log(listMessage);
+			}
+			return;
 		}
-		return;
-	}
+
+		// 인증 체크 (목록 조회 제외)
+		if (!this.hasWriteAccess()) {
+			this.error(this.comments.readOnlyFeatureDisabled);
+			this.log(this.comments.authenticationRequired);
+			return;
+		}
 	
 	// 예약 취소 (마지막 예약 제거)
 	if (trimmedArgs === '취소') {

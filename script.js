@@ -786,7 +786,11 @@ function saveToLocalStorage() {
 			forbiddenPairs: state.forbiddenPairs,
 			pendingConstraints: state.pendingConstraints,
 			reservations: state.reservations, // 예약 목록 저장
-			// hiddenGroups와 pendingHiddenGroups는 저장하지 않음 (새로고침 시 초기화)
+			hiddenGroups: state.hiddenGroups,
+			hiddenGroupChains: state.hiddenGroupChains,
+			pendingHiddenGroups: state.pendingHiddenGroups,
+			pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+			probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
 			// 설정 값 저장
 			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 			genderBalanceEnabled: state.genderBalanceEnabled,
@@ -828,6 +832,25 @@ function loadFromLocalStorage() {
 			.then((snapshot) => {
 				const data = snapshot.val();
 				if (!data) return;
+
+				const normalizeReservations = (value) => {
+					const toRow = (item) => {
+						if (Array.isArray(item)) {
+							return item.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
+						}
+						if (typeof item === 'string') {
+							return item.split(',').map((name) => name.trim()).filter((name) => name.length > 0);
+						}
+						return [];
+					};
+					if (Array.isArray(value)) {
+						return value.map(toRow).filter((row) => row.length > 0);
+					}
+					if (value && typeof value === 'object') {
+						return Object.values(value).map(toRow).filter((row) => row.length > 0);
+					}
+					return [];
+				};
 			
 				// cmd 콘솔에도 출력
 				setTimeout(() => {
@@ -852,13 +875,12 @@ function loadFromLocalStorage() {
 				state.nextId = data.nextId || 1;
 				state.forbiddenPairs = data.forbiddenPairs || [];
 				state.pendingConstraints = data.pendingConstraints || [];
-				state.reservations = data.reservations || []; // 예약 목록 복원
-				// hiddenGroups, pendingHiddenGroups, hiddenGroupChains, pendingHiddenGroupChains는 항상 빈 배열로 초기화 (저장하지 않음)
-				state.hiddenGroups = [];
-				state.pendingHiddenGroups = [];
-				state.hiddenGroupChains = [];
-				state.pendingHiddenGroupChains = [];
-				state.probabilisticForbiddenPairs = [];
+				state.reservations = normalizeReservations(data.reservations); // 예약 목록 복원
+				state.hiddenGroups = data.hiddenGroups || [];
+				state.pendingHiddenGroups = data.pendingHiddenGroups || [];
+				state.hiddenGroupChains = data.hiddenGroupChains || [];
+				state.pendingHiddenGroupChains = data.pendingHiddenGroupChains || [];
+				state.probabilisticForbiddenPairs = data.probabilisticForbiddenPairs || [];
 				state.activeProbabilisticForbiddenPairs = [];
 				
 				// 설정 값 복원
@@ -1322,6 +1344,13 @@ function addPerson(fromConsole = false, options = {}) {
 		return;
 	}
 
+	if (input === '!') {
+		safeOpenForbiddenWindow();
+		elements.nameInput.value = '';
+		elements.nameInput.focus();
+		return;
+	}
+
 	// 콘솔 열기 명령어 체크
 	if (input.toLowerCase() === 'command' || input.toLowerCase() === 'cmd') {
 		const consoleEl = document.getElementById('commandConsole');
@@ -1580,6 +1609,63 @@ function addPerson(fromConsole = false, options = {}) {
 					}
 				}
 				return; // 체이닝 제거 처리 완료
+			}
+
+			// 간편 삭제 패턴: A!, A!B, A!B!C
+			const removeSimplePattern = /^([^()!,]+)!(.*)$/;
+			const removeSimpleMatch = token.match(removeSimplePattern);
+			if (removeSimpleMatch) {
+				const primaryName = removeSimpleMatch[1].trim();
+				const rest = removeSimpleMatch[2].trim();
+				const primaryKey = normalizeName(primaryName);
+
+				const existingChain = state.hiddenGroupChains.find(chain => normalizeName(chain.primary) === primaryKey);
+				if (!existingChain) {
+					console.log(commandConsoleMessages.comments.chainRuleDeleteFailed.replace('{name}', primaryName));
+					return;
+				}
+
+				if (!rest) {
+					state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => normalizeName(chain.primary) !== primaryKey);
+					const removedProb = removeProbabilisticForbiddenByName(primaryName);
+					saveToLocalStorage();
+					constraintsTouched = true;
+					console.log(commandConsoleMessages.comments.chainRuleDeleted.replace('{name}', primaryName));
+					return;
+				}
+
+				const removeTargets = rest.split('!').map(n => n.trim()).filter(n => n);
+				let removedCount = 0;
+				const removedNames = [];
+				const removedProbTargets = [];
+
+				removeTargets.forEach(targetName => {
+					const targetKey = normalizeName(targetName);
+					const beforeLen = existingChain.candidates.length;
+					existingChain.candidates = existingChain.candidates.filter(c => normalizeName(c.name) !== targetKey);
+					const afterLen = existingChain.candidates.length;
+					if (beforeLen > afterLen) {
+						removedCount++;
+						removedNames.push(targetName);
+					}
+					const probRemoved = removeProbabilisticForbiddenPairByNames(primaryName, targetName);
+					if (probRemoved > 0) removedProbTargets.push(targetName);
+				});
+
+				if (existingChain.candidates.length === 0) {
+					state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => normalizeName(chain.primary) !== primaryKey);
+					console.log(commandConsoleMessages.comments.chainAllCandidatesDeleted.replace('{name}', primaryName));
+				} else if (removedCount > 0) {
+					console.log(commandConsoleMessages.comments.chainCandidatesDeleted + `: '${primaryName}' → ${removedNames.map(n => `'${n}'`).join(', ')} (${removedCount}개)`);
+				} else {
+					console.log(commandConsoleMessages.comments.chainCandidateDeleteFailed);
+				}
+
+				if (removedCount > 0 || removedProbTargets.length > 0) {
+					saveToLocalStorage();
+					constraintsTouched = true;
+				}
+				return;
 			}
 			
 			// 히든 그룹 체이닝 체크: A(50)B(50)C(50)D 패턴
@@ -4264,6 +4350,25 @@ function createResultListItem(person) {
 // cmd 콘솔에 팀 생성 결과 출력
 function logTeamResultsToConsole(teams) {
 	if (!commandConsole || !commandConsole.log) return;
+
+	const persistAppliedSummaryToDb = (appliedReservationSnapshot, appliedRulesSnapshot) => {
+		if (!database || !syncEnabled || !currentProfileKey) {
+			return;
+		}
+		if (!commandConsole.authenticated) {
+			return;
+		}
+		const timestamp = (typeof getCurrentDbTimestamp === 'function')
+			? getCurrentDbTimestamp()
+			: new Date().toISOString();
+		database.ref(`profiles/${currentProfileKey}`).update({
+			lastAppliedReservation: appliedReservationSnapshot || null,
+			lastAppliedRules: appliedRulesSnapshot || [],
+			lastAppliedAt: timestamp
+		}).catch((error) => {
+			console.warn('적용 규칙/예약 저장 실패:', error);
+		});
+	};
 	
 	// 인증이 안 되어 있으면 읽기 모드로 전환
 	if (!commandConsole.authenticated && commandConsole.inputMode !== 'normal') {
@@ -4314,10 +4419,17 @@ function logTeamResultsToConsole(teams) {
 	
 	// 적용된 규칙이 있을 경우 추가 (인증된 사용자만)
 	let outputMessage = `${commandConsoleMessages.comments.generatedTeams}<br>${teamResults}`;
+	let appliedReservationSnapshot = null;
+	const appliedRulesSnapshot = [];
 	
 	// 적용된 예약 정보 출력
 	if (commandConsole.authenticated && window.appliedReservation) {
 		const reservation = window.appliedReservation;
+		appliedReservationSnapshot = {
+			applied: [...(reservation.foundNames || []), ...(reservation.additionalNames || [])],
+			notFound: reservation.notFoundNames || [],
+			excluded: reservation.excludedNames || []
+		};
 		let reservationInfo = `<br><br>${commandConsoleMessages.comments.reservationApplied}<br>`;
 		
 		// 적용된 참가자 목록
@@ -4339,6 +4451,12 @@ function logTeamResultsToConsole(teams) {
 	// 적용된 규칙과 예약의 상호작용 출력
 	if (commandConsole.authenticated && window.appliedReservationRules && window.appliedReservationRules.length > 0) {
 		const ruleResults = window.appliedReservationRules.map(rule => {
+			appliedRulesSnapshot.push({
+				type: 'reservation-link',
+				primary: rule.primaryName,
+				target: rule.partnerName,
+				probability: rule.probability
+			});
 			return `  - ${rule.primaryName} → ${rule.partnerName} (${rule.probability}%)`;
 		}).join('<br>');
 		
@@ -4357,6 +4475,12 @@ function logTeamResultsToConsole(teams) {
 		
 		if (generalRules.length > 0) {
 			const ruleResults = generalRules.map(info => {
+				appliedRulesSnapshot.push({
+					type: 'rule',
+					primary: info.primaryName,
+					target: info.candidateName,
+					probability: info.probability
+				});
 				return `  - ${info.primaryName} → ${info.candidateName} (${info.probability}%)`;
 			}).join('<br>');
 			
@@ -4373,6 +4497,12 @@ function logTeamResultsToConsole(teams) {
 	// 확률 제약 규칙 출력 (A(!10)B)
 	if (commandConsole.authenticated && state.activeProbabilisticForbiddenPairs && state.activeProbabilisticForbiddenPairs.length > 0) {
 		const probRules = state.activeProbabilisticForbiddenPairs.map(rule => {
+			appliedRulesSnapshot.push({
+				type: 'probabilistic-forbidden',
+				left: rule.aName,
+				right: rule.bName,
+				probability: Math.round(rule.probability)
+			});
 			return `  - ${rule.aName} ⛔ ${rule.bName} (${Math.round(rule.probability)}%)`;
 		}).join('<br>');
 		
@@ -4382,6 +4512,19 @@ function logTeamResultsToConsole(teams) {
 			outputMessage += `<br><br>${commandConsoleMessages.comments.appliedRules}<br>${probRules}`;
 		}
 	}
+
+	if (typeof window !== 'undefined') {
+		window.lastAppliedReservationForHistory = appliedReservationSnapshot
+			? {
+				applied: [...(appliedReservationSnapshot.applied || [])],
+				notFound: [...(appliedReservationSnapshot.notFound || [])],
+				excluded: [...(appliedReservationSnapshot.excluded || [])]
+			}
+			: { applied: [], notFound: [], excluded: [] };
+		window.lastAppliedRulesForHistory = appliedRulesSnapshot.map((rule) => ({ ...rule }));
+	}
+
+	persistAppliedSummaryToDb(appliedReservationSnapshot, appliedRulesSnapshot);
 	
 	commandConsole.log(outputMessage);
 }
@@ -4392,10 +4535,24 @@ function saveGenerateHistory(teams) {
 		if (!database || !currentUserCode) return;
 		if (!Array.isArray(teams) || teams.length === 0) return;
 
+		const appliedReservation = (typeof window !== 'undefined' && window.lastAppliedReservationForHistory)
+			? {
+				applied: [...(window.lastAppliedReservationForHistory.applied || [])],
+				notFound: [...(window.lastAppliedReservationForHistory.notFound || [])],
+				excluded: [...(window.lastAppliedReservationForHistory.excluded || [])]
+			}
+			: { applied: [], notFound: [], excluded: [] };
+
+		const appliedRules = (typeof window !== 'undefined' && Array.isArray(window.lastAppliedRulesForHistory))
+			? window.lastAppliedRulesForHistory.map((rule) => ({ ...rule }))
+			: [];
+
 		const timestamp = getCurrentDbTimestamp();
 		const historyData = {
 			createdAt: timestamp,
 			profile: currentProfileKey || '',
+			appliedReservation,
+			appliedRules,
 			teams: teams.map(team => team.map(person => {
 				const details = [];
 				if (state.genderBalanceEnabled && person.gender) {
@@ -4410,12 +4567,36 @@ function saveGenerateHistory(teams) {
 			}))
 		};
 
-		database.ref(`users/${currentUserCode}/generateHistory`).push(historyData)
-			.then(() => {
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) commandConsole.log(`✅ 저장 완료`);
+		const historyRef = database.ref(`users/${currentUserCode}/generateHistory`).push();
+		const writePath = `users/${currentUserCode}/generateHistory/${historyRef.key}`;
+
+		console.log('[generateHistory][write:payload]', writePath, historyData);
+
+		historyRef.set(historyData)
+			.then(() => historyRef.once('value'))
+			.then((snapshot) => {
+				const savedData = snapshot.val() || null;
+				console.log('[generateHistory][write:verified]', writePath, savedData);
+				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+					const reservationCount = savedData && savedData.appliedReservation
+						? [
+							...(savedData.appliedReservation.applied || []),
+							...(savedData.appliedReservation.notFound || []),
+							...(savedData.appliedReservation.excluded || [])
+						].length
+						: 0;
+					const rulesCount = savedData && Array.isArray(savedData.appliedRules)
+						? savedData.appliedRules.length
+						: 0;
+					commandConsole.log(`✅ 저장 완료 (${writePath})`);
+					commandConsole.log(`🧪 확인: appliedReservation 항목 ${reservationCount}개, appliedRules ${rulesCount}개`);
+				}
 			})
 			.catch((error) => {
 				console.error('generateHistory 저장 실패:', error);
+				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+					commandConsole.log(`❌ generateHistory 저장 실패: ${error.message || error}`);
+				}
 			});
 	} catch (error) {
 		console.error('generateHistory 저장 실패:', error);
@@ -4493,12 +4674,12 @@ async function startValidationLoop(initialTeams) {
 	
 	// cmd 콘솔에 팀 생성 결과 출력
 	logTeamResultsToConsole(currentTeams);
+
+	// 팀 생성 시 generateHistory 저장 (displayTeams 전에 저장해야 적용 정보가 유지됨)
+	saveGenerateHistory(currentTeams);
 	
 	// 최종 검증된 팀을 결과창에 표시
 	await displayTeams(currentTeams);
-
-	// 팀 생성 시 generateHistory 저장
-	saveGenerateHistory(currentTeams);
 }
 
 // 검증 단계 비교 화면 표시
