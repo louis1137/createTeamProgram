@@ -22,17 +22,17 @@ const commandConsole = {
 		const sendBtn = document.getElementById('commandSendBtn');
 		const toggleBtn = document.getElementById('toggleConsoleBtn');
 		const consoleEl = document.getElementById('commandConsole');
-		const roomKeyDisplay = document.getElementById('roomKeyDisplay');
+		const profileKeyDisplay = document.getElementById('profileKeyDisplay');
 		
-		// key 파라미터가 있을 때 room key 설정 (콘솔은 표시하지 않음)
-		currentRoomKey = getRoomKeyFromURL();
-		if (currentRoomKey) {
-			roomKeyDisplay.textContent = `Profile: ${currentRoomKey}`;
+		// key 파라미터가 있을 때 profile key 설정 (콘솔은 표시하지 않음)
+		currentProfileKey = getProfileKeyFromURL();
+		if (currentProfileKey) {
+			profileKeyDisplay.textContent = `Profile: ${currentProfileKey}`;
 			// 인증 상태면 초록색 배경
 			if (authenticatedPassword) {
-				roomKeyDisplay.classList.add('authenticated');
+				profileKeyDisplay.classList.add('authenticated');
 			} else {
-				roomKeyDisplay.classList.remove('authenticated');
+				profileKeyDisplay.classList.remove('authenticated');
 			}
 			
 			// Firebase 초기화 시도
@@ -119,7 +119,7 @@ const commandConsole = {
 				consoleEl.style.display = 'none';
 				
 				// 상태 초기화 (다시 열었을 때 프로필 입력부터 시작)
-				if (!currentRoomKey) {
+				if (!currentProfileKey) {
 					// 파라미터가 없는 경우에만 초기화 (자동 프로필 프롬프트 비활성화)
 					this.inputMode = 'normal';
 					this.input.type = 'text';
@@ -478,17 +478,17 @@ const commandConsole = {
 	handleConfirmResponse(confirmed) {
 		if (this.inputMode === 'profile-create-confirm') {
 			if (confirmed) {
-				currentRoomKey = this.tempProfile;
+				currentProfileKey = this.tempProfile;
 				
 				const url = new URL(window.location);
 				url.searchParams.set('key', this.tempProfile);
 				window.history.pushState({}, '', url);
 				
-				const roomKeyDisplay = document.getElementById('roomKeyDisplay');
-				if (roomKeyDisplay) {
-					roomKeyDisplay.textContent = `Profile: ${this.tempProfile}`;
+				const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+				if (profileKeyDisplay) {
+					profileKeyDisplay.textContent = `Profile: ${this.tempProfile}`;
 					// 신규 생성 시에는 인증됨
-					roomKeyDisplay.classList.add('authenticated');
+					profileKeyDisplay.classList.add('authenticated');
 				}
 				
 				this.success(`프로필 '${this.tempProfile}' 생성됨`);
@@ -520,8 +520,8 @@ const commandConsole = {
 					timestamp: getCurrentDbTimestamp()
 				};
 				
-				if (database && currentRoomKey) {
-					database.ref(`rooms/${currentRoomKey}`).set(initialData)
+				if (database && currentProfileKey) {
+					database.ref(`profiles/${currentProfileKey}`).set(initialData)
 						.then(() => {
 							this.success(this.comments.syncActivated);
 							this.log(this.comments.passwordCreate);
@@ -541,16 +541,16 @@ const commandConsole = {
 				}
 			} else {
 				// 프로필 생성 취소: 현재 프로필 유지 또는 초기 모드로 돌아가기
-				if (currentRoomKey) {
+				if (currentProfileKey) {
 					// 이미 프로필이 있으면 현재 프로필 유지
-					this.log(this.comments.profileCreateCanceled.replace('{currentRoomKey}', currentRoomKey));
+					this.log(this.comments.profileCreateCanceled.replace('{currentProfileKey}', currentProfileKey));
 
 					// 전환 취소 시 파라미터 없는(프로필 없음) 상태로 전환
 					const url = new URL(window.location);
 					url.searchParams.delete('key');
 					window.history.pushState({}, '', url);
 
-					currentRoomKey = '';
+					currentProfileKey = '';
 
 					// 전환을 취소하면 현재 프로필을 유지하고 명령어 입력 모드로 복귀
 					this.inputMode = 'normal';
@@ -566,13 +566,13 @@ const commandConsole = {
 					url.searchParams.delete('key');
 					window.history.pushState({}, '', url);
 					
-					const roomKeyDisplay = document.getElementById('roomKeyDisplay');
-					if (roomKeyDisplay) {
-						roomKeyDisplay.textContent = 'Profile: -';
-						roomKeyDisplay.classList.remove('authenticated');
+					const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+					if (profileKeyDisplay) {
+						profileKeyDisplay.textContent = 'Profile: -';
+						profileKeyDisplay.classList.remove('authenticated');
 					}
 					
-					currentRoomKey = null;
+					currentProfileKey = null;
 					this.tempProfile = '';
 					this.tempPassword = '';
 					this.storedPassword = null;
@@ -599,7 +599,7 @@ const commandConsole = {
 				setTimeout(() => this.input.focus(), 50);
 			} else {
 				if (database && this.tempProfile) {
-					database.ref(`rooms/${this.tempProfile}/password`).set('').then(() => {
+					database.ref(`profiles/${this.tempProfile}/password`).set('').then(() => {
 						this.success(this.comments.passwordSkipSuccess);
 					}).catch((error) => {
 						this.error(`${this.comments.profileCreateFailed}: ${error.message}`);
@@ -667,8 +667,8 @@ const commandConsole = {
 		} else if (this.inputMode === 'password-delete-confirm') {
 			// 비밀번호 삭제 확인
 			if (confirmed) {
-				if (database && currentRoomKey) {
-					database.ref(`rooms/${currentRoomKey}/password`).set('')
+				if (database && currentProfileKey) {
+					database.ref(`profiles/${currentProfileKey}/password`).set('')
 						.then(() => {
 							this.success(this.comments.passwordDeleted);
 							this.storedPassword = ''; // 저장된 비밀번호 초기화
@@ -813,7 +813,7 @@ const commandConsole = {
 			}
 			
 			// 현재 프로필과 동일한 이름을 입력한 경우
-			if (cmd === currentRoomKey) {
+			if (cmd === currentProfileKey) {
 				this.log(this.comments.profileKeepCurrent);
 				this.inputMode = 'normal';
 				this.input.type = 'text';
@@ -821,25 +821,25 @@ const commandConsole = {
 				return;
 			}
 			
-			// 프로필 전체 데이터 확인 (rooms + users)
+			// 프로필 전체 데이터 확인 (profiles + users)
 			Promise.all([
-				database.ref(`rooms/${cmd}`).once('value'),
+				database.ref(`profiles/${cmd}`).once('value'),
 				database.ref(`users/${cmd}`).once('value')
-			]).then(([roomSnapshot, userSnapshot]) => {
-				const roomData = roomSnapshot.val();
+			]).then(([profileSnapshot, userSnapshot]) => {
+				const profileNodeData = profileSnapshot.val();
 				const userData = userSnapshot.val();
-				const usingUserProfile = roomData === null && userData !== null;
-				const profileData = roomData !== null ? roomData : userData;
+				const usingUserProfile = profileNodeData === null && userData !== null;
+				const profileData = profileNodeData !== null ? profileNodeData : userData;
 				const isProfileSwitch = this.inputMode === 'profile-switch';
 				
 				// 프로필이 존재하는지 확인 (password 또는 다른 데이터가 있으면 존재)
 				if (profileData !== null) {
 					if (typeof setCurrentProfileSource === 'function') {
-						setCurrentProfileSource(usingUserProfile ? 'users' : 'rooms');
+						setCurrentProfileSource(usingUserProfile ? 'users' : 'profiles');
 					}
 					const password = profileData.password || '';
 					this.tempProfile = cmd;
-					currentRoomKey = cmd;
+					currentProfileKey = cmd;
 					this.storedPassword = password;
 					this.authenticated = false;
 					authenticatedPassword = ''; // 프로필 전환 시 인증 초기화
@@ -848,11 +848,11 @@ const commandConsole = {
 					url.searchParams.set('key', cmd);
 					window.history.pushState({}, '', url);
 					
-					const roomKeyDisplay = document.getElementById('roomKeyDisplay');
-					if (roomKeyDisplay) {
-						roomKeyDisplay.textContent = `Profile: ${cmd}`;
+					const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+					if (profileKeyDisplay) {
+						profileKeyDisplay.textContent = `Profile: ${cmd}`;
 						// 프로필 전환 시에는 항상 인증되지 않은 상태
-						roomKeyDisplay.classList.remove('authenticated');
+						profileKeyDisplay.classList.remove('authenticated');
 					}
 					
 					if (isProfileSwitch) {
@@ -869,7 +869,7 @@ const commandConsole = {
 							}
 							
 							// 데이터 로드 및 자동 동기화 설정
-							database.ref(`rooms/${currentRoomKey}`).once('value')
+							database.ref(`profiles/${currentProfileKey}`).once('value')
 								.then((snapshot) => {
 									const data = snapshot.val();
 									if (data && (data.people || data.timestamp)) {
@@ -895,7 +895,7 @@ const commandConsole = {
 							}
 							
 							// 데이터 먼저 로드
-							database.ref(`rooms/${currentRoomKey}`).once('value')
+							database.ref(`profiles/${currentProfileKey}`).once('value')
 								.then((snapshot) => {
 									const data = snapshot.val();
 									if (data && (data.people || data.timestamp)) {
@@ -925,7 +925,7 @@ const commandConsole = {
 						}
 						
 						// 데이터 먼저 로드
-						database.ref(`rooms/${currentRoomKey}`).once('value')
+						database.ref(`profiles/${currentProfileKey}`).once('value')
 							.then((snapshot) => {
 								const data = snapshot.val();
 								if (data && (data.people || data.timestamp)) {
@@ -976,9 +976,9 @@ const commandConsole = {
 				this.removeCancelButton();
 				
 				// 프로필 배경색 업데이트
-				const roomKeyDisplay = document.getElementById('roomKeyDisplay');
-				if (roomKeyDisplay) {
-					roomKeyDisplay.classList.add('authenticated');
+				const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+				if (profileKeyDisplay) {
+					profileKeyDisplay.classList.add('authenticated');
 				}
 				
 				// 동기화가 비활성화되어 있으면 활성화
@@ -988,7 +988,7 @@ const commandConsole = {
 				}
 				
 				// 프로필 전환 모드든 초기 접속 모드든 데이터 로드
-				database.ref(`rooms/${currentRoomKey}`).once('value')
+				database.ref(`profiles/${currentProfileKey}`).once('value')
 					.then((snapshot) => {
 						const data = snapshot.val();
 						if (data && (data.people || data.timestamp)) {
@@ -1033,8 +1033,8 @@ const commandConsole = {
 		// 두 번째 비밀번호 입력 및 확인
 		if (cmd === this.tempPassword) {
 			// 비밀번호 일치
-			if (database && currentRoomKey) {
-				database.ref(`rooms/${currentRoomKey}/password`).set(this.tempPassword)
+			if (database && currentProfileKey) {
+				database.ref(`profiles/${currentProfileKey}/password`).set(this.tempPassword)
 					.then(() => {
 					this.success(this.comments.passwordSet);
 						this.authenticated = true;
@@ -1100,8 +1100,8 @@ const commandConsole = {
 	if (this.inputMode === 'password-change-confirm') {
 		// 3단계: 새 비밀번호 확인
 		if (cmd === this.tempPassword) {
-			if (database && currentRoomKey) {
-				database.ref(`rooms/${currentRoomKey}/password`).set(this.tempPassword)
+			if (database && currentProfileKey) {
+				database.ref(`profiles/${currentProfileKey}/password`).set(this.tempPassword)
 					.then(() => {
 						this.success(this.comments.passwordChanged);
 						this.storedPassword = this.tempPassword; // 저장된 비밀번호 업데이트
@@ -1162,16 +1162,16 @@ const commandConsole = {
 		
 	if (this.inputMode === 'delete-final-confirm') {
 		// 최종 확인: 프로필 이름 일치 확인
-		if (cmd === currentRoomKey) {
+		if (cmd === currentProfileKey) {
 			// Firebase에서 프로필 삭제
-			database.ref(`rooms/${currentRoomKey}`).remove()
+			database.ref(`profiles/${currentProfileKey}`).remove()
 				.then(() => {
-					this.success(`✅ ${this.comments.profileDeleted.replace('프로필이', `프로필 '${currentRoomKey}'가`).replace('삭제되었습니다', '완전히 삭제되었습니다')}`);
+					this.success(`✅ ${this.comments.profileDeleted.replace('프로필이', `프로필 '${currentProfileKey}'가`).replace('삭제되었습니다', '완전히 삭제되었습니다')}`);
 					this.log(this.comments.deleteRedirect);
 					
 					// 로컬 상태 초기화
 					clearState();
-					currentRoomKey = null;
+					currentProfileKey = null;
 					syncEnabled = false;
 					
 					// 2초 후 index.html로 리다이렉트
@@ -1192,7 +1192,7 @@ const commandConsole = {
 		return;
 	}
 		
-	if (!this.authenticated && currentRoomKey) {
+	if (!this.authenticated && currentProfileKey) {
 		// 읽기 모드에서는 save와 입력 관련 명령어만 차단
 		const [command] = cmd.split(' ');
 		const writeCommands = ['save', '저장', 'input', '입력', 'clear', '초기화'];
@@ -1293,7 +1293,7 @@ const commandConsole = {
 	},
 
 	saveCommand() {
-		if (!syncEnabled || !currentRoomKey) {
+		if (!syncEnabled || !currentProfileKey) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
@@ -1308,7 +1308,7 @@ const commandConsole = {
 				return Promise.resolve();
 			}
 
-			return resolveProfileRecord(currentRoomKey)
+			return resolveProfileRecord(currentProfileKey)
 				.then((result) => {
 					if (result && result.source === 'users' && typeof setCurrentProfileSource === 'function') {
 						setCurrentProfileSource('users');
@@ -1322,7 +1322,7 @@ const commandConsole = {
 		}
 		
 		ensureProfileSourceForSave()
-		.then(() => database.ref(`rooms/${currentRoomKey}/password`).once('value'))
+		.then(() => database.ref(`profiles/${currentProfileKey}/password`).once('value'))
 		.then((snapshot) => {
 			const currentPassword = snapshot.val();
 			
@@ -1351,7 +1351,7 @@ const commandConsole = {
 				data.password = currentPassword;
 			}
 			
-			return database.ref(`rooms/${currentRoomKey}`).set(data);
+			return database.ref(`profiles/${currentProfileKey}`).set(data);
 		})
 		.then(() => {
 			this.success(this.comments.saveComplete);
@@ -1374,7 +1374,7 @@ const commandConsole = {
 },
 
 loadCommand(profileName = '') {
-		if (!currentRoomKey) {
+		if (!currentProfileKey) {
 			this.error('⚠️ 현재 프로필이 없어서 실행할 수 없습니다. 먼저 프로필을 선택하세요.');
 			return;
 		}
@@ -1382,7 +1382,7 @@ loadCommand(profileName = '') {
 		const targetProfile = (profileName || '').trim();
 		const ensureSource = (profileKey) => {
 			if (typeof resolveProfileRecord !== 'function') {
-				return Promise.resolve({ exists: true, source: 'rooms', data: null });
+				return Promise.resolve({ exists: true, source: 'profiles', data: null });
 			}
 			return resolveProfileRecord(profileKey)
 				.then((result) => {
@@ -1394,8 +1394,8 @@ loadCommand(profileName = '') {
 		};
 		
 		if (!targetProfile) {
-			ensureSource(currentRoomKey)
-				.then(() => database.ref(`rooms/${currentRoomKey}`).once('value'))
+			ensureSource(currentProfileKey)
+				.then(() => database.ref(`profiles/${currentProfileKey}`).once('value'))
 				.then((snapshot) => {
 					const data = snapshot.val();
 					if (data) {
@@ -1451,7 +1451,7 @@ loadCommand(profileName = '') {
 	},
 	
 	syncCommand(args) {
-		if (!syncEnabled || !currentRoomKey) {
+		if (!syncEnabled || !currentProfileKey) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
@@ -1521,7 +1521,7 @@ loadCommand(profileName = '') {
 		}
 		
 		// 먼저 현재 상태를 저장
-		database.ref(`rooms/${currentRoomKey}/password`).once('value')
+		database.ref(`profiles/${currentProfileKey}/password`).once('value')
 			.then((snapshot) => {
 				const currentPassword = snapshot.val();
 				
@@ -1550,7 +1550,7 @@ loadCommand(profileName = '') {
 					data.password = currentPassword;
 				}
 				
-				return database.ref(`rooms/${currentRoomKey}`).set(data);
+				return database.ref(`profiles/${currentProfileKey}`).set(data);
 			})
 			.then(() => {
 				// 동기화 트리거를 Firebase에 기록하여 모든 창에 알림
@@ -1561,11 +1561,11 @@ loadCommand(profileName = '') {
 					lastSyncTrigger = syncTrigger;
 				}
 				
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 현재 창에서도 동기화 실행
-				return database.ref(`rooms/${currentRoomKey}`).once('value');
+				return database.ref(`profiles/${currentProfileKey}`).once('value');
 			})
 			.then((snapshot) => {
 				const data = snapshot.val();
@@ -1606,7 +1606,7 @@ loadCommand(profileName = '') {
 			return;
 		}
 		
-		database.ref(`rooms/${currentRoomKey}`).once('value')
+		database.ref(`profiles/${currentProfileKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
 				
@@ -1620,23 +1620,23 @@ loadCommand(profileName = '') {
 					timestamp: getCurrentDbTimestamp()
 				};
 				
-				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+				return database.ref(`profiles/${currentProfileKey}`).update(updates);
 			})
 			.then(() => {
 				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'rule' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 규칙 데이터만 다시 로드
 				return Promise.all([
-					database.ref(`rooms/${currentRoomKey}/hiddenGroups`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/hiddenGroupChains`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/pendingHiddenGroups`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/pendingHiddenGroupChains`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/probabilisticForbiddenPairs`).once('value')
+					database.ref(`profiles/${currentProfileKey}/hiddenGroups`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/hiddenGroupChains`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/pendingHiddenGroups`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/pendingHiddenGroupChains`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/probabilisticForbiddenPairs`).once('value')
 				]);
 			})
 			.then(([hiddenGroupsSnap, hiddenGroupChainsSnap, pendingHiddenGroupsSnap, pendingHiddenGroupChainsSnap, probabilisticForbiddenPairsSnap]) => {
@@ -1664,7 +1664,7 @@ loadCommand(profileName = '') {
 			return;
 		}
 		
-		database.ref(`rooms/${currentRoomKey}`).once('value')
+		database.ref(`profiles/${currentProfileKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
 				
@@ -1677,22 +1677,22 @@ loadCommand(profileName = '') {
 					timestamp: getCurrentDbTimestamp()
 				};
 				
-				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+				return database.ref(`profiles/${currentProfileKey}`).update(updates);
 			})
 			.then(() => {
 				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'option' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 옵션 데이터만 다시 로드
 				return Promise.all([
-					database.ref(`rooms/${currentRoomKey}/maxTeamSizeEnabled`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/genderBalanceEnabled`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/weightBalanceEnabled`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/membersPerTeam`).once('value')
+					database.ref(`profiles/${currentProfileKey}/maxTeamSizeEnabled`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/genderBalanceEnabled`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/weightBalanceEnabled`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/membersPerTeam`).once('value')
 				]);
 			})
 			.then(([maxTeamSizeSnap, genderBalanceSnap, weightBalanceSnap, membersPerTeamSnap]) => {
@@ -1717,7 +1717,7 @@ loadCommand(profileName = '') {
 	
 	// 참가자만 동기화
 	syncMemberCommand() {
-		database.ref(`rooms/${currentRoomKey}`).once('value')
+		database.ref(`profiles/${currentProfileKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
 				
@@ -1728,20 +1728,20 @@ loadCommand(profileName = '') {
 					timestamp: getCurrentDbTimestamp()
 				};
 				
-				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+				return database.ref(`profiles/${currentProfileKey}`).update(updates);
 			})
 			.then(() => {
 				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'member' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 참가자 데이터만 다시 로드
 				return Promise.all([
-					database.ref(`rooms/${currentRoomKey}/people`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/nextId`).once('value')
+					database.ref(`profiles/${currentProfileKey}/people`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/nextId`).once('value')
 				]);
 			})
 			.then(([peopleSnap, nextIdSnap]) => {
@@ -1762,7 +1762,7 @@ loadCommand(profileName = '') {
 	
 	// 미참가자만 동기화
 	syncPeopleCommand() {
-		database.ref(`rooms/${currentRoomKey}`).once('value')
+		database.ref(`profiles/${currentProfileKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
 				
@@ -1772,18 +1772,18 @@ loadCommand(profileName = '') {
 					timestamp: getCurrentDbTimestamp()
 				};
 				
-				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+				return database.ref(`profiles/${currentProfileKey}`).update(updates);
 			})
 			.then(() => {
 				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'people' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 미참가자 데이터만 다시 로드
-				return database.ref(`rooms/${currentRoomKey}/inactivePeople`).once('value');
+				return database.ref(`profiles/${currentProfileKey}/inactivePeople`).once('value');
 			})
 			.then((snapshot) => {
 				// 미참가자 데이터만 state에 반영
@@ -1801,7 +1801,7 @@ loadCommand(profileName = '') {
 	
 	// 제약만 동기화
 	syncConstraintCommand() {
-		database.ref(`rooms/${currentRoomKey}`).once('value')
+		database.ref(`profiles/${currentProfileKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
 				
@@ -1813,21 +1813,21 @@ loadCommand(profileName = '') {
 					timestamp: getCurrentDbTimestamp()
 				};
 				
-				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+				return database.ref(`profiles/${currentProfileKey}`).update(updates);
 			})
 			.then(() => {
 				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'constraint' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 제약 데이터만 다시 로드
 				return Promise.all([
-					database.ref(`rooms/${currentRoomKey}/requiredGroups`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/forbiddenPairs`).once('value'),
-					database.ref(`rooms/${currentRoomKey}/pendingConstraints`).once('value')
+					database.ref(`profiles/${currentProfileKey}/requiredGroups`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/forbiddenPairs`).once('value'),
+					database.ref(`profiles/${currentProfileKey}/pendingConstraints`).once('value')
 				]);
 			})
 			.then(([requiredGroupsSnap, forbiddenPairsSnap, pendingConstraintsSnap]) => {
@@ -1855,7 +1855,7 @@ loadCommand(profileName = '') {
 			return;
 		}
 		
-		database.ref(`rooms/${currentRoomKey}`).once('value')
+		database.ref(`profiles/${currentProfileKey}`).once('value')
 			.then((snapshot) => {
 				const existingData = snapshot.val() || {};
 				
@@ -1865,18 +1865,18 @@ loadCommand(profileName = '') {
 					timestamp: getCurrentDbTimestamp()
 				};
 				
-				return database.ref(`rooms/${currentRoomKey}`).update(updates);
+				return database.ref(`profiles/${currentProfileKey}`).update(updates);
 			})
 			.then(() => {
 				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'reservation' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 예약 데이터만 다시 로드
-				return database.ref(`rooms/${currentRoomKey}/reservations`).once('value');
+				return database.ref(`profiles/${currentProfileKey}/reservations`).once('value');
 			})
 			.then((snapshot) => {
 				// 예약 데이터만 state에 반영
@@ -1890,7 +1890,7 @@ loadCommand(profileName = '') {
 	},
 	
 	clearCommand(args = '') {
-		if (!syncEnabled || !currentRoomKey) {
+		if (!syncEnabled || !currentProfileKey) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
@@ -1906,7 +1906,7 @@ loadCommand(profileName = '') {
 			}
 			
 			// 비밀번호 백업
-			database.ref(`rooms/${currentRoomKey}/password`).once('value')
+			database.ref(`profiles/${currentProfileKey}/password`).once('value')
 				.then((snapshot) => {
 					const savedPassword = snapshot.val();
 					
@@ -1931,7 +1931,7 @@ loadCommand(profileName = '') {
 						password: savedPassword !== null ? savedPassword : '',
 						timestamp: getCurrentDbTimestamp()
 					};
-					return database.ref(`rooms/${currentRoomKey}`).set(emptyData);
+					return database.ref(`profiles/${currentProfileKey}`).set(emptyData);
 				})
 				.then(() => {
 					// 로컬 state 초기화
@@ -2072,7 +2072,7 @@ loadCommand(profileName = '') {
 			window.lastReservationChangeByMe = true;
 		}
 		
-		database.ref(`rooms/${currentRoomKey}`).update(updateData)
+		database.ref(`profiles/${currentProfileKey}`).update(updateData)
 			.then(() => {
 				this.success('🗑️ 선택한 항목이 초기화되었습니다.');
 			})
@@ -2095,7 +2095,7 @@ loadCommand(profileName = '') {
 		const reservationCount = state.reservations?.length || 0;
 		const statusLines = [
 			'=== 현재 상태 ===',
-			`Room Key: ${currentRoomKey || '없음'}`,
+			`Profile Key: ${currentProfileKey || '없음'}`,
 			`Firebase: ${syncEnabled ? '활성화' : '비활성화'}`,
 			`참가자: ${state.people.length}명 <code data-cmd="참가자">참가자</code>`,
 			`미참가자: ${state.inactivePeople.length}명 <code data-cmd="미참가자">미참가자</code>`,
@@ -2154,7 +2154,7 @@ loadCommand(profileName = '') {
 	},
 	
 	loginCommand() {
-		if (!currentRoomKey) {
+		if (!currentProfileKey) {
 			this.error('⚠️ 현재 프로필이 없어서 실행할 수 없습니다. 먼저 프로필을 선택하세요.');
 			return;
 		}
@@ -2179,7 +2179,7 @@ loadCommand(profileName = '') {
 	},
 	
 	logoutCommand() {
-		if (!currentRoomKey) {
+		if (!currentProfileKey) {
 			this.error('⚠️ 현재 프로필이 없어서 실행할 수 없습니다. 먼저 프로필을 선택하세요.');
 			return;
 		}
@@ -2199,9 +2199,9 @@ loadCommand(profileName = '') {
 		authenticatedPassword = ''; // 인증 해제
 		
 		// 프로필 배경색 업데이트
-		const roomKeyDisplay = document.getElementById('roomKeyDisplay');
-		if (roomKeyDisplay) {
-			roomKeyDisplay.classList.remove('authenticated');
+		const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+		if (profileKeyDisplay) {
+			profileKeyDisplay.classList.remove('authenticated');
 		}
 		
 		this.success(this.comments.logoutSuccess);
@@ -2700,7 +2700,7 @@ loadCommand(profileName = '') {
 	},
 	
 	deleteCommand() {
-		if (!syncEnabled || !currentRoomKey) {
+		if (!syncEnabled || !currentProfileKey) {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
@@ -2711,7 +2711,7 @@ loadCommand(profileName = '') {
 			return;
 		}
 		
-		this.warn(this.comments.profileDeleteAttemptMessage.replace('{profile}', currentRoomKey));
+		this.warn(this.comments.profileDeleteAttemptMessage.replace('{profile}', currentProfileKey));
 		this.warn(this.comments.deleteWarning);
 		
 		// 비밀번호가 있는지 확인

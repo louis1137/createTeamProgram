@@ -137,16 +137,16 @@ function init() {
 	setTeamAnimDurationFromDelay();
 
 	// localStorage에서 데이터 복원 (프로필이 없을 경우에만)
-	if (!currentRoomKey) {
+	if (!currentProfileKey) {
 		loadFromLocalStorage();
 	} else if (database) {
-		// 프로필이 있는 경우 Firebase에서 데이터 즉시 로드 (rooms + users 동시 확인)
-		resolveProfileRecord(currentRoomKey)
+		// 프로필이 있는 경우 Firebase에서 데이터 즉시 로드 (profiles + users 동시 확인)
+		resolveProfileRecord(currentProfileKey)
 			.then((result) => {
 				const data = result.data;
 				if (data && (data.people || data.timestamp)) {
 					loadStateFromData(data);
-					console.log(commandConsoleMessages.comments.profileLoaded.replace('{profile}', currentRoomKey).replace('{count}', state.people.length));
+					console.log(commandConsoleMessages.comments.profileLoaded.replace('{profile}', currentProfileKey).replace('{count}', state.people.length));
 				}
 				setupRealtimeSync();
 			})
@@ -216,21 +216,21 @@ function checkDevToolsAndOpenConsole() {
 				if (toggleBtn) toggleBtn.textContent = '−';
 				
 				if (commandConsole.output) {
-					if (currentRoomKey) {
+					if (currentProfileKey) {
 						// 프로필이 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 						if (commandConsole.authenticated) {
-							commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentRoomKey));
+							commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentProfileKey));
 							commandConsole.log(commandConsoleMessages.comments.syncActivated);
 							commandConsole.log(commandConsoleMessages.comments.consoleReady);
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else if (database) {
 							// 아직 인증되지 않았다면 비밀번호 확인
-							resolveProfileRecord(currentRoomKey)
+							resolveProfileRecord(currentProfileKey)
 								.then((result) => {
 									if (!result.exists) {
-										commandConsole.tempProfile = currentRoomKey;
-										commandConsole.warn(commandConsoleMessages.comments.profileNotFoundInitial.replace('{profile}', currentRoomKey));
-										commandConsole.log(commandConsoleMessages.comments.profileCreateNew.replace('{profile}', currentRoomKey));
+										commandConsole.tempProfile = currentProfileKey;
+										commandConsole.warn(commandConsoleMessages.comments.profileNotFoundInitial.replace('{profile}', currentProfileKey));
+										commandConsole.log(commandConsoleMessages.comments.profileCreateNew.replace('{profile}', currentProfileKey));
 										commandConsole.inputMode = 'profile-create-confirm';
 										commandConsole.showConfirmButtons();
 										return;
@@ -244,7 +244,7 @@ function checkDevToolsAndOpenConsole() {
 										if (data && (data.people || data.timestamp)) {
 											loadStateFromData(data);
 										} else {
-											logProfileConsole(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`);
+											logProfileConsole(`📡 프로필 '${currentProfileKey}' 로드됨 (초기 상태)`);
 										}
 										commandConsole.log('🔄 실시간 동기화 활성화됨');
 										setupRealtimeSync();
@@ -255,9 +255,9 @@ function checkDevToolsAndOpenConsole() {
 										commandConsole.authenticated = false;
 										if (data && (data.people || data.timestamp)) {
 											loadStateFromData(data);
-											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`);
+											logProfileConsole(`📡 프로필 '${currentProfileKey}' 발견 (참가자: ${state.people.length}명)`);
 										} else {
-											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`);
+											logProfileConsole(`📡 프로필 '${currentProfileKey}' 발견 (초기 상태)`);
 										}
 										commandConsole.log('🔄 실시간 동기화 활성화됨');
 										setupRealtimeSync();
@@ -767,7 +767,7 @@ function handleDuplicateCancel() {
 function saveToLocalStorage() {
 	try {
 		// key 모드에서는 자동 저장하지 않음 (save 명령으로만 저장)
-		if (currentRoomKey) return;
+		if (currentProfileKey) return;
 
 		if (!database && !initFirebase()) return;
 		if (!currentUserCode) return;
@@ -813,7 +813,7 @@ function loadFromLocalStorage() {
 	
 	try {
 		// key 모드에서는 자동 복원을 사용하지 않음
-		if (currentRoomKey) return;
+		if (currentProfileKey) return;
 
 		if (!database && !initFirebase()) return;
 		if (!currentUserCode) return;
@@ -1332,10 +1332,10 @@ function addPerson(fromConsole = false, options = {}) {
 			elements.nameInput.value = '';
 			
 			if (commandConsole.output) {
-				if (currentRoomKey) {
+				if (currentProfileKey) {
 					// 파라미터가 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
 					if (commandConsole.authenticated) {
-						commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentRoomKey));
+						commandConsole.log(commandConsoleMessages.comments.profileConnectedAuth.replace('{profile}', currentProfileKey));
 						commandConsole.log(commandConsoleMessages.comments.consoleReady);
 						setTimeout(() => commandConsole.input.focus(), 100);
 					} else if (database) {
@@ -1343,17 +1343,17 @@ function addPerson(fromConsole = false, options = {}) {
 						if (commandConsole.storedPassword !== null && commandConsole.storedPassword !== undefined) {
 							// 읽기 전용 모드로 진입
 							commandConsole.authenticated = false;
-							commandConsole.log(commandConsoleMessages.comments.profileConnectedReadOnly.replace('{profile}', currentRoomKey));
+							commandConsole.log(commandConsoleMessages.comments.profileConnectedReadOnly.replace('{profile}', currentProfileKey));
 							commandConsole.log(commandConsoleMessages.comments.writeLoginRequired);
 							commandConsole.log(commandConsoleMessages.comments.consoleReady);
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else {
 							// 최초 cmd 입력 시 - 비밀번호 확인
-							resolveProfileRecord(currentRoomKey)
+							resolveProfileRecord(currentProfileKey)
 								.then((result) => {
 									if (!result.exists) {
-										commandConsole.tempProfile = currentRoomKey;
-										commandConsole.warn(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`);
+										commandConsole.tempProfile = currentProfileKey;
+										commandConsole.warn(`⚠️ '${currentProfileKey}'는 존재하지 않는 프로필입니다.`);
 										commandConsole.log(commandConsoleMessages.comments.registerNewProfile);
 										commandConsole.inputMode = 'profile-create-confirm';
 										commandConsole.showConfirmButtons();
@@ -1369,7 +1369,7 @@ function addPerson(fromConsole = false, options = {}) {
 										if (data && (data.people || data.timestamp)) {
 											loadStateFromData(data);
 										} else {
-											logProfileConsole(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`);
+											logProfileConsole(`📡 프로필 '${currentProfileKey}' 로드됨 (초기 상태)`);
 										}
 										commandConsole.log('🔄 실시간 동기화 활성화됨');
 										setupRealtimeSync();
@@ -1380,9 +1380,9 @@ function addPerson(fromConsole = false, options = {}) {
 										commandConsole.authenticated = false;
 										if (data && (data.people || data.timestamp)) {
 											loadStateFromData(data);
-											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`);
+											logProfileConsole(`📡 프로필 '${currentProfileKey}' 발견 (참가자: ${state.people.length}명)`);
 										} else {
-											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`);
+											logProfileConsole(`📡 프로필 '${currentProfileKey}' 발견 (초기 상태)`);
 										}
 										commandConsole.log('🔄 실시간 동기화 활성화됨');
 										setupRealtimeSync();
@@ -3372,19 +3372,19 @@ function shuffleTeams() {
 	}
 	
 	// Firebase에 예약 소모 반영
-	if (consumedReservation && syncEnabled && currentRoomKey) {
+	if (consumedReservation && syncEnabled && currentProfileKey) {
 		// 자신이 예약을 소모했다는 플래그 설정 (Firebase 리스너가 알림을 보내지 않도록)
 		if (typeof window !== 'undefined') {
 			window.lastReservationChangeByMe = true;
 		}
-		database.ref(`rooms/${currentRoomKey}/reservations`).set(state.reservations)
+		database.ref(`profiles/${currentProfileKey}/reservations`).set(state.reservations)
 			.then(() => {
 				// syncTrigger 설정하여 다른 창에 알림
 				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'reservation' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
-				return database.ref(`rooms/${currentRoomKey}/syncTrigger`).set(syncTrigger);
+				return database.ref(`profiles/${currentProfileKey}/syncTrigger`).set(syncTrigger);
 			})
 			.then(() => {
 				// 약간의 지연 후 플래그 해제
@@ -4371,7 +4371,7 @@ function saveGenerateHistory(teams) {
 		const timestamp = getCurrentDbTimestamp();
 		const historyData = {
 			createdAt: timestamp,
-			profile: currentRoomKey || '',
+			profile: currentProfileKey || '',
 			teams: teams.map(team => team.map(person => {
 				const details = [];
 				if (state.genderBalanceEnabled && person.gender) {

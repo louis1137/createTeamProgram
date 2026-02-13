@@ -34,7 +34,7 @@ const commandConsoleMessages = {
 		'</tr></thead>' +
 		'<tbody style="font-size: 14px;">' +
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="load">load</code> / <code data-cmd="불러오기">불러오기</code></td><td style="padding: 10px;">서버에 저장된 데이터를 불러옵니다. 최신 저장 상태로 복원되며, 화면이 자동으로 업데이트됩니다.</td></tr>' +
-		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="status">status</code> / <code data-cmd="상태">상태</code></td><td style="padding: 10px;">현재 Room Key, Firebase 연결 상태, 참가자 수, 미참가자 수, 제약 조건 개수 등 현재 상태를 확인합니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="status">status</code> / <code data-cmd="상태">상태</code></td><td style="padding: 10px;">현재 Profile Key, Firebase 연결 상태, 참가자 수, 미참가자 수, 제약 조건 개수 등 현재 상태를 확인합니다.</td></tr>' +
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="login">login</code> / <code data-cmd="로그인">로그인</code></td><td style="padding: 10px;">읽기 전용 모드에서 쓰기 모드로 전환합니다. 비밀번호를 입력하여 인증하면 데이터 수정이 가능합니다.</td></tr>' +
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="logout">logout</code> / <code data-cmd="종료">종료</code></td><td style="padding: 10px;">쓰기 모드에서 읽기 전용 모드로 전환합니다. 데이터를 읽을 수만 있고 수정할 수 없습니다.</td></tr>' +
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="profile">profile</code> / <code data-cmd="프로필">프로필</code></td><td style="padding: 10px;">다른 프로필로 전환합니다. 프로필 이름을 입력하면 해당 프로필의 데이터를 불러옵니다.</td></tr>' +
@@ -56,7 +56,7 @@ const commandConsoleMessages = {
 		'<th style="padding: 12px; text-align: left; color: #f59e0b; font-weight: bold;">설명</th>' +
 		'</tr></thead>' +
 		'<tbody style="font-size: 14px;">' +
-		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="save">save</code> / <code data-cmd="저장">저장</code></td><td style="padding: 10px;">현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다. 동일한 Room Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.</td></tr>' +
+		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="save">save</code> / <code data-cmd="저장">저장</code></td><td style="padding: 10px;">현재 참가자, 미참가자, 제약 조건, 설정 등 모든 상태를 서버에 저장합니다. 동일한 Profile Key로 접속한 다른 사용자들과 실시간으로 공유됩니다.</td></tr>' +
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync">sync</code> / <code data-cmd="동기화">동기화</code></td><td style="padding: 10px;">서버의 최신 데이터를 불러와 현재 화면과 동기화합니다. 다른 사용자가 변경한 내용을 즉시 반영합니다.</td></tr>' +
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync rule">sync rule</code> / <code data-cmd="동기화 규칙">동기화 규칙</code></td><td style="padding: 10px;">확률 규칙만 서버에 저장하고 동기화합니다.</td></tr>' +
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="sync option">sync option</code> / <code data-cmd="동기화 옵션">동기화 옵션</code></td><td style="padding: 10px;">팀 생성 옵션만 서버에 저장하고 동기화합니다. (최대인원, 성별균형, 가중치균형, 팀 인원수)</td></tr>' +
@@ -152,7 +152,7 @@ const commandConsoleMessages = {
 		writeLoginRequired: '💡 쓰기 권한이 필요하면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.',
 		
 		// --- Firebase/저장/동기화 관련 ---
-		firebaseMissing: '⚠️ Firebase가 설정되지 않았거나 Room Key가 없습니다.',
+		firebaseMissing: '⚠️ Firebase가 설정되지 않았거나 Profile Key가 없습니다.',
 		firebaseInitFailed: 'Firebase 초기화에 실패했습니다',
 		saving: '💾 저장 중...',
 		saveComplete: '💾 저장 완료!',

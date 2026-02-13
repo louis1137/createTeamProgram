@@ -14,14 +14,14 @@ const firebaseConfig = {
 
 let firebaseApp = null;
 let database = null;
-let currentRoomKey = null;
-let currentProfileSource = 'rooms';
+let currentProfileKey = null;
+let currentProfileSource = 'profiles';
 let currentUserCode = null;
 let syncEnabled = false;
 let authenticatedPassword = ''; // 인증된 비밀번호 저장
 
 function setCurrentProfileSource(source) {
-	currentProfileSource = source === 'users' ? 'users' : 'rooms';
+	currentProfileSource = source === 'users' ? 'users' : 'profiles';
 }
 
 function getCurrentProfileSource() {
@@ -30,19 +30,19 @@ function getCurrentProfileSource() {
 
 function resolveProfileRecord(profileKey) {
 	if (!database || !profileKey) {
-		return Promise.resolve({ exists: false, source: 'rooms', data: null });
+		return Promise.resolve({ exists: false, source: 'profiles', data: null });
 	}
 
 	return Promise.all([
-		database.ref(`rooms/${profileKey}`).once('value'),
+		database.ref(`profiles/${profileKey}`).once('value'),
 		database.ref(`users/${profileKey}`).once('value')
-	]).then(([roomSnapshot, userSnapshot]) => {
-		const roomData = roomSnapshot.val();
+	]).then(([profileSnapshot, userSnapshot]) => {
+		const profileData = profileSnapshot.val();
 		const userData = userSnapshot.val();
 
-		if (roomData !== null) {
-			setCurrentProfileSource('rooms');
-			return { exists: true, source: 'rooms', data: roomData };
+		if (profileData !== null) {
+			setCurrentProfileSource('profiles');
+			return { exists: true, source: 'profiles', data: profileData };
 		}
 
 		if (userData !== null) {
@@ -50,8 +50,8 @@ function resolveProfileRecord(profileKey) {
 			return { exists: true, source: 'users', data: userData };
 		}
 
-		setCurrentProfileSource('rooms');
-		return { exists: false, source: 'rooms', data: null };
+		setCurrentProfileSource('profiles');
+		return { exists: false, source: 'profiles', data: null };
 	});
 }
 
@@ -119,7 +119,7 @@ function ensureUserRecord() {
 }
 
 // URL 파라미터에서 key 읽기
-function getRoomKeyFromURL() {
+function getProfileKeyFromURL() {
 	const params = new URLSearchParams(window.location.search);
 	return params.get('key');
 }
@@ -140,13 +140,13 @@ function initFirebase() {
 			const originalRef = database.ref.bind(database);
 			database.ref = (path) => {
 				if (typeof path !== 'string') return originalRef(path);
-				if (currentProfileSource === 'users' && currentRoomKey) {
-					const roomPrefix = `rooms/${currentRoomKey}`;
-					if (path === roomPrefix) {
-						return originalRef(`users/${currentRoomKey}`);
+				if (currentProfileSource === 'users' && currentProfileKey) {
+					const profilePrefix = `profiles/${currentProfileKey}`;
+					if (path === profilePrefix) {
+						return originalRef(`users/${currentProfileKey}`);
 					}
-					if (path.startsWith(`${roomPrefix}/`)) {
-						return originalRef(`users/${currentRoomKey}/${path.slice(roomPrefix.length + 1)}`);
+					if (path.startsWith(`${profilePrefix}/`)) {
+						return originalRef(`users/${currentProfileKey}/${path.slice(profilePrefix.length + 1)}`);
 					}
 				}
 				return originalRef(path);
@@ -155,8 +155,8 @@ function initFirebase() {
 			console.log('⚙️ 참가자 입력란에 \'cmd\' 또는 \'command\'를 입력하면 다양한 기능을 사용할 수 있습니다.');
 			
 			// URL에서 프로필 키 읽기
-			currentRoomKey = getRoomKeyFromURL();
-			setCurrentProfileSource('rooms');
+			currentProfileKey = getProfileKeyFromURL();
+			setCurrentProfileSource('profiles');
 			currentUserCode = getUserCode();
 			ensureUserRecord();
 
@@ -185,7 +185,7 @@ let syncListenerAttached = false; // 리스너 중복 등록 방지
 
 // 실시간 동기화 설정
 function setupRealtimeSync() {
-	if (!database || !currentRoomKey) return;
+	if (!database || !currentProfileKey) return;
 	
 	// 이미 리스너가 등록되어 있으면 중복 등록 방지
 	if (syncListenerAttached) return;
@@ -199,7 +199,7 @@ function setupRealtimeSync() {
 	syncListenerAttached = true;
 	
 	// syncTrigger 감시 - 명시적으로 동기화 명령어를 실행했을 때만 감지
-	database.ref(`rooms/${currentRoomKey}/syncTrigger`).on('value', (snapshot) => {
+	database.ref(`profiles/${currentProfileKey}/syncTrigger`).on('value', (snapshot) => {
 		const syncTrigger = snapshot.val();
 		if (syncTrigger && syncTrigger !== lastSyncTrigger && lastSyncTrigger !== 0) {
 			// 새로운 동기화 트리거 감지
@@ -233,11 +233,11 @@ function loadDataByType(type) {
 		case 'rule':
 			// 규칙만 로드
 			return Promise.all([
-				database.ref(`rooms/${currentRoomKey}/hiddenGroups`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/hiddenGroupChains`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/pendingHiddenGroups`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/pendingHiddenGroupChains`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/probabilisticForbiddenPairs`).once('value')
+				database.ref(`profiles/${currentProfileKey}/hiddenGroups`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/hiddenGroupChains`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/pendingHiddenGroups`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/pendingHiddenGroupChains`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/probabilisticForbiddenPairs`).once('value')
 			]).then(([hiddenGroupsSnap, hiddenGroupChainsSnap, pendingHiddenGroupsSnap, pendingHiddenGroupChainsSnap, probabilisticForbiddenPairsSnap]) => {
 				state.hiddenGroups = hiddenGroupsSnap.val() || [];
 				state.hiddenGroupChains = hiddenGroupChainsSnap.val() || [];
@@ -250,10 +250,10 @@ function loadDataByType(type) {
 		case 'option':
 			// 옵션만 로드
 			return Promise.all([
-				database.ref(`rooms/${currentRoomKey}/maxTeamSizeEnabled`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/genderBalanceEnabled`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/weightBalanceEnabled`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/membersPerTeam`).once('value')
+				database.ref(`profiles/${currentProfileKey}/maxTeamSizeEnabled`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/genderBalanceEnabled`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/weightBalanceEnabled`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/membersPerTeam`).once('value')
 			]).then(([maxTeamSizeSnap, genderBalanceSnap, weightBalanceSnap, membersPerTeamSnap]) => {
 				state.maxTeamSizeEnabled = maxTeamSizeSnap.val() || false;
 				state.genderBalanceEnabled = genderBalanceSnap.val() || false;
@@ -272,8 +272,8 @@ function loadDataByType(type) {
 		case 'member':
 			// 참가자만 로드
 			return Promise.all([
-				database.ref(`rooms/${currentRoomKey}/people`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/nextId`).once('value')
+				database.ref(`profiles/${currentProfileKey}/people`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/nextId`).once('value')
 			]).then(([peopleSnap, nextIdSnap]) => {
 				state.people = peopleSnap.val() || [];
 				state.nextId = nextIdSnap.val() || 1;
@@ -284,7 +284,7 @@ function loadDataByType(type) {
 		
 		case 'people':
 			// 미참가자만 로드
-			return database.ref(`rooms/${currentRoomKey}/inactivePeople`).once('value')
+			return database.ref(`profiles/${currentProfileKey}/inactivePeople`).once('value')
 				.then((snapshot) => {
 					state.inactivePeople = snapshot.val() || [];
 					renderPeople();
@@ -293,9 +293,9 @@ function loadDataByType(type) {
 		case 'constraint':
 			// 제약만 로드
 			return Promise.all([
-				database.ref(`rooms/${currentRoomKey}/requiredGroups`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/forbiddenPairs`).once('value'),
-				database.ref(`rooms/${currentRoomKey}/pendingConstraints`).once('value')
+				database.ref(`profiles/${currentProfileKey}/requiredGroups`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/forbiddenPairs`).once('value'),
+				database.ref(`profiles/${currentProfileKey}/pendingConstraints`).once('value')
 			]).then(([requiredGroupsSnap, forbiddenPairsSnap, pendingConstraintsSnap]) => {
 				state.requiredGroups = requiredGroupsSnap.val() || [];
 				state.forbiddenPairs = forbiddenPairsSnap.val() || [];
@@ -308,7 +308,7 @@ function loadDataByType(type) {
 		case 'reservation':
 		// 예약만 로드 (동기화 예약 명령어로 실행된 경우)
 		const oldReservationCount = state.reservations ? state.reservations.length : 0;
-		return database.ref(`rooms/${currentRoomKey}/reservations`).once('value')
+		return database.ref(`profiles/${currentProfileKey}/reservations`).once('value')
 			.then((snapshot) => {
 				const newReservations = snapshot.val() || [];
 				const newCount = newReservations.length;
@@ -331,7 +331,7 @@ function loadDataByType(type) {
 		case 'all':
 		default:
 			// 전체 데이터 로드
-			return database.ref(`rooms/${currentRoomKey}`).once('value')
+			return database.ref(`profiles/${currentProfileKey}`).once('value')
 				.then((snapshot) => {
 					const data = snapshot.val();
 					if (data) {

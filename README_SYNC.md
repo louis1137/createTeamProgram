@@ -49,8 +49,8 @@ Firebase Console > Realtime Database > 규칙 탭에서:
 ```json
 {
   "rules": {
-    "rooms": {
-      "$roomKey": {
+    "profiles": {
+      "$profileKey": {
         ".read": true,
         ".write": true
       }
@@ -65,14 +65,14 @@ Firebase Console > Realtime Database > 규칙 탭에서:
 
 1. **URL로 접속**
    ```
-   index.html?key=myroom
+   index.html?key=myprofile
    ```
    - `key` 값은 원하는 문자열로 설정 가능
    - 같은 key를 사용하는 모든 사용자가 데이터를 공유
 
 2. **명령어 콘솔**
    - 페이지 우측 하단에 명령어 콘솔이 자동으로 표시됨
-   - Room Key가 표시되어 현재 접속한 방 확인 가능
+   - Profile Key가 표시되어 현재 접속한 방 확인 가능
 
 ### 명령어
 
@@ -112,7 +112,7 @@ status
 
 **출력 예시:**
 ```
-Room Key: myroom
+Profile Key: myprofile
 Firebase: 활성화
 참가자: 10명
 미참가자: 5명
@@ -159,7 +159,7 @@ help
 
 ### Key 이름 규칙
 
-- **공개 사용:** `public-room-2024`
+- **공개 사용:** `public-profile-2024`
 - **비공개 사용:** `7a9f3c2e-5b1d-4e8a-9f2c-3d5e7a8b9c1f` (UUID 사용)
 - **팀별 사용:** `team-alpha`, `team-beta`
 
@@ -168,8 +168,8 @@ help
 ```json
 {
   "rules": {
-    "rooms": {
-      "$roomKey": {
+    "profiles": {
+      "$profileKey": {
         ".read": "auth != null",
         ".write": "auth != null"
       }
