@@ -1068,7 +1068,8 @@ function writeFormData(key, type, data) {
 	getEl(fieldIds.genderBalanceEnabled).checked = Boolean(data.genderBalanceEnabled);
 	getEl(fieldIds.maxTeamSizeEnabled).checked = Boolean(data.maxTeamSizeEnabled);
 	getEl(fieldIds.weightBalanceEnabled).checked = Boolean(data.weightBalanceEnabled);
-	getEl(fieldIds.createdAt).value = data.createdAt || '';
+	const createdAtValue = data.createdAt || (type === 'profiles' ? (data.timestamp || '') : '');
+	getEl(fieldIds.createdAt).value = createdAtValue;
 	getEl(fieldIds.lastAccess).value = data.lastAccess || '';
 	getEl(fieldIds.password).value = data.password || '';
 	getEl(fieldIds.timestamp).value = data.timestamp || '';
@@ -1316,6 +1317,7 @@ function buildPayloadFromForm(type) {
 	};
 
 	if (type === 'profiles') {
+		payload.createdAt = form.createdAt || getDbTimestamp();
 		payload.timestamp = form.timestamp || getDbTimestamp();
 	}
 	if (type === 'users') {

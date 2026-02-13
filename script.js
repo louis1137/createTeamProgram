@@ -2467,9 +2467,16 @@ function applyReservationAsHiddenGroup(reservationNames) {
 	const excludedNames = reservationIds.slice(maxReservationSize).map(id => 
 		state.people.find(p => p.id === id)?.name
 	).filter(Boolean);
-	
-	// 참가자가 1명 이하면 예약 적용 불가
-	if (limitedReservationIds.length <= 1) return;
+	if (limitedReservationIds.length <= 1) {
+		window.appliedReservation = {
+			names: reservationNames,
+			foundNames: limitedReservationIds.map(id => state.people.find(p => p.id === id).name),
+			additionalNames: [],
+			notFoundNames: notFoundNames,
+			excludedNames: excludedNames
+		};
+		return [...limitedReservationIds];
+	}
 	
 	// 예약 그룹과 규칙의 상호작용 처리
 	// 규칙 A(확률)B가 있고 예약에 B가 포함되어 있으면, A도 예약 그룹에 확률적으로 추가
@@ -2534,6 +2541,8 @@ function applyReservationAsHiddenGroup(reservationNames) {
 		notFoundNames: notFoundNames,
 		excludedNames: excludedNames // 팀 인원수 초과로 제외된 이름들
 	};
+
+	return [...finalReservationIds];
 }
 
 // 예약으로 추가된 임시 그룹 제거 (더 이상 필요 없음)
@@ -3559,6 +3568,34 @@ function preShufflePeopleForGeneration(people) {
 
 function generateTeams(people, reservation = null) {
 	buildForbiddenMap();
+	const reservationBaseIdSet = new Set();
+	if (Array.isArray(reservation)) {
+		reservation.forEach((name) => {
+			const person = people.find((item) => item.name === name);
+			if (person && Number.isInteger(person.id)) {
+				reservationBaseIdSet.add(person.id);
+			}
+		});
+	}
+	const isReservationOverridePair = (aId, bId, activeReservationIdSet) => {
+		if (!(activeReservationIdSet instanceof Set)) {
+			return false;
+		}
+		return activeReservationIdSet.has(aId) || activeReservationIdSet.has(bId);
+	};
+	const conflictExistsWithReservation = (teams, activeReservationIdSet) => {
+		for (const team of teams) {
+			for (let i = 0; i < team.length; i++) {
+				for (let j = i + 1; j < team.length; j++) {
+					if (isReservationOverridePair(team[i].id, team[j].id, activeReservationIdSet)) {
+						continue;
+					}
+					if (isForbidden(team[i].id, team[j].id)) return true;
+				}
+			}
+		}
+		return false;
+	};
 
 	// 팀 순서 배열에서 마지막 팀 인덱스를 항상 맨 뒤로 보낼지 결정하는 공통 로직
 	function pushLastTeamToEndIfNeeded(teamOrder, teams) {
@@ -3576,6 +3613,9 @@ function generateTeams(people, reservation = null) {
 	for (const group of state.requiredGroups) {
 		for (let i = 0; i < group.length; i++) {
 			for (let j = i + 1; j < group.length; j++) {
+				if (isReservationOverridePair(group[i], group[j], reservationBaseIdSet)) {
+					continue;
+				}
 				if (isForbidden(group[i], group[j])) {
 					showError(commandConsoleMessages.comments.constraintInSameGroup);
 					return null;
@@ -3631,8 +3671,14 @@ function generateTeams(people, reservation = null) {
 		// 각 시도마다 확률적 제약과 히든 그룹을 새로 샘플링
 		activateProbabilisticForbiddenPairsForTeamGeneration();
 		activateHiddenGroupsForTeamGeneration();
+		const activeReservationIdSet = new Set(reservationBaseIdSet);
 		if (reservation) {
-			applyReservationAsHiddenGroup(reservation);
+			const appliedReservationIds = applyReservationAsHiddenGroup(reservation) || [];
+			appliedReservationIds.forEach((id) => {
+				if (Number.isInteger(id)) {
+					activeReservationIdSet.add(id);
+				}
+			});
 		}
 		
 		// 나머지 사람들만 셔플
@@ -3701,7 +3747,12 @@ function generateTeams(people, reservation = null) {
 					// 충돌 체크
 					let hasConflict = false;
 					for (const bm of blockMembers) {
-						if (teams[i].some(tm => isForbidden(bm.id, tm.id))) {
+						if (teams[i].some((tm) => {
+							if (isReservationOverridePair(bm.id, tm.id, activeReservationIdSet)) {
+								return false;
+							}
+							return isForbidden(bm.id, tm.id);
+						})) {
 							hasConflict = true;
 							break;
 						}
@@ -3790,7 +3841,12 @@ function generateTeams(people, reservation = null) {
 				// 체크 2: 충돌(금지 제약) 없음
 				let hasConflict = false;
 				for (const gm of groupMembers) {
-					if (teams[i].some(tm => isForbidden(gm.id, tm.id))) {
+					if (teams[i].some((tm) => {
+						if (isReservationOverridePair(gm.id, tm.id, activeReservationIdSet)) {
+							return false;
+						}
+						return isForbidden(gm.id, tm.id);
+					})) {
 						hasConflict = true;
 						break;
 					}
@@ -3910,7 +3966,12 @@ function generateTeams(people, reservation = null) {
 				}
 				
 				// 체크 2: 충돌(금지 제약) 없음
-				if (teams[i].some(tm => isForbidden(tm.id, person.id))) continue;
+				if (teams[i].some((tm) => {
+					if (isReservationOverridePair(tm.id, person.id, activeReservationIdSet)) {
+						return false;
+					}
+					return isForbidden(tm.id, person.id);
+				})) continue;
 				
 				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
 				// 가중치 균등 모드에서는 가중치 우선, 성별 균형은 참고만
@@ -3938,7 +3999,7 @@ function generateTeams(people, reservation = null) {
 		if (personFailed) continue;
 
 		// 검증: 충돌 없음 및 팀당 최소 2개의 유닛 확보
-		if (conflictExists(teams)) continue;
+		if (conflictExistsWithReservation(teams, activeReservationIdSet)) continue;
 		
 		// 각 팀이 최소 2개의 유닛을 갖추었는지 확인
 		let allValid = true;
