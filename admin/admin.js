@@ -180,6 +180,14 @@ function normalizeProbability(value) {
 	return Math.min(100, Math.max(0, Math.round(parsed)));
 }
 
+function normalizeRuleProbability(value) {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) {
+		return 100;
+	}
+	return Math.min(100, Math.max(-100, Math.round(parsed)));
+}
+
 function toList(value) {
 	if (Array.isArray(value)) {
 		return value;
@@ -236,6 +244,7 @@ function cloneConstraints(data) {
 
 function cloneRules(data) {
 	const hiddenGroupChains = toList(data?.hiddenGroupChains);
+	const probabilisticForbiddenPairs = toList(data?.probabilisticForbiddenPairs);
 	const rows = [];
 	hiddenGroupChains.forEach((chain) => {
 		if (!chain || typeof chain !== 'object') {
@@ -253,6 +262,20 @@ function cloneRules(data) {
 			rows.push({ member1: primary, member2, probability });
 		});
 	});
+
+	probabilisticForbiddenPairs.forEach((rule) => {
+		if (!rule || typeof rule !== 'object') {
+			return;
+		}
+		const member1 = String(rule.left ?? rule.a ?? '').trim();
+		const member2 = String(rule.right ?? rule.b ?? '').trim();
+		if (!member1 || !member2) {
+			return;
+		}
+		const probability = normalizeProbability(rule.probability);
+		rows.push({ member1, member2, probability: -probability });
+	});
+
 	ruleDraft = rows.sort((a, b) => {
 		const byMember1 = normalizeName(a.member1).localeCompare(normalizeName(b.member1), 'ko');
 		if (byMember1 !== 0) {
@@ -541,12 +564,12 @@ function renderRuleTableRows() {
 		const member1 = String(current.member1 ?? '').trim();
 
 		if (!member1) {
-			const probability = normalizeProbability(ruleDraft[index].probability);
+			const probability = normalizeRuleProbability(ruleDraft[index].probability);
 			html += `<tr data-index="${index}">
 				<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>
 				<td class="rule-member1-cell"><input class="member-input" type="text" data-role="member1-single" value="${escapeAttr(ruleDraft[index].member1)}"></td>
 				<td class="rule-member2-cell"><input class="member-input" type="text" data-role="member2" value="${escapeAttr(ruleDraft[index].member2)}"></td>
-				<td class="rule-probability-cell"><input class="member-input" type="number" min="0" max="100" step="1" data-role="probability" value="${probability}"></td>
+				<td class="rule-probability-cell"><input class="member-input" type="number" min="-100" max="100" step="1" data-role="probability" value="${probability}"></td>
 				<td class="rule-delete-cell"><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
 			</tr>`;
 			index += 1;
@@ -565,14 +588,14 @@ function renderRuleTableRows() {
 		for (let offset = 0; offset < span; offset += 1) {
 			const rowIndex = index + offset;
 			const row = ruleDraft[rowIndex];
-			const probability = normalizeProbability(row.probability);
+			const probability = normalizeRuleProbability(row.probability);
 			html += `<tr data-index="${rowIndex}">`;
 			html += `<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>`;
 			if (offset === 0) {
 				html += `<td class="rule-member1-cell" rowspan="${span}"><input class="member-input" type="text" data-role="member1-group" data-group-start="${index}" data-group-size="${span}" value="${escapeAttr(member1)}"></td>`;
 			}
 			html += `<td class="rule-member2-cell"><input class="member-input" type="text" data-role="member2" value="${escapeAttr(row.member2)}"></td>
-			<td class="rule-probability-cell"><input class="member-input" type="number" min="0" max="100" step="1" data-role="probability" value="${probability}"></td>
+			<td class="rule-probability-cell"><input class="member-input" type="number" min="-100" max="100" step="1" data-role="probability" value="${probability}"></td>
 			<td class="rule-delete-cell"><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
 			</tr>`;
 		}
@@ -1185,8 +1208,10 @@ function buildPayloadFromForm(type) {
 	const forbiddenPairs = [];
 	const pendingConstraints = [];
 	const hiddenGroupChainsMap = new Map();
+	const probabilisticForbiddenPairs = [];
 	const dedupeForbidden = new Set();
 	const dedupePending = new Set();
+	const dedupeProbabilistic = new Set();
 
 	constraintDraft.forEach((item) => {
 		const member1 = String(item.member1 ?? '').trim();
@@ -1228,6 +1253,25 @@ function buildPayloadFromForm(type) {
 		if (!member1 || !member2) {
 			return;
 		}
+		const ruleProbability = normalizeRuleProbability(item.probability);
+		if (ruleProbability < 0) {
+				const left = member1;
+				const right = member2;
+			if (!left || !right || left === right) {
+				return;
+			}
+			const pairKey = `${left}:${right}`;
+			if (dedupeProbabilistic.has(pairKey)) {
+				return;
+			}
+			dedupeProbabilistic.add(pairKey);
+			probabilisticForbiddenPairs.push({
+				left,
+				right,
+				probability: Math.abs(ruleProbability)
+			});
+			return;
+		}
 		let chain = hiddenGroupChainsMap.get(member1);
 		if (!chain) {
 			chain = {
@@ -1242,7 +1286,7 @@ function buildPayloadFromForm(type) {
 			return;
 		}
 		chain.candidateKeys.add(candidateKey);
-		chain.candidates.push({ name: member2, probability: normalizeProbability(item.probability) });
+		chain.candidates.push({ name: member2, probability: normalizeProbability(ruleProbability) });
 	});
 
 	const hiddenGroupChains = Array.from(hiddenGroupChainsMap.values()).map((chain) => {
@@ -1267,6 +1311,7 @@ function buildPayloadFromForm(type) {
 		forbiddenPairs,
 		pendingConstraints,
 		hiddenGroupChains,
+		probabilisticForbiddenPairs,
 		reservations
 	};
 
@@ -1634,7 +1679,7 @@ function bindEvents() {
 			if (!Number.isInteger(index) || !ruleDraft[index]) {
 				return;
 			}
-			ruleDraft[index].probability = normalizeProbability(target.value);
+			ruleDraft[index].probability = normalizeRuleProbability(target.value);
 			renderRuleTable();
 		});
 
