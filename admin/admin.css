@@ -432,20 +432,27 @@ body {
 	min-width: 0;
 }
 
-.constraint-table td:nth-child(1),
-.constraint-table th:nth-child(1) {
-	width: 45%;
-}
-
 .constraint-table td:nth-child(2),
 .constraint-table th:nth-child(2) {
-	width: 45%;
+	width: 45% !important;
 }
 
 .constraint-table td:nth-child(3),
 .constraint-table th:nth-child(3) {
-	width: 10%;
+	width: 45% !important;
+}
+
+.constraint-table td:nth-child(4),
+.constraint-table th:nth-child(4) {
+	width: 10% !important;
 	text-align: center;
+	vertical-align: middle;
+}
+
+.constraint-table td:nth-child(4) .member-delete-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .constraint-table-row.expanded .member-table-panel {
@@ -480,25 +487,25 @@ body {
 	width: auto;
 }
 
-.rule-table td:nth-child(1),
-.rule-table th:nth-child(1) {
-	width: 35%;
-}
-
 .rule-table td:nth-child(2),
 .rule-table th:nth-child(2) {
-	width: 35%;
+	width: 35% !important;
 }
 
 .rule-table td:nth-child(3),
 .rule-table th:nth-child(3) {
-	width: 20%;
-	text-align: center;
+	width: 35% !important;
 }
 
 .rule-table td:nth-child(4),
 .rule-table th:nth-child(4) {
-	width: 10%;
+	width: 20% !important;
+	text-align: center;
+}
+
+.rule-table td:nth-child(5),
+.rule-table th:nth-child(5) {
+	width: 10% !important;
 	text-align: center;
 }
 
@@ -531,15 +538,22 @@ body {
 	justify-content: center;
 }
 
-.reservation-table td:nth-child(1),
-.reservation-table th:nth-child(1) {
-	width: 90%;
-}
-
 .reservation-table td:nth-child(2),
 .reservation-table th:nth-child(2) {
-	width: 10%;
+	width: 90% !important;
+}
+
+.reservation-table td:nth-child(3),
+.reservation-table th:nth-child(3) {
+	width: 10% !important;
 	text-align: center;
+}
+
+.reservation-table .drag-col,
+.reservation-table .drag-cell {
+	width: 20px !important;
+	min-width: 20px;
+	max-width: 20px;
 }
 
 .history-table td:nth-child(1),
@@ -621,22 +635,68 @@ body {
 	background: rgba(0, 0, 0, 0.08);
 }
 
-.member-table td:nth-child(1) {
+.member-table td:nth-child(2) {
 	width: 44%;
 }
 
-.member-table td:nth-child(2) {
+.member-table td:nth-child(3) {
 	width: 20%;
 }
 
-.member-table td:nth-child(3) {
+.member-table td:nth-child(4) {
 	width: 26%;
 }
 
-.member-table td:nth-child(4),
-.member-table th:nth-child(4) {
+.member-table td:nth-child(5),
+.member-table th:nth-child(5) {
 	width: 10%;
 	text-align: center;
+}
+
+.member-table .drag-col,
+.member-table .drag-cell {
+	width: 20px !important;
+	min-width: 20px;
+	max-width: 20px;
+	text-align: center;
+	padding: 0;
+}
+
+.member-table th:nth-child(1),
+.member-table td:nth-child(1) {
+	width: 20px !important;
+	min-width: 20px;
+	max-width: 20px;
+}
+
+.drag-cell {
+	border-left: 4px solid transparent;
+	cursor: grab;
+	transition: border-color 0.15s ease;
+}
+
+tr:hover .drag-cell {
+	border-left-color: var(--line);
+}
+
+.drag-cell:active {
+	cursor: grabbing;
+}
+
+.member-table tbody tr.dragging-row {
+	opacity: 0.6;
+}
+
+.member-table tbody tr.dragging-row .drag-cell {
+	border-left-color: var(--accent);
+}
+
+.member-table tbody tr.drag-over-before {
+	box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.member-table tbody tr.drag-over-after {
+	box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .member-input {
@@ -863,6 +923,7 @@ body {
 		flex-direction: column;
 		gap: 8px;
 	}
+
 
 	.history-table-row {
 		flex-direction: column;

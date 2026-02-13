@@ -59,29 +59,56 @@ function buildSyncTriggerPayload(type = 'all') {
 	};
 }
 
-async function broadcastSyncTrigger(key, type = 'all') {
+function getSyncTriggerPath(type, key) {
 	if (!key) {
-		return;
+		return '';
 	}
-	const payload = buildSyncTriggerPayload(type);
-	const refs = [
-		database.ref(`profiles/${key}/syncTrigger`),
-		database.ref(`users/${key}/syncTrigger`),
-		database.ref(`profile/${key}/syncTrigger`)
-	];
-	await Promise.allSettled(refs.map((ref) => ref.set(payload)));
+	if (type === 'users') {
+		return `users/${key}/syncTrigger`;
+	}
+	if (type === 'profiles') {
+		return `profiles/${key}/syncTrigger`;
+	}
+	if (type === 'profile') {
+		return `profile/${key}/syncTrigger`;
+	}
+	return '';
 }
 
-async function broadcastProfilePayload(key, payload) {
-	if (!key || !payload) {
+async function broadcastSyncTrigger(type, key, syncType = 'all') {
+	if (!type || !key) {
 		return;
 	}
-	const refs = [
-		database.ref(`profiles/${key}`),
-		database.ref(`users/${key}`),
-		database.ref(`profile/${key}`)
-	];
-	await Promise.allSettled(refs.map((ref) => ref.update(payload)));
+	const path = getSyncTriggerPath(type, key);
+	if (!path) {
+		return;
+	}
+	const payload = buildSyncTriggerPayload(syncType);
+	await database.ref(path).set(payload);
+}
+
+function getSelectedTypePath(type, key) {
+	if (!key) {
+		return '';
+	}
+	if (type === 'users') {
+		return `users/${key}`;
+	}
+	if (type === 'profiles') {
+		return `profiles/${key}`;
+	}
+	return `${type}/${key}`;
+}
+
+async function savePayloadByType(type, key, payload) {
+	if (!type || !key || !payload) {
+		return;
+	}
+	const path = getSelectedTypePath(type, key);
+	if (!path) {
+		return;
+	}
+	await database.ref(path).update(payload);
 }
 
 function getEl(id) {
@@ -444,11 +471,12 @@ function renderMemberTableRows(containerId, listKey) {
 	}
 	const rows = memberDraft[listKey];
 	if (!rows.length) {
-		container.innerHTML = `<tr><td class="member-empty" colspan="4">데이터가 없습니다.</td></tr>`;
+		container.innerHTML = `<tr><td class="member-empty" colspan="5">데이터가 없습니다.</td></tr>`;
 		return;
 	}
 	container.innerHTML = rows.map((person, index) => {
 		return `<tr data-list="${listKey}" data-index="${index}">
+			<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>
 			<td><input class="member-input" type="text" data-role="name" value="${person.name.replace(/"/g, '&quot;')}"></td>
 			<td><button class="gender-toggle-btn" type="button" data-role="gender">${getGenderLabel(person.gender)}</button></td>
 			<td><input class="member-input" type="number" data-role="weight" min="0" step="1" value="${person.weight}"></td>
@@ -471,13 +499,14 @@ function renderConstraintTableRows() {
 		return;
 	}
 	if (!constraintDraft.length) {
-		container.innerHTML = `<tr><td class="member-empty" colspan="3">데이터가 없습니다.</td></tr>`;
+		container.innerHTML = `<tr><td class="member-empty" colspan="4">데이터가 없습니다.</td></tr>`;
 		return;
 	}
 	container.innerHTML = constraintDraft.map((item, index) => {
 		const member1 = (item.member1 || '').replace(/"/g, '&quot;');
 		const member2 = (item.member2 || '').replace(/"/g, '&quot;');
 		return `<tr data-index="${index}">
+			<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>
 			<td><input class="member-input" type="text" data-role="member1" value="${member1}"></td>
 			<td><input class="member-input" type="text" data-role="member2" value="${member2}"></td>
 			<td><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
@@ -501,7 +530,7 @@ function renderRuleTableRows() {
 		return;
 	}
 	if (!ruleDraft.length) {
-		container.innerHTML = `<tr><td class="member-empty" colspan="4">데이터가 없습니다.</td></tr>`;
+		container.innerHTML = `<tr><td class="member-empty" colspan="5">데이터가 없습니다.</td></tr>`;
 		return;
 	}
 
@@ -514,6 +543,7 @@ function renderRuleTableRows() {
 		if (!member1) {
 			const probability = normalizeProbability(ruleDraft[index].probability);
 			html += `<tr data-index="${index}">
+				<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>
 				<td class="rule-member1-cell"><input class="member-input" type="text" data-role="member1-single" value="${escapeAttr(ruleDraft[index].member1)}"></td>
 				<td class="rule-member2-cell"><input class="member-input" type="text" data-role="member2" value="${escapeAttr(ruleDraft[index].member2)}"></td>
 				<td class="rule-probability-cell"><input class="member-input" type="number" min="0" max="100" step="1" data-role="probability" value="${probability}"></td>
@@ -537,6 +567,7 @@ function renderRuleTableRows() {
 			const row = ruleDraft[rowIndex];
 			const probability = normalizeProbability(row.probability);
 			html += `<tr data-index="${rowIndex}">`;
+			html += `<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>`;
 			if (offset === 0) {
 				html += `<td class="rule-member1-cell" rowspan="${span}"><input class="member-input" type="text" data-role="member1-group" data-group-start="${index}" data-group-size="${span}" value="${escapeAttr(member1)}"></td>`;
 			}
@@ -562,13 +593,14 @@ function renderReservationTableRows() {
 		return;
 	}
 	if (!reservationDraft.length) {
-		container.innerHTML = `<tr><td class="member-empty" colspan="2">데이터가 없습니다.</td></tr>`;
+		container.innerHTML = `<tr><td class="member-empty" colspan="3">데이터가 없습니다.</td></tr>`;
 		return;
 	}
 
 	container.innerHTML = reservationDraft.map((names, index) => {
 		const text = names.join(', ');
 		return `<tr data-index="${index}">
+			<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>
 			<td><input class="member-input" type="text" data-role="reservationText" value="${escapeAttr(text)}"></td>
 			<td><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
 		</tr>`;
@@ -577,6 +609,120 @@ function renderReservationTableRows() {
 
 function renderReservationTable() {
 	renderReservationTableRows();
+}
+
+function moveArrayItem(list, fromIndex, toIndex) {
+	if (!Array.isArray(list)) {
+		return;
+	}
+	if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) {
+		return;
+	}
+	if (fromIndex < 0 || toIndex < 0 || fromIndex >= list.length || toIndex > list.length) {
+		return;
+	}
+	if (fromIndex === toIndex || fromIndex + 1 === toIndex) {
+		return;
+	}
+	const [moved] = list.splice(fromIndex, 1);
+	const insertIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;
+	list.splice(insertIndex, 0, moved);
+}
+
+function clearDragIndicators(tbody) {
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	tbody.querySelectorAll('tr.drag-over-before, tr.drag-over-after, tr.dragging-row').forEach((row) => {
+		row.classList.remove('drag-over-before', 'drag-over-after', 'dragging-row');
+	});
+}
+
+function bindReorderDnD(tbody, handlers) {
+	if (!(tbody instanceof HTMLElement) || !handlers) {
+		return;
+	}
+	const dragState = {
+		fromIndex: -1,
+		fromGroup: null,
+		overIndex: -1,
+		insertAfter: false
+	};
+
+	tbody.addEventListener('dragstart', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement) || !target.matches('[data-role="drag-handle"]')) {
+			event.preventDefault();
+			return;
+		}
+		const row = target.closest('tr[data-index]');
+		if (!(row instanceof HTMLElement)) {
+			event.preventDefault();
+			return;
+		}
+		dragState.fromIndex = Number(row.getAttribute('data-index'));
+		dragState.fromGroup = handlers.getGroupKey ? handlers.getGroupKey(row) : null;
+		dragState.overIndex = dragState.fromIndex;
+		dragState.insertAfter = false;
+		row.classList.add('dragging-row');
+		if (event.dataTransfer) {
+			event.dataTransfer.effectAllowed = 'move';
+			event.dataTransfer.setData('text/plain', String(dragState.fromIndex));
+		}
+	});
+
+	tbody.addEventListener('dragover', (event) => {
+		if (dragState.fromIndex < 0) {
+			return;
+		}
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) {
+			return;
+		}
+		const row = target.closest('tr[data-index]');
+		if (!(row instanceof HTMLElement)) {
+			return;
+		}
+		if (handlers.getGroupKey) {
+			const currentGroup = handlers.getGroupKey(row);
+			if (currentGroup !== dragState.fromGroup) {
+				return;
+			}
+		}
+		event.preventDefault();
+		const rowRect = row.getBoundingClientRect();
+		const insertAfter = (event.clientY - rowRect.top) > (rowRect.height / 2);
+		dragState.overIndex = Number(row.getAttribute('data-index'));
+		dragState.insertAfter = insertAfter;
+		clearDragIndicators(tbody);
+		row.classList.add(insertAfter ? 'drag-over-after' : 'drag-over-before');
+		if (event.dataTransfer) {
+			event.dataTransfer.dropEffect = 'move';
+		}
+	});
+
+	tbody.addEventListener('drop', (event) => {
+		if (dragState.fromIndex < 0 || dragState.overIndex < 0) {
+			return;
+		}
+		event.preventDefault();
+		const targetIndex = dragState.overIndex + (dragState.insertAfter ? 1 : 0);
+		handlers.reorder(dragState.fromIndex, targetIndex, dragState.fromGroup);
+		handlers.render();
+		dragState.fromIndex = -1;
+		dragState.overIndex = -1;
+		dragState.fromGroup = null;
+		dragState.insertAfter = false;
+		clearDragIndicators(tbody);
+	});
+
+	tbody.addEventListener('dragend', () => {
+		dragState.fromIndex = -1;
+		dragState.overIndex = -1;
+		dragState.fromGroup = null;
+		dragState.insertAfter = false;
+		clearDragIndicators(tbody);
+	});
 }
 
 function scrollReservationTableToBottom() {
@@ -1190,8 +1336,8 @@ async function saveSelected() {
 	removeEmptyRuleRows();
 	removeEmptyReservationRows();
 	const payload = buildPayloadFromForm(selected.type);
-	await broadcastProfilePayload(selected.key, payload);
-	await broadcastSyncTrigger(selected.key, 'all');
+	await savePayloadByType(selected.type, selected.key, payload);
+	await broadcastSyncTrigger(selected.type, selected.key, 'all');
 	await loadSelectedItem();
 	await loadLists();
 	showToast('저장 완료');
@@ -1206,8 +1352,8 @@ async function syncSelected() {
 	removeEmptyRuleRows();
 	removeEmptyReservationRows();
 	const payload = buildPayloadFromForm(selected.type);
-	await broadcastProfilePayload(selected.key, payload);
-	await broadcastSyncTrigger(selected.key, 'all');
+	await savePayloadByType(selected.type, selected.key, payload);
+	await broadcastSyncTrigger(selected.type, selected.key, 'all');
 	await loadSelectedItem();
 	showToast('동기화 완료');
 }
@@ -1334,6 +1480,28 @@ function bindEvents() {
 			tbody.addEventListener('input', handleMemberInput);
 			tbody.addEventListener('click', handleGenderToggle);
 		});
+
+		bindReorderDnD(participantsBody, {
+			getGroupKey: (row) => row.getAttribute('data-list') || '',
+			reorder: (fromIndex, toIndex, listKey) => {
+				if (listKey !== 'people') {
+					return;
+				}
+				moveArrayItem(memberDraft.people, fromIndex, toIndex);
+			},
+			render: () => renderMemberTables()
+		});
+
+		bindReorderDnD(inactiveBody, {
+			getGroupKey: (row) => row.getAttribute('data-list') || '',
+			reorder: (fromIndex, toIndex, listKey) => {
+				if (listKey !== 'inactivePeople') {
+					return;
+				}
+				moveArrayItem(memberDraft.inactivePeople, fromIndex, toIndex);
+			},
+			render: () => renderMemberTables()
+		});
 	}
 
 	document.querySelectorAll('.member-add-btn').forEach((button) => {
@@ -1387,6 +1555,13 @@ function bindEvents() {
 			}
 			constraintDraft.splice(index, 1);
 			renderConstraintTable();
+		});
+
+		bindReorderDnD(constraintTableBody, {
+			reorder: (fromIndex, toIndex) => {
+				moveArrayItem(constraintDraft, fromIndex, toIndex);
+			},
+			render: () => renderConstraintTable()
 		});
 	}
 
@@ -1479,6 +1654,13 @@ function bindEvents() {
 			ruleDraft.splice(index, 1);
 			renderRuleTable();
 		});
+
+		bindReorderDnD(ruleTableBody, {
+			reorder: (fromIndex, toIndex) => {
+				moveArrayItem(ruleDraft, fromIndex, toIndex);
+			},
+			render: () => renderRuleTable()
+		});
 	}
 
 	const ruleAddBtn = getEl('ruleAddBtn');
@@ -1524,6 +1706,13 @@ function bindEvents() {
 			}
 			reservationDraft.splice(index, 1);
 			renderReservationTable();
+		});
+
+		bindReorderDnD(reservationTableBody, {
+			reorder: (fromIndex, toIndex) => {
+				moveArrayItem(reservationDraft, fromIndex, toIndex);
+			},
+			render: () => renderReservationTable()
 		});
 	}
 
