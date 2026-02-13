@@ -821,13 +821,22 @@ const commandConsole = {
 				return;
 			}
 			
-			// 프로필 전체 데이터 확인 (password뿐만 아니라 다른 데이터도 체크)
-			database.ref(`rooms/${cmd}`).once('value', (snapshot) => {
-				const profileData = snapshot.val();
+			// 프로필 전체 데이터 확인 (rooms + users)
+			Promise.all([
+				database.ref(`rooms/${cmd}`).once('value'),
+				database.ref(`users/${cmd}`).once('value')
+			]).then(([roomSnapshot, userSnapshot]) => {
+				const roomData = roomSnapshot.val();
+				const userData = userSnapshot.val();
+				const usingUserProfile = roomData === null && userData !== null;
+				const profileData = roomData !== null ? roomData : userData;
 				const isProfileSwitch = this.inputMode === 'profile-switch';
 				
 				// 프로필이 존재하는지 확인 (password 또는 다른 데이터가 있으면 존재)
 				if (profileData !== null) {
+					if (typeof setCurrentProfileSource === 'function') {
+						setCurrentProfileSource(usingUserProfile ? 'users' : 'rooms');
+					}
 					const password = profileData.password || '';
 					this.tempProfile = cmd;
 					currentRoomKey = cmd;
@@ -1288,14 +1297,32 @@ const commandConsole = {
 			this.error(this.comments.firebaseMissing);
 			return;
 		}
+
+		const ensureProfileSourceForSave = () => {
+			if (typeof getCurrentProfileSource === 'function' && getCurrentProfileSource() === 'users') {
+				if (typeof setCurrentProfileSource === 'function') setCurrentProfileSource('users');
+				return Promise.resolve();
+			}
+
+			if (typeof resolveProfileRecord !== 'function') {
+				return Promise.resolve();
+			}
+
+			return resolveProfileRecord(currentRoomKey)
+				.then((result) => {
+					if (result && result.source === 'users' && typeof setCurrentProfileSource === 'function') {
+						setCurrentProfileSource('users');
+					}
+				});
+		};
 	
 		// 저장은 Firebase에 업로드만 하고 다른 창에 알림을 보내지 않음
 		if (typeof window !== 'undefined') {
 			window.lastReservationChangeByMe = true;
 		}
 		
-		// 먼저 현재 password를 읽어옴
-		database.ref(`rooms/${currentRoomKey}/password`).once('value')
+		ensureProfileSourceForSave()
+		.then(() => database.ref(`rooms/${currentRoomKey}/password`).once('value'))
 		.then((snapshot) => {
 			const currentPassword = snapshot.val();
 			
@@ -2154,8 +2181,8 @@ loadCommand(profileName = '') {
 	},
 	
 	profileCommand() {
-		if (!syncEnabled || !currentRoomKey) {
-			this.error(this.comments.firebaseMissing);
+		if (!database && !initFirebase()) {
+			this.error(this.comments.firebaseInitFailed + '.');
 			return;
 		}
 		

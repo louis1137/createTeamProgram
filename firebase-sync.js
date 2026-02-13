@@ -15,9 +15,45 @@ const firebaseConfig = {
 let firebaseApp = null;
 let database = null;
 let currentRoomKey = null;
+let currentProfileSource = 'rooms';
 let currentUserCode = null;
 let syncEnabled = false;
 let authenticatedPassword = ''; // 인증된 비밀번호 저장
+
+function setCurrentProfileSource(source) {
+	currentProfileSource = source === 'users' ? 'users' : 'rooms';
+}
+
+function getCurrentProfileSource() {
+	return currentProfileSource;
+}
+
+function resolveProfileRecord(profileKey) {
+	if (!database || !profileKey) {
+		return Promise.resolve({ exists: false, source: 'rooms', data: null });
+	}
+
+	return Promise.all([
+		database.ref(`rooms/${profileKey}`).once('value'),
+		database.ref(`users/${profileKey}`).once('value')
+	]).then(([roomSnapshot, userSnapshot]) => {
+		const roomData = roomSnapshot.val();
+		const userData = userSnapshot.val();
+
+		if (roomData !== null) {
+			setCurrentProfileSource('rooms');
+			return { exists: true, source: 'rooms', data: roomData };
+		}
+
+		if (userData !== null) {
+			setCurrentProfileSource('users');
+			return { exists: true, source: 'users', data: userData };
+		}
+
+		setCurrentProfileSource('rooms');
+		return { exists: false, source: 'rooms', data: null };
+	});
+}
 
 // 6자리 영숫자 userCode 생성
 function generateUserCode() {
@@ -101,11 +137,26 @@ function initFirebase() {
 		if (typeof firebase !== 'undefined') {
 			firebaseApp = firebase.initializeApp(firebaseConfig);
 			database = firebase.database();
+			const originalRef = database.ref.bind(database);
+			database.ref = (path) => {
+				if (typeof path !== 'string') return originalRef(path);
+				if (currentProfileSource === 'users' && currentRoomKey) {
+					const roomPrefix = `rooms/${currentRoomKey}`;
+					if (path === roomPrefix) {
+						return originalRef(`users/${currentRoomKey}`);
+					}
+					if (path.startsWith(`${roomPrefix}/`)) {
+						return originalRef(`users/${currentRoomKey}/${path.slice(roomPrefix.length + 1)}`);
+					}
+				}
+				return originalRef(path);
+			};
 			console.log('✅ Firebase 초기화 완료');
 			console.log('⚙️ 참가자 입력란에 \'cmd\' 또는 \'command\'를 입력하면 다양한 기능을 사용할 수 있습니다.');
 			
 			// URL에서 프로필 키 읽기
 			currentRoomKey = getRoomKeyFromURL();
+			setCurrentProfileSource('rooms');
 			currentUserCode = getUserCode();
 			ensureUserRecord();
 

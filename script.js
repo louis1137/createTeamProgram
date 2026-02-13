@@ -85,6 +85,18 @@ const elements = {
 };
 
 let captureSuccessTimer = null;
+let lastProfileConsoleMessage = '';
+let lastProfileConsoleMessageAt = 0;
+
+function logProfileConsole(message) {
+	const now = Date.now();
+	if (message === lastProfileConsoleMessage && (now - lastProfileConsoleMessageAt) < 1500) {
+		return;
+	}
+	lastProfileConsoleMessage = message;
+	lastProfileConsoleMessageAt = now;
+	commandConsole.log(message);
+}
 
 function init() {
 	if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
@@ -128,15 +140,14 @@ function init() {
 	if (!currentRoomKey) {
 		loadFromLocalStorage();
 	} else if (database) {
-		// 프로필이 있는 경우 Firebase에서 데이터 즉시 로드
-		database.ref(`rooms/${currentRoomKey}`).once('value')
-			.then((snapshot) => {
-				const data = snapshot.val();
+		// 프로필이 있는 경우 Firebase에서 데이터 즉시 로드 (rooms + users 동시 확인)
+		resolveProfileRecord(currentRoomKey)
+			.then((result) => {
+				const data = result.data;
 				if (data && (data.people || data.timestamp)) {
 					loadStateFromData(data);
-					console.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`);
+					console.log(commandConsoleMessages.comments.profileLoaded.replace('{profile}', currentRoomKey).replace('{count}', state.people.length));
 				}
-				// 실시간 동기화 설정
 				setupRealtimeSync();
 			})
 			.catch((error) => {
@@ -214,66 +225,50 @@ function checkDevToolsAndOpenConsole() {
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else if (database) {
 							// 아직 인증되지 않았다면 비밀번호 확인
-							database.ref(`rooms/${currentRoomKey}/password`).once('value', (snapshot) => {
-								const password = snapshot.val();
-								if (password !== null) {
+							resolveProfileRecord(currentRoomKey)
+								.then((result) => {
+									if (!result.exists) {
+										commandConsole.tempProfile = currentRoomKey;
+										commandConsole.warn(commandConsoleMessages.comments.profileNotFoundInitial.replace('{profile}', currentRoomKey));
+										commandConsole.log(commandConsoleMessages.comments.profileCreateNew.replace('{profile}', currentRoomKey));
+										commandConsole.inputMode = 'profile-create-confirm';
+										commandConsole.showConfirmButtons();
+										return;
+									}
+
+									const data = result.data || {};
+									const password = data.password || '';
+
 									if (password === '') {
 										commandConsole.authenticated = true;
-										
-										// 데이터 로드
-										database.ref(`rooms/${currentRoomKey}`).once('value')
-											.then((snapshot) => {
-												const data = snapshot.val();
-												if (data && (data.people || data.timestamp)) {
-													loadStateFromData(data);
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`);
-												} else {
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`);
-												}
-												commandConsole.log('🔄 실시간 동기화 활성화됨');
-												setupRealtimeSync();
-												commandConsole.log(commandConsoleMessages.comments.consoleReady);
-											})
-											.catch((error) => {
-												commandConsole.error(`데이터 로드 실패: ${error.message}`);
-											});
-										
+										if (data && (data.people || data.timestamp)) {
+											loadStateFromData(data);
+										} else {
+											logProfileConsole(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`);
+										}
+										commandConsole.log('🔄 실시간 동기화 활성화됨');
+										setupRealtimeSync();
+										commandConsole.log(commandConsoleMessages.comments.consoleReady);
 										setTimeout(() => commandConsole.input.focus(), 100);
 									} else {
 										commandConsole.storedPassword = password;
 										commandConsole.authenticated = false;
-										
-										// 비밀번호 확인 전에 데이터 동기화 먼저 시작
-										database.ref(`rooms/${currentRoomKey}`).once('value')
-											.then((snapshot) => {
-												const data = snapshot.val();
-												if (data && (data.people || data.timestamp)) {
-													loadStateFromData(data);
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`);
-												} else {
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`);
-												}
-												commandConsole.log('🔄 실시간 동기화 활성화됨');
-												setupRealtimeSync();
-												commandConsole.log(commandConsoleMessages.comments.passwordInputAsk);
-												commandConsole.inputMode = 'password-ask-initial';
-												commandConsole.showConfirmButtons();
-											})
-											.catch((error) => {
-												commandConsole.error(commandConsoleMessages.comments.dataLoadFailed + error.message);
-												commandConsole.log(commandConsoleMessages.comments.passwordInputAsk);
-												commandConsole.inputMode = 'password-ask-initial';
-												commandConsole.showConfirmButtons();
-											});
+										if (data && (data.people || data.timestamp)) {
+											loadStateFromData(data);
+											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`);
+										} else {
+											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`);
+										}
+										commandConsole.log('🔄 실시간 동기화 활성화됨');
+										setupRealtimeSync();
+										commandConsole.log(commandConsoleMessages.comments.passwordInputAsk);
+										commandConsole.inputMode = 'password-ask-initial';
+										commandConsole.showConfirmButtons();
 									}
-								} else {
-									commandConsole.tempProfile = currentRoomKey;
-									commandConsole.warn(commandConsoleMessages.comments.profileNotFoundInitial.replace('{profile}', currentRoomKey));
-									commandConsole.log(commandConsoleMessages.comments.profileCreateNew.replace('{profile}', currentRoomKey));
-									commandConsole.inputMode = 'profile-create-confirm';
-									commandConsole.showConfirmButtons();
-								}
-							});
+								})
+								.catch((error) => {
+									commandConsole.error(commandConsoleMessages.comments.dataLoadFailed + error.message);
+								});
 						}
 					} else {
 						// 프로필이 없는 경우: 자동 프롬프트 없이 일반 입력 모드 유지
@@ -1354,74 +1349,53 @@ function addPerson(fromConsole = false, options = {}) {
 							setTimeout(() => commandConsole.input.focus(), 100);
 						} else {
 							// 최초 cmd 입력 시 - 비밀번호 확인
-							database.ref(`rooms/${currentRoomKey}/password`).once('value', (snapshot) => {
-								const password = snapshot.val();
-								if (password !== null) {
-									// 프로필이 존재함 (password는 ''이거나 값이 있음)
+							resolveProfileRecord(currentRoomKey)
+								.then((result) => {
+									if (!result.exists) {
+										commandConsole.tempProfile = currentRoomKey;
+										commandConsole.warn(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`);
+										commandConsole.log(commandConsoleMessages.comments.registerNewProfile);
+										commandConsole.inputMode = 'profile-create-confirm';
+										commandConsole.showConfirmButtons();
+										return;
+									}
+
+									const data = result.data || {};
+									const password = data.password || '';
+
 									if (password === '') {
-										// 비밀번호 없음 - 바로 사용 가능
 										commandConsole.authenticated = true;
 										commandConsole.storedPassword = '';
-										
-										// 데이터 로드
-										database.ref(`rooms/${currentRoomKey}`).once('value')
-											.then((snapshot) => {
-												const data = snapshot.val();
-												if (data && (data.people || data.timestamp)) {
-													loadStateFromData(data);
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (참가자: ${state.people.length}명)`);
-												} else {
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`);
-												}
-												commandConsole.log('🔄 실시간 동기화 활성화됨');
-												setupRealtimeSync();
-												commandConsole.log(commandConsoleMessages.comments.consoleReady);
-											})
-											.catch((error) => {
-												commandConsole.error(`데이터 로드 실패: ${error.message}`);
-											});
-										
-										// 입력 폼에 포커스
+										if (data && (data.people || data.timestamp)) {
+											loadStateFromData(data);
+										} else {
+											logProfileConsole(`📡 프로필 '${currentRoomKey}' 로드됨 (초기 상태)`);
+										}
+										commandConsole.log('🔄 실시간 동기화 활성화됨');
+										setupRealtimeSync();
+										commandConsole.log(commandConsoleMessages.comments.consoleReady);
 										setTimeout(() => commandConsole.input.focus(), 100);
 									} else {
-										// 비밀번호가 설정되어 있음 - 인증 필요
 										commandConsole.storedPassword = password;
 										commandConsole.authenticated = false;
-										
-										// 비밀번호 확인 전에 데이터 동기화 먼저 시작
-										database.ref(`rooms/${currentRoomKey}`).once('value')
-											.then((snapshot) => {
-												const data = snapshot.val();
-												if (data && (data.people || data.timestamp)) {
-													loadStateFromData(data);
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`);
-												} else {
-													commandConsole.log(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`);
-												}
-												commandConsole.log('🔄 실시간 동기화 활성화됨');
-												setupRealtimeSync();
-												commandConsole.log('🔒 비밀번호를 입력하세요:');
-											})
-											.catch((error) => {
-												commandConsole.error(`데이터 로드 실패: ${error.message}`);
-												commandConsole.log('🔒 비밀번호를 입력하세요:');
-											});
-										
+										if (data && (data.people || data.timestamp)) {
+											loadStateFromData(data);
+											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (참가자: ${state.people.length}명)`);
+										} else {
+											logProfileConsole(`📡 프로필 '${currentRoomKey}' 발견 (초기 상태)`);
+										}
+										commandConsole.log('🔄 실시간 동기화 활성화됨');
+										setupRealtimeSync();
+										commandConsole.log('🔒 비밀번호를 입력하세요:');
 										commandConsole.inputMode = 'auth';
 										commandConsole.input.type = 'password';
 										commandConsole.input.placeholder = '비밀번호 입력...';
-										// 입력 폼에 포커스
 										setTimeout(() => commandConsole.input.focus(), 100);
 									}
-								} else {
-									// 존재하지 않는 프로필 - 생성 확인
-									commandConsole.tempProfile = currentRoomKey;
-									commandConsole.warn(`⚠️ '${currentRoomKey}'는 존재하지 않는 프로필입니다.`);
-									commandConsole.log(commandConsoleMessages.comments.registerNewProfile);
-									commandConsole.inputMode = 'profile-create-confirm';
-									commandConsole.showConfirmButtons();
-								}
-							});
+								})
+								.catch((error) => {
+									commandConsole.error(`데이터 로드 실패: ${error.message}`);
+								});
 						}
 					}
 				} else {
@@ -4414,9 +4388,7 @@ function saveGenerateHistory(teams) {
 
 		database.ref(`users/${currentUserCode}/generateHistory`).push(historyData)
 			.then(() => {
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					commandConsole.log(`✅ generateHistory 저장 완료 (${teams.length}팀)`);
-				}
+				if (typeof commandConsole !== 'undefined' && commandConsole.log) commandConsole.log(`✅ 저장 완료`);
 			})
 			.catch((error) => {
 				console.error('generateHistory 저장 실패:', error);
