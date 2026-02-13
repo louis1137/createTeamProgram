@@ -1474,7 +1474,6 @@ async function saveSelected() {
 	removeEmptyReservationRows();
 	const payload = buildPayloadFromForm(selected.type);
 	await savePayloadByType(selected.type, selected.key, payload);
-	await broadcastSyncTrigger(selected.type, selected.key, 'all');
 	await loadSelectedItem();
 	await loadLists();
 	showToast('저장 완료');
@@ -1508,7 +1507,9 @@ async function executeSectionAction(section, action) {
 	const syncType = getSectionSyncType(section);
 	const label = getSectionLabel(section);
 	await savePayloadByType(selected.type, selected.key, sectionPayload);
-	await broadcastSyncTrigger(selected.type, selected.key, syncType);
+	if (action === 'sync') {
+		await broadcastSyncTrigger(selected.type, selected.key, syncType);
+	}
 	await loadSelectedItem();
 	if (action === 'sync') {
 		showToast(`${label} 동기화 완료`);

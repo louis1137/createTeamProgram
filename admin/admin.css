@@ -205,7 +205,28 @@ body {
 	overflow: visible;
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+}
+
+.form-grid > .field-row {
+	position: relative;
+	padding: 24px 0;
+}
+
+.form-grid > .field-row::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	border-top: 1px solid var(--line);
+}
+
+.form-grid > .field-row:first-child {
+	padding-top: 0;
+}
+
+.form-grid > .field-row:first-child::before {
+	display: none;
 }
 
 .field-row {
@@ -224,6 +245,16 @@ body {
 	font-size: 12px;
 	color: var(--muted);
 	font-weight: 600;
+}
+
+.field-row label.member-table-label,
+.field-row label.constraint-table-label,
+.field-row label.option-inline-title {
+	font-size: 16px;
+}
+
+.form-grid .field-row > label {
+	font-size: 16px;
 }
 
 .field-row input[type='text'],
@@ -268,6 +299,7 @@ body {
 }
 
 .option-inline-title {
+	font-size: 16px;
 	font-weight: 600;
 }
 
@@ -280,9 +312,13 @@ body {
 }
 
 .option-field-row {
-	align-items: center;
+	align-items: flex-start;
 	color: var(--text);
 	min-height: var(--row-h);
+}
+
+.option-field-row > .option-inline-title {
+	padding-top: 8px;
 }
 
 .member-table-section {
@@ -299,7 +335,7 @@ body {
 }
 
 .member-table-label {
-	font-size: 12px;
+	font-size: 16px;
 	color: var(--muted);
 	font-weight: 600;
 }
@@ -453,7 +489,7 @@ body {
 }
 
 .constraint-table-label {
-	font-size: 12px;
+	font-size: 16px;
 	color: var(--muted);
 	font-weight: 600;
 }
