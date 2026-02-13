@@ -405,6 +405,13 @@ body {
 	min-height: 0;
 }
 
+.history-table-row {
+	display: flex;
+	align-items: stretch;
+	gap: 12px;
+	min-height: 0;
+}
+
 .constraint-label-group {
 	flex: 0 0 180px;
 	width: 180px;
@@ -533,6 +540,57 @@ body {
 .reservation-table th:nth-child(2) {
 	width: 10%;
 	text-align: center;
+}
+
+.history-table td:nth-child(1),
+.history-table th:nth-child(1) {
+	width: 100% !important;
+	text-align: left;
+}
+
+.history-toggle-btn {
+	width: 100%;
+	padding: 8px 10px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--text);
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 600;
+	text-align: left;
+}
+
+.history-toggle-btn:hover {
+	border-color: var(--line);
+	background: var(--panel);
+}
+
+.history-chevron {
+	width: 12px;
+	color: var(--muted);
+	flex: 0 0 12px;
+}
+
+.history-detail-row td {
+	padding: 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.history-detail-row[hidden] {
+	display: none;
+}
+
+.history-detail-content {
+	padding: 10px;
+	background: var(--panel);
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--text);
+	white-space: pre-wrap;
+	word-break: break-word;
 }
 
 .reservation-text {
@@ -802,6 +860,11 @@ body {
 	}
 
 	.reservation-table-row {
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.history-table-row {
 		flex-direction: column;
 		gap: 8px;
 	}

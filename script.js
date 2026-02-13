@@ -4560,10 +4560,6 @@ function logTeamResultsToConsole(teams) {
 		appliedRules: appliedRulesText === '-' ? '' : appliedRulesText
 	};
 
-	outputMessage += `<br><br>appliedConstraints : ${appliedConstraintText}`;
-	outputMessage += `<br>appliedReservation : ${appliedReservationText || '-'}`;
-	outputMessage += `<br>appliedRules : ${appliedRulesText}`;
-
 	if (typeof window !== 'undefined') {
 		window.lastAppliedSummaryForHistory = { ...appliedSummaryForHistory };
 		window.lastAppliedReservationForHistory = appliedReservationSnapshot
@@ -4812,30 +4808,33 @@ function saveGenerateHistory(teams) {
 			historyData.appliedConstraints = constraintItems;
 		}
 
-		const historyRef = database.ref(`users/${currentUserCode}/generateHistory`).push();
-		const writePath = `users/${currentUserCode}/generateHistory/${historyRef.key}`;
+		const toHistoryKeyTimestamp = () => {
+			const now = new Date();
+			const year = now.getFullYear();
+			const month = String(now.getMonth() + 1).padStart(2, '0');
+			const day = String(now.getDate()).padStart(2, '0');
+			const hour = String(now.getHours()).padStart(2, '0');
+			const minute = String(now.getMinutes()).padStart(2, '0');
+			const second = String(now.getSeconds()).padStart(2, '0');
+			return `${year}${month}${day}${hour}${minute}${second}`;
+		};
 
-		console.log('[generateHistory][write:payload]', writePath, historyData);
+		const historyRootRef = database.ref(`users/${currentUserCode}/generateHistory`);
+		const baseHistoryKey = toHistoryKeyTimestamp();
 
-		historyRef.set(historyData)
-			.then(() => historyRef.once('value'))
-			.then((snapshot) => {
-				const savedData = snapshot.val() || null;
-				console.log('[generateHistory][write:verified]', writePath, savedData);
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					const reservationCount = savedData && Array.isArray(savedData.appliedReservation)
-						? savedData.appliedReservation.length
-						: 0;
-					const rulesCount = savedData && Array.isArray(savedData.appliedRules)
-						? savedData.appliedRules.length
-						: 0;
-					const constraintsCount = savedData && Array.isArray(savedData.appliedConstraints)
-						? savedData.appliedConstraints.length
-						: 0;
-					commandConsole.log(`✅ 저장 완료 (${writePath})`);
-					commandConsole.log(`🧪 확인: appliedReservation 항목 ${reservationCount}개, appliedRules ${rulesCount}개, appliedConstraints ${constraintsCount}개`);
+		const writeWithTimestampKey = (sequence = 0) => {
+			const entryKey = sequence === 0 ? baseHistoryKey : `${baseHistoryKey}_${sequence}`;
+			const entryRef = historyRootRef.child(entryKey);
+			return entryRef.once('value').then((snapshot) => {
+				if (snapshot.exists()) {
+					return writeWithTimestampKey(sequence + 1);
 				}
-			})
+				return entryRef.set(historyData);
+			});
+		};
+
+		writeWithTimestampKey()
+			.then(() => null)
 			.catch((error) => {
 				console.error('generateHistory 저장 실패:', error);
 				if (typeof commandConsole !== 'undefined' && commandConsole.log) {

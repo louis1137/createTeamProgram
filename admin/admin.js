@@ -16,6 +16,7 @@ let memberDraft = { people: [], inactivePeople: [] };
 let constraintDraft = [];
 let ruleDraft = [];
 let reservationDraft = [];
+let historyDraft = [];
 
 const fieldIds = {
 	key: 'fieldKey',
@@ -264,6 +265,161 @@ function parseReservationText(text) {
 		.split(',')
 		.map((name) => name.trim())
 		.filter((name) => name.length > 0);
+}
+
+function escapeHtml(value) {
+	return String(value ?? '')
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+function getHistoryCreatedAt(entryKey, entry) {
+	const createdAt = String(entry?.createdAt ?? '').trim();
+	if (createdAt) {
+		return createdAt;
+	}
+	const keyText = String(entryKey ?? '').trim();
+	const match = keyText.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
+	if (match) {
+		return `${match[1]}-${match[2]}-${match[3]} ${match[4]}:${match[5]}:${match[6]}`;
+	}
+	return keyText;
+}
+
+function normalizeHistoryTeams(value) {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	return value.map((team) => {
+		if (Array.isArray(team)) {
+			return team.map((item) => String(item ?? '').trim()).filter((item) => item.length > 0);
+		}
+		const text = String(team ?? '').trim();
+		return text ? [text] : [];
+	}).filter((team) => team.length > 0);
+}
+
+function normalizeHistoryStrings(value, splitter = null) {
+	if (Array.isArray(value)) {
+		return value.map((item) => String(item ?? '').trim()).filter((item) => item.length > 0);
+	}
+	const text = String(value ?? '').trim();
+	if (!text) {
+		return [];
+	}
+	if (!splitter) {
+		return [text];
+	}
+	return text.split(splitter).map((item) => item.trim()).filter((item) => item.length > 0);
+}
+
+function buildHistoryDetailLines(historyItem) {
+	const lines = [];
+	lines.push('[생성된 팀]');
+	if (historyItem.teams.length) {
+		historyItem.teams.forEach((team, index) => {
+			lines.push(`${index + 1}팀: ${team.join(', ')}`);
+		});
+	} else {
+		lines.push('없음');
+	}
+
+	if (historyItem.appliedReservation.length) {
+		lines.push('');
+		lines.push('[적용된 예약]');
+		historyItem.appliedReservation.forEach((item) => {
+			lines.push(`- ${item}`);
+		});
+	}
+
+	if (historyItem.appliedRules.length) {
+		lines.push('');
+		lines.push('[적용된 규칙]');
+		historyItem.appliedRules.forEach((item) => {
+			lines.push(`- ${item}`);
+		});
+	}
+
+	if (historyItem.appliedConstraints.length) {
+		lines.push('');
+		lines.push('[적용된 제약]');
+		historyItem.appliedConstraints.forEach((item) => {
+			lines.push(`- ${item}`);
+		});
+	}
+
+	return lines.join('\n');
+}
+
+function cloneGenerateHistory(data) {
+	const source = data?.generateHistory;
+	if (!source || typeof source !== 'object') {
+		historyDraft = [];
+		return;
+	}
+
+	historyDraft = Object.entries(source).map(([entryKey, entry]) => {
+		const createdAt = getHistoryCreatedAt(entryKey, entry || {});
+		const teams = normalizeHistoryTeams(entry?.teams);
+		const appliedReservation = normalizeHistoryStrings(entry?.appliedReservation, null);
+		const appliedRules = normalizeHistoryStrings(entry?.appliedRules, '/');
+		const appliedConstraints = normalizeHistoryStrings(entry?.appliedConstraints, '/');
+		const detailText = buildHistoryDetailLines({
+			teams,
+			appliedReservation,
+			appliedRules,
+			appliedConstraints
+		});
+		const sortTime = Date.parse(createdAt.includes('T') ? createdAt : createdAt.replace(' ', 'T'));
+		return {
+			entryKey,
+			createdAt,
+			detailText,
+			sortTime: Number.isFinite(sortTime) ? sortTime : Number.NEGATIVE_INFINITY
+		};
+	});
+
+	historyDraft.sort((a, b) => {
+		if (a.sortTime !== b.sortTime) {
+			return a.sortTime - b.sortTime;
+		}
+		return String(a.entryKey).localeCompare(String(b.entryKey), 'ko');
+	});
+}
+
+function renderGenerateHistoryTableRows() {
+	const container = getEl('historyTableBody');
+	if (!container) {
+		return;
+	}
+	if (!historyDraft.length) {
+		container.innerHTML = `<tr><td class="member-empty" colspan="1">데이터가 없습니다.</td></tr>`;
+		return;
+	}
+
+	container.innerHTML = historyDraft.map((item, index) => {
+		const detailHtml = escapeHtml(item.detailText).replace(/\n/g, '<br>');
+		return `<tr class="history-summary-row" data-index="${index}">
+			<td>
+				<button class="history-toggle-btn" type="button" data-role="toggle-history" data-index="${index}" aria-expanded="false">
+					<span class="history-chevron">▸</span>
+					<span>${escapeHtml(item.createdAt)}</span>
+				</button>
+			</td>
+		</tr>
+		<tr class="history-detail-row" data-index="${index}" hidden>
+			<td><div class="history-detail-content">${detailHtml}</div></td>
+		</tr>`;
+	}).join('');
+}
+
+function renderGenerateHistoryTable() {
+	renderGenerateHistoryTableRows();
+	refreshHistoryExpandButton();
+	applyHistoryExpandedState();
 }
 
 function getGenderLabel(gender) {
@@ -571,6 +727,11 @@ function shouldShowConstraintExpandButton() {
 	return isOverflowingForCollapsedView(tbody);
 }
 
+function shouldShowHistoryExpandButton() {
+	const tbody = getEl('historyTableBody');
+	return isOverflowingForCollapsedView(tbody);
+}
+
 function refreshMemberExpandButton() {
 	const button = getEl('memberExpandBtn');
 	const row = getEl('memberTableRow');
@@ -594,6 +755,22 @@ function refreshConstraintExpandButton() {
 		return;
 	}
 	const shouldShow = shouldShowConstraintExpandButton();
+	if (!shouldShow) {
+		row.classList.remove('expanded');
+		button.style.display = 'none';
+		return;
+	}
+	button.style.display = '';
+	button.textContent = row.classList.contains('expanded') ? '숨기기' : '모두 보기';
+}
+
+function refreshHistoryExpandButton() {
+	const button = getEl('historyExpandBtn');
+	const row = getEl('historyTableRow');
+	if (!(button instanceof HTMLButtonElement) || !row) {
+		return;
+	}
+	const shouldShow = shouldShowHistoryExpandButton();
 	if (!shouldShow) {
 		row.classList.remove('expanded');
 		button.style.display = 'none';
@@ -650,6 +827,29 @@ function applyConstraintExpandedState() {
 	}
 }
 
+function applyHistoryExpandedState() {
+	const row = getEl('historyTableRow');
+	if (!row) {
+		return;
+	}
+	const tbody = getEl('historyTableBody');
+	if (!(tbody instanceof HTMLElement)) {
+		return;
+	}
+	const isExpanded = row.classList.contains('expanded');
+	if (isExpanded) {
+		tbody.style.maxHeight = 'none';
+		tbody.style.overflowY = 'visible';
+		tbody.style.overflowX = 'visible';
+		tbody.style.height = 'auto';
+	} else {
+		tbody.style.maxHeight = 'var(--member-tbody-max-h)';
+		tbody.style.overflowY = 'auto';
+		tbody.style.overflowX = 'hidden';
+		tbody.style.height = '';
+	}
+}
+
 function setFieldAvailability(type) {
 	const disabledMap = fieldEnabledByType[type] || {};
 	Object.values(fieldIds).forEach((id) => {
@@ -670,10 +870,14 @@ function setFieldAvailability(type) {
 
 function updateConditionalRows(type) {
 	const passwordRow = getEl('passwordRow');
+	const historyRow = getEl('historyTableRow');
 	if (!passwordRow) {
 		return;
 	}
 	passwordRow.style.display = type === 'users' ? 'none' : 'flex';
+	if (historyRow) {
+		historyRow.style.display = type === 'users' ? 'flex' : 'none';
+	}
 }
 
 function readFormData() {
@@ -703,10 +907,12 @@ function writeFormData(key, type, data) {
 	cloneConstraints(data || {});
 	cloneRules(data || {});
 	cloneReservations(data || {});
+	cloneGenerateHistory(data || {});
 	renderMemberTables();
 	renderConstraintTable();
 	renderRuleTable();
 	renderReservationTable();
+	renderGenerateHistoryTable();
 	setFieldAvailability(type);
 	updateConditionalRows(type);
 }
@@ -1331,6 +1537,63 @@ function bindEvents() {
 		});
 	}
 
+	const historyTableBody = getEl('historyTableBody');
+	if (historyTableBody) {
+		historyTableBody.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) {
+				return;
+			}
+			const button = target.closest('button[data-role="toggle-history"]');
+			if (!(button instanceof HTMLButtonElement)) {
+				return;
+			}
+			const index = button.getAttribute('data-index');
+			if (!index) {
+				return;
+			}
+
+			const detailRows = Array.from(historyTableBody.querySelectorAll('tr.history-detail-row'));
+			const toggleButtons = Array.from(historyTableBody.querySelectorAll('button[data-role="toggle-history"]'));
+			const targetDetailRow = historyTableBody.querySelector(`tr.history-detail-row[data-index="${index}"]`);
+			if (!(targetDetailRow instanceof HTMLElement)) {
+				return;
+			}
+
+			const shouldOpen = targetDetailRow.hasAttribute('hidden');
+
+			detailRows.forEach((row) => {
+				row.setAttribute('hidden', '');
+			});
+			toggleButtons.forEach((item) => {
+				item.setAttribute('aria-expanded', 'false');
+				const chevron = item.querySelector('.history-chevron');
+				if (chevron) {
+					chevron.textContent = '▸';
+				}
+			});
+
+			if (shouldOpen) {
+				targetDetailRow.removeAttribute('hidden');
+				button.setAttribute('aria-expanded', 'true');
+				const chevron = button.querySelector('.history-chevron');
+				if (chevron) {
+					chevron.textContent = '▾';
+				}
+			}
+		});
+	}
+
+	const historyExpandBtn = getEl('historyExpandBtn');
+	const historyTableRow = getEl('historyTableRow');
+	if (historyExpandBtn instanceof HTMLButtonElement && historyTableRow) {
+		historyExpandBtn.addEventListener('click', () => {
+			historyTableRow.classList.toggle('expanded');
+			applyHistoryExpandedState();
+			refreshHistoryExpandButton();
+		});
+	}
+
 	const memberExpandBtn = getEl('memberExpandBtn');
 	const memberTableRow = getEl('memberTableRow');
 	if (memberExpandBtn instanceof HTMLButtonElement && memberTableRow) {
@@ -1355,6 +1618,8 @@ function bindEvents() {
 	refreshMemberExpandButton();
 	applyConstraintExpandedState();
 	refreshConstraintExpandButton();
+	applyHistoryExpandedState();
+	refreshHistoryExpandButton();
 }
 
 async function bootstrap() {
