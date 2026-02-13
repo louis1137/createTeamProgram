@@ -4423,7 +4423,7 @@ function logTeamResultsToConsole(teams) {
 	const appliedRulesSnapshot = [];
 	
 	// 적용된 예약 정보 출력
-	if (commandConsole.authenticated && window.appliedReservation) {
+	if (window.appliedReservation) {
 		const reservation = window.appliedReservation;
 		appliedReservationSnapshot = {
 			applied: [...(reservation.foundNames || []), ...(reservation.additionalNames || [])],
@@ -4449,7 +4449,7 @@ function logTeamResultsToConsole(teams) {
 	}
 	
 	// 적용된 규칙과 예약의 상호작용 출력
-	if (commandConsole.authenticated && window.appliedReservationRules && window.appliedReservationRules.length > 0) {
+	if (window.appliedReservationRules && window.appliedReservationRules.length > 0) {
 		const ruleResults = window.appliedReservationRules.map(rule => {
 			appliedRulesSnapshot.push({
 				type: 'reservation-link',
@@ -4464,7 +4464,7 @@ function logTeamResultsToConsole(teams) {
 	}
 	
 	// 일반 규칙 출력 (예약과 무관한 규칙)
-	if (commandConsole.authenticated && state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
+	if (state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
 		// 예약 규칙과 중복되지 않는 것만 출력
 		const appliedRuleNames = window.appliedReservationRules ? window.appliedReservationRules.map(r => `${r.primaryName}-${r.partnerName}`) : [];
 		
@@ -4495,7 +4495,7 @@ function logTeamResultsToConsole(teams) {
 	}
 
 	// 확률 제약 규칙 출력 (A(!10)B)
-	if (commandConsole.authenticated && state.activeProbabilisticForbiddenPairs && state.activeProbabilisticForbiddenPairs.length > 0) {
+	if (state.activeProbabilisticForbiddenPairs && state.activeProbabilisticForbiddenPairs.length > 0) {
 		const probRules = state.activeProbabilisticForbiddenPairs.map(rule => {
 			appliedRulesSnapshot.push({
 				type: 'probabilistic-forbidden',
@@ -4513,7 +4513,59 @@ function logTeamResultsToConsole(teams) {
 		}
 	}
 
+	const personNameById = new Map((state.people || []).map((person) => [person.id, person.name]));
+	const appliedConstraintSet = new Set();
+	(state.forbiddenPairs || []).forEach((pair) => {
+		const leftId = Array.isArray(pair) ? pair[0] : null;
+		const rightId = Array.isArray(pair) ? pair[1] : null;
+		const left = String(personNameById.get(leftId) || '').trim();
+		const right = String(personNameById.get(rightId) || '').trim();
+		if (!left || !right) {
+			return;
+		}
+		const sorted = [left, right].sort((a, b) => a.localeCompare(b, 'ko'));
+		appliedConstraintSet.add(`${sorted[0]}!${sorted[1]}`);
+	});
+
+	const appliedConstraintText = Array.from(appliedConstraintSet).join(' / ') || '-';
+	const appliedReservationText = appliedReservationSnapshot && Array.isArray(appliedReservationSnapshot.applied)
+		? appliedReservationSnapshot.applied.map((name) => String(name || '').trim()).filter((name) => name.length > 0).join(',')
+		: '';
+
+	const appliedRuleSet = new Set();
+	appliedRulesSnapshot.forEach((rule) => {
+		if (!rule || typeof rule !== 'object') {
+			return;
+		}
+		if (rule.type === 'probabilistic-forbidden') {
+			const left = String(rule.left || '').trim();
+			const right = String(rule.right || '').trim();
+			const probability = Math.round(Number(rule.probability) || 0);
+			if (left && right) {
+				appliedRuleSet.add(`${left}(!${probability})${right}`);
+			}
+			return;
+		}
+		const primary = String(rule.primary || '').trim();
+		const target = String(rule.target || '').trim();
+		const probability = Math.round(Number(rule.probability) || 0);
+		if (primary && target) {
+			appliedRuleSet.add(`${primary}(${probability})${target}`);
+		}
+	});
+	const appliedRulesText = Array.from(appliedRuleSet).join(' / ') || '-';
+	const appliedSummaryForHistory = {
+		appliedConstraints: appliedConstraintText === '-' ? '' : appliedConstraintText,
+		appliedReservation: appliedReservationText || '',
+		appliedRules: appliedRulesText === '-' ? '' : appliedRulesText
+	};
+
+	outputMessage += `<br><br>appliedConstraints : ${appliedConstraintText}`;
+	outputMessage += `<br>appliedReservation : ${appliedReservationText || '-'}`;
+	outputMessage += `<br>appliedRules : ${appliedRulesText}`;
+
 	if (typeof window !== 'undefined') {
+		window.lastAppliedSummaryForHistory = { ...appliedSummaryForHistory };
 		window.lastAppliedReservationForHistory = appliedReservationSnapshot
 			? {
 				applied: [...(appliedReservationSnapshot.applied || [])],
@@ -4535,24 +4587,207 @@ function saveGenerateHistory(teams) {
 		if (!database || !currentUserCode) return;
 		if (!Array.isArray(teams) || teams.length === 0) return;
 
-		const appliedReservation = (typeof window !== 'undefined' && window.lastAppliedReservationForHistory)
-			? {
-				applied: [...(window.lastAppliedReservationForHistory.applied || [])],
-				notFound: [...(window.lastAppliedReservationForHistory.notFound || [])],
-				excluded: [...(window.lastAppliedReservationForHistory.excluded || [])]
+		const buildAppliedReservationSnapshot = () => {
+			if (typeof window !== 'undefined' && window.lastAppliedReservationForHistory) {
+				const applied = [...(window.lastAppliedReservationForHistory.applied || [])];
+				const notFound = [...(window.lastAppliedReservationForHistory.notFound || [])];
+				const excluded = [...(window.lastAppliedReservationForHistory.excluded || [])];
+				return {
+					applied,
+					notFound,
+					excluded,
+					counts: {
+						applied: applied.length,
+						notFound: notFound.length,
+						excluded: excluded.length,
+						total: applied.length + notFound.length + excluded.length
+					}
+				};
 			}
-			: { applied: [], notFound: [], excluded: [] };
 
-		const appliedRules = (typeof window !== 'undefined' && Array.isArray(window.lastAppliedRulesForHistory))
-			? window.lastAppliedRulesForHistory.map((rule) => ({ ...rule }))
+			const reservation = (typeof window !== 'undefined') ? window.appliedReservation : null;
+			if (!reservation) {
+				return {
+					applied: [],
+					notFound: [],
+					excluded: [],
+					counts: {
+						applied: 0,
+						notFound: 0,
+						excluded: 0,
+						total: 0
+					}
+				};
+			}
+
+			const applied = [
+				...(reservation.foundNames || []),
+				...(reservation.additionalNames || [])
+			];
+			const notFound = [...(reservation.notFoundNames || [])];
+			const excluded = [...(reservation.excludedNames || [])];
+
+			return {
+				applied,
+				notFound,
+				excluded,
+				counts: {
+					applied: applied.length,
+					notFound: notFound.length,
+					excluded: excluded.length,
+					total: applied.length + notFound.length + excluded.length
+				}
+			};
+		};
+
+		const buildAppliedRulesSnapshot = () => {
+			if (typeof window !== 'undefined' && Array.isArray(window.lastAppliedRulesForHistory)) {
+				return window.lastAppliedRulesForHistory.map((rule) => ({ ...rule }));
+			}
+
+			const rules = [];
+			if (typeof window !== 'undefined' && Array.isArray(window.appliedReservationRules)) {
+				window.appliedReservationRules.forEach((rule) => {
+					rules.push({
+						type: 'reservation-link',
+						primary: rule.primaryName,
+						target: rule.partnerName,
+						probability: rule.probability
+					});
+				});
+			}
+
+			if (Array.isArray(state.activeHiddenGroupChainInfo)) {
+				state.activeHiddenGroupChainInfo.forEach((info) => {
+					rules.push({
+						type: 'rule',
+						primary: info.primaryName,
+						target: info.candidateName,
+						probability: info.probability
+					});
+				});
+			}
+
+			if (Array.isArray(state.activeProbabilisticForbiddenPairs)) {
+				state.activeProbabilisticForbiddenPairs.forEach((rule) => {
+					rules.push({
+						type: 'probabilistic-forbidden',
+						left: rule.aName,
+						right: rule.bName,
+						probability: Math.round(rule.probability)
+					});
+				});
+			}
+
+			return rules;
+		};
+
+		const idToName = new Map((state.people || []).map((person) => [person.id, person.name]));
+		const forbiddenPairs = (state.forbiddenPairs || []).map((pair) => {
+				const leftId = Array.isArray(pair) ? pair[0] : null;
+				const rightId = Array.isArray(pair) ? pair[1] : null;
+				return {
+					leftId,
+					rightId,
+					leftName: idToName.get(leftId) || '',
+					rightName: idToName.get(rightId) || ''
+				};
+			});
+		const pendingConstraints = (state.pendingConstraints || []).map((item) => ({
+				left: item?.left || '',
+				right: item?.right || ''
+			}));
+		const activeProbabilisticForbiddenPairs = (state.activeProbabilisticForbiddenPairs || []).map((rule) => ({
+				left: rule.aName || '',
+				right: rule.bName || '',
+				probability: Math.round(rule.probability || 0)
+			}));
+		const appliedReservationSnapshot = buildAppliedReservationSnapshot();
+		const appliedRuleItems = buildAppliedRulesSnapshot();
+
+		const appliedConstraintMap = new Map();
+		forbiddenPairs.forEach((pair) => {
+			const left = String(pair.leftName || '').trim();
+			const right = String(pair.rightName || '').trim();
+			if (!left || !right) {
+				return;
+			}
+			const normalized = [left.toLowerCase(), right.toLowerCase()].sort();
+			const dedupeKey = `${normalized[0]}!${normalized[1]}`;
+			if (!appliedConstraintMap.has(dedupeKey)) {
+				const displayPair = [left, right].sort((a, b) => a.localeCompare(b, 'ko'));
+				appliedConstraintMap.set(dedupeKey, `${displayPair[0]}!${displayPair[1]}`);
+			}
+		});
+		pendingConstraints.forEach((pair) => {
+			const left = String(pair.left || '').trim();
+			const right = String(pair.right || '').trim();
+			if (!left || !right) {
+				return;
+			}
+			const normalized = [left.toLowerCase(), right.toLowerCase()].sort();
+			const dedupeKey = `${normalized[0]}!${normalized[1]}`;
+			if (!appliedConstraintMap.has(dedupeKey)) {
+				const displayPair = [left, right].sort((a, b) => a.localeCompare(b, 'ko'));
+				appliedConstraintMap.set(dedupeKey, `${displayPair[0]}!${displayPair[1]}`);
+			}
+		});
+		const appliedConstraints = Array.from(appliedConstraintMap.values());
+
+		const appliedReservation = (appliedReservationSnapshot.applied || [])
+			.map((name) => String(name || '').trim())
+			.filter((name) => name.length > 0)
+			.join(',');
+
+		const appliedRuleSet = new Set();
+		appliedRuleItems.forEach((rule) => {
+			if (!rule || typeof rule !== 'object') {
+				return;
+			}
+			if (rule.type === 'probabilistic-forbidden') {
+				const left = String(rule.left || '').trim();
+				const right = String(rule.right || '').trim();
+				const probability = Math.round(Number(rule.probability) || 0);
+				if (!left || !right) {
+					return;
+				}
+				appliedRuleSet.add(`${left}(!${probability})${right}`);
+				return;
+			}
+			const primary = String(rule.primary || '').trim();
+			const target = String(rule.target || '').trim();
+			const probability = Math.round(Number(rule.probability) || 0);
+			if (!primary || !target) {
+				return;
+			}
+			appliedRuleSet.add(`${primary}(${probability})${target}`);
+		});
+		const appliedRules = Array.from(appliedRuleSet);
+
+		const appliedSummary = (typeof window !== 'undefined' && window.lastAppliedSummaryForHistory)
+			? window.lastAppliedSummaryForHistory
+			: {
+				appliedConstraints: appliedConstraints.join(' / '),
+				appliedReservation,
+				appliedRules: appliedRules.join(' / ')
+			};
+
+		const reservationItems = (appliedSummary.appliedReservation || '').trim()
+			? [appliedSummary.appliedReservation.trim()]
 			: [];
+		const ruleItems = String(appliedSummary.appliedRules || '')
+			.split('/')
+			.map((item) => item.trim())
+			.filter((item) => item.length > 0);
+		const constraintItems = String(appliedSummary.appliedConstraints || '')
+			.split('/')
+			.map((item) => item.trim())
+			.filter((item) => item.length > 0);
 
 		const timestamp = getCurrentDbTimestamp();
 		const historyData = {
 			createdAt: timestamp,
 			profile: currentProfileKey || '',
-			appliedReservation,
-			appliedRules,
 			teams: teams.map(team => team.map(person => {
 				const details = [];
 				if (state.genderBalanceEnabled && person.gender) {
@@ -4567,6 +4802,16 @@ function saveGenerateHistory(teams) {
 			}))
 		};
 
+		if (reservationItems.length > 0) {
+			historyData.appliedReservation = reservationItems;
+		}
+		if (ruleItems.length > 0) {
+			historyData.appliedRules = ruleItems;
+		}
+		if (constraintItems.length > 0) {
+			historyData.appliedConstraints = constraintItems;
+		}
+
 		const historyRef = database.ref(`users/${currentUserCode}/generateHistory`).push();
 		const writePath = `users/${currentUserCode}/generateHistory/${historyRef.key}`;
 
@@ -4578,18 +4823,17 @@ function saveGenerateHistory(teams) {
 				const savedData = snapshot.val() || null;
 				console.log('[generateHistory][write:verified]', writePath, savedData);
 				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					const reservationCount = savedData && savedData.appliedReservation
-						? [
-							...(savedData.appliedReservation.applied || []),
-							...(savedData.appliedReservation.notFound || []),
-							...(savedData.appliedReservation.excluded || [])
-						].length
+					const reservationCount = savedData && Array.isArray(savedData.appliedReservation)
+						? savedData.appliedReservation.length
 						: 0;
 					const rulesCount = savedData && Array.isArray(savedData.appliedRules)
 						? savedData.appliedRules.length
 						: 0;
+					const constraintsCount = savedData && Array.isArray(savedData.appliedConstraints)
+						? savedData.appliedConstraints.length
+						: 0;
 					commandConsole.log(`✅ 저장 완료 (${writePath})`);
-					commandConsole.log(`🧪 확인: appliedReservation 항목 ${reservationCount}개, appliedRules ${rulesCount}개`);
+					commandConsole.log(`🧪 확인: appliedReservation 항목 ${reservationCount}개, appliedRules ${rulesCount}개, appliedConstraints ${constraintsCount}개`);
 				}
 			})
 			.catch((error) => {

@@ -629,7 +629,9 @@ body {
 }
 
 .member-empty {
-	padding: 10px;
+	height: var(--row-h);
+	padding: 0 10px;
+	line-height: var(--row-h);
 	font-size: 12px;
 	color: var(--muted);
 }

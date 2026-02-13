@@ -750,6 +750,33 @@ function buildItemButton(type, key, data) {
 	return button;
 }
 
+function toSortableTime(value) {
+	if (typeof value === 'number' && Number.isFinite(value)) {
+		return value;
+	}
+	const text = String(value ?? '').trim();
+	if (!text) {
+		return Number.POSITIVE_INFINITY;
+	}
+	const normalized = text.includes('T') ? text : text.replace(' ', 'T');
+	const parsed = Date.parse(normalized);
+	if (Number.isFinite(parsed)) {
+		return parsed;
+	}
+	return Number.POSITIVE_INFINITY;
+}
+
+function getCreatedAtSortValue(type, data) {
+	const createdAt = data?.createdAt;
+	if (createdAt) {
+		return toSortableTime(createdAt);
+	}
+	if (type === 'profiles') {
+		return toSortableTime(data?.timestamp || data?.lastAccess);
+	}
+	return toSortableTime(data?.timestamp || data?.lastAccess);
+}
+
 function renderList(type, values) {
 	const listElement = getEl(type === 'profiles' ? 'profilesList' : 'usersList');
 	const countElement = getEl(type === 'profiles' ? 'profilesCount' : 'usersCount');
@@ -763,7 +790,14 @@ function renderList(type, values) {
 		listElement.appendChild(empty);
 		return;
 	}
-	entries.sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+	entries.sort((a, b) => {
+		const timeA = getCreatedAtSortValue(type, a[1]);
+		const timeB = getCreatedAtSortValue(type, b[1]);
+		if (timeA !== timeB) {
+			return timeA - timeB;
+		}
+		return a[0].localeCompare(b[0], 'ko');
+	});
 	entries.forEach(([key, value]) => {
 		listElement.appendChild(buildItemButton(type, key, value));
 	});
