@@ -170,7 +170,6 @@ const commandConsoleMessages = {
 		dataLoadFailed: '데이터 로드 실패: ',
 		noSavedData: '저장된 데이터가 없습니다',
 		localDataRestored: '✅ 로컬 데이터 복원: 참가자 {count}명',
-		allSettingsRestored: '✅ 모든 설정 복원 완료',
 		localStorageRestoreFailed: '❌ localStorage 복원 실패: ',
 		
 		// --- 초기화/리셋 관련 ---

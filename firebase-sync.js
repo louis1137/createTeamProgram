@@ -15,8 +15,72 @@ const firebaseConfig = {
 let firebaseApp = null;
 let database = null;
 let currentRoomKey = null;
+let currentUserCode = null;
 let syncEnabled = false;
 let authenticatedPassword = ''; // 인증된 비밀번호 저장
+
+// 6자리 영숫자 userCode 생성
+function generateUserCode() {
+	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+	let code = '';
+	for (let i = 0; i < 6; i++) {
+		code += chars.charAt(Math.floor(Math.random() * chars.length));
+	}
+	return code;
+}
+
+// userCode 가져오기/생성 (localStorage key: userCode)
+function getUserCode() {
+	const storageKey = 'userCode';
+	let userCode = localStorage.getItem(storageKey);
+	
+	// 이전 키 마이그레이션
+	if (!userCode) {
+		const legacyUserCode = localStorage.getItem('teamMakerUserCode');
+		if (legacyUserCode) {
+			userCode = legacyUserCode;
+			localStorage.setItem(storageKey, userCode);
+			localStorage.removeItem('teamMakerUserCode');
+		}
+	}
+	
+	if (!userCode) {
+		userCode = generateUserCode();
+		localStorage.setItem(storageKey, userCode);
+	}
+	
+	return userCode;
+}
+
+// DB 저장용 타임스탬프 포맷: YYYY-MM-DD HH:mm:ss
+function getCurrentDbTimestamp() {
+	const now = new Date();
+	const year = now.getFullYear();
+	const month = String(now.getMonth() + 1).padStart(2, '0');
+	const day = String(now.getDate()).padStart(2, '0');
+	const hours = String(now.getHours()).padStart(2, '0');
+	const minutes = String(now.getMinutes()).padStart(2, '0');
+	const seconds = String(now.getSeconds()).padStart(2, '0');
+	return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+// users/{userCode} 레코드 보장
+function ensureUserRecord() {
+	if (!database || !currentUserCode) return Promise.resolve(false);
+	const userRef = database.ref(`users/${currentUserCode}`);
+	const now = getCurrentDbTimestamp();
+	
+	return userRef.once('value')
+		.then((snapshot) => {
+			if (!snapshot.exists()) {
+				return userRef.set({ createdAt: now, lastAccess: now });
+			}
+			return userRef.update({ lastAccess: now });
+		})
+		.catch((error) => {
+			console.error('❌ user 레코드 저장 실패:', error);
+		});
+}
 
 // URL 파라미터에서 key 읽기
 function getRoomKeyFromURL() {
@@ -28,7 +92,11 @@ function getRoomKeyFromURL() {
 function initFirebase() {
 	try {
 		// 이미 초기화되었는지 확인
-		if (database) return true;
+		if (database) {
+			if (!currentUserCode) currentUserCode = getUserCode();
+			ensureUserRecord();
+			return true;
+		}
 		
 		if (typeof firebase !== 'undefined') {
 			firebaseApp = firebase.initializeApp(firebaseConfig);
@@ -38,6 +106,15 @@ function initFirebase() {
 			
 			// URL에서 프로필 키 읽기
 			currentRoomKey = getRoomKeyFromURL();
+			currentUserCode = getUserCode();
+			ensureUserRecord();
+
+			// user 파라미터는 노출하지 않음
+			const url = new URL(window.location.href);
+			if (url.searchParams.has('user')) {
+				url.searchParams.delete('user');
+				window.history.replaceState({}, '', url);
+			}
 			
 			return true;
 		} else {

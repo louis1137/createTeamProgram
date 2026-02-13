@@ -120,10 +120,10 @@ const commandConsole = {
 				
 				// 상태 초기화 (다시 열었을 때 프로필 입력부터 시작)
 				if (!currentRoomKey) {
-					// 파라미터가 없는 경우에만 초기화
-					this.inputMode = 'profile';
+					// 파라미터가 없는 경우에만 초기화 (자동 프로필 프롬프트 비활성화)
+					this.inputMode = 'normal';
 					this.input.type = 'text';
-					this.input.placeholder = this.placeholders.profile;
+					this.input.placeholder = this.placeholders.input;
 					this.authenticated = false;
 					this.storedPassword = null;
 					this.tempProfile = '';
@@ -517,7 +517,7 @@ const commandConsole = {
 					weightBalanceEnabled: state.weightBalanceEnabled || false,
 					membersPerTeam: state.membersPerTeam || 4,
 					password: '', // 비밀번호 없음
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				if (database && currentRoomKey) {
@@ -1316,7 +1316,7 @@ const commandConsole = {
 				genderBalanceEnabled: state.genderBalanceEnabled,
 				weightBalanceEnabled: state.weightBalanceEnabled,
 				membersPerTeam: state.membersPerTeam,
-				timestamp: Date.now()
+				timestamp: getCurrentDbTimestamp()
 			};
 				
 			// password가 존재하면 포함
@@ -1497,7 +1497,7 @@ loadCommand(profileName = '') {
 					genderBalanceEnabled: state.genderBalanceEnabled,
 					weightBalanceEnabled: state.weightBalanceEnabled,
 					membersPerTeam: state.membersPerTeam,
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				// password가 존재하면 포함
@@ -1509,7 +1509,7 @@ loadCommand(profileName = '') {
 			})
 			.then(() => {
 				// 동기화 트리거를 Firebase에 기록하여 모든 창에 알림
-				const syncTrigger = { timestamp: Date.now(), type: 'all' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'all' };
 
 				// 자신이 발생시킨 트리거는 리스너에서 무시하도록 lastSyncTrigger 미리 업데이트
 				if (typeof lastSyncTrigger !== 'undefined') {
@@ -1572,13 +1572,13 @@ loadCommand(profileName = '') {
 					pendingHiddenGroups: state.pendingHiddenGroups,
 					pendingHiddenGroupChains: state.pendingHiddenGroupChains,
 					probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = { timestamp: Date.now(), type: 'rule' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'rule' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -1629,13 +1629,13 @@ loadCommand(profileName = '') {
 					genderBalanceEnabled: state.genderBalanceEnabled,
 					weightBalanceEnabled: state.weightBalanceEnabled,
 					membersPerTeam: state.membersPerTeam,
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = { timestamp: Date.now(), type: 'option' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'option' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -1680,13 +1680,13 @@ loadCommand(profileName = '') {
 				const updates = {
 					people: state.people,
 					nextId: state.nextId,
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = { timestamp: Date.now(), type: 'member' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'member' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -1724,13 +1724,13 @@ loadCommand(profileName = '') {
 				// 미참가자 관련 데이터만 업데이트
 				const updates = {
 					inactivePeople: state.inactivePeople,
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = { timestamp: Date.now(), type: 'people' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'people' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -1765,13 +1765,13 @@ loadCommand(profileName = '') {
 					requiredGroups: state.requiredGroups,
 					forbiddenPairs: state.forbiddenPairs,
 					pendingConstraints: state.pendingConstraints,
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = { timestamp: Date.now(), type: 'constraint' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'constraint' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -1817,13 +1817,13 @@ loadCommand(profileName = '') {
 				// 예약 데이터만 업데이트
 				const updates = {
 					reservations: state.reservations,
-					timestamp: Date.now()
+					timestamp: getCurrentDbTimestamp()
 				};
 				
 				return database.ref(`rooms/${currentRoomKey}`).update(updates);
 			})
 			.then(() => {
-				const syncTrigger = { timestamp: Date.now(), type: 'reservation' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'reservation' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -1884,7 +1884,7 @@ loadCommand(profileName = '') {
 						weightBalanceEnabled: false,
 						membersPerTeam: 4,
 						password: savedPassword !== null ? savedPassword : '',
-						timestamp: Date.now()
+						timestamp: getCurrentDbTimestamp()
 					};
 					return database.ref(`rooms/${currentRoomKey}`).set(emptyData);
 				})
@@ -1963,7 +1963,7 @@ loadCommand(profileName = '') {
 			return;
 		}
 		
-		const updateData = { timestamp: Date.now() };
+		const updateData = { timestamp: getCurrentDbTimestamp() };
 		
 		if (targets.has('participants')) {
 			state.people = [];

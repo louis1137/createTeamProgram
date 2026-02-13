@@ -276,11 +276,10 @@ function checkDevToolsAndOpenConsole() {
 							});
 						}
 					} else {
-						// 프로필이 없는 경우
-						commandConsole.log(commandConsoleMessages.comments.profileInput);
-						commandConsole.inputMode = 'profile';
-						commandConsole.input.placeholder = commandConsoleMessages.placeholders.profile;
-						commandConsole.restoreInputField(true);
+						// 프로필이 없는 경우: 자동 프롬프트 없이 일반 입력 모드 유지
+						commandConsole.inputMode = 'normal';
+						commandConsole.restoreInputField(false);
+						commandConsole.input.placeholder = commandConsoleMessages.placeholders.input;
 						setTimeout(() => commandConsole.input && commandConsole.input.focus(), 100);
 					}
 				}
@@ -772,6 +771,12 @@ function handleDuplicateCancel() {
 // localStorage에 저장
 function saveToLocalStorage() {
 	try {
+		// key 모드에서는 자동 저장하지 않음 (save 명령으로만 저장)
+		if (currentRoomKey) return;
+
+		if (!database && !initFirebase()) return;
+		if (!currentUserCode) return;
+
 		const data = {
 			people: state.people,
 			inactivePeople: state.inactivePeople, // 미참가자 목록 저장
@@ -785,22 +790,26 @@ function saveToLocalStorage() {
 			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 			genderBalanceEnabled: state.genderBalanceEnabled,
 			weightBalanceEnabled: state.weightBalanceEnabled,
-			membersPerTeam: state.membersPerTeam
+			membersPerTeam: state.membersPerTeam,
+			timestamp: getCurrentDbTimestamp(),
+			lastAccess: getCurrentDbTimestamp()
 		};
-		localStorage.setItem('teamMakerData', JSON.stringify(data));
-		
-		// 이름별 성별/가중치 기본값 저장 (사용하지 않음 - inactivePeople로 대체)
-		const personDefaults = {};
-		state.people.forEach(p => {
-			const normalized = normalizeName(p.name);
-			personDefaults[normalized] = {
-				gender: p.gender,
-				weight: p.weight
-			};
-		});
-		localStorage.setItem('teamMakerDefaults', JSON.stringify(personDefaults));
+
+		const userRef = database.ref(`users/${currentUserCode}`);
+		userRef.once('value')
+			.then((snapshot) => {
+				const existing = snapshot.val() || {};
+				const payload = {
+					...data,
+					createdAt: existing.createdAt || getCurrentDbTimestamp()
+				};
+				return userRef.update(payload);
+			})
+			.catch((e) => {
+				console.error('자동 저장 실패:', e);
+			});
 	} catch (e) {
-		console.error('localStorage 저장 실패:', e);
+		console.error('자동 저장 실패:', e);
 	}
 }
 
@@ -808,68 +817,77 @@ function saveToLocalStorage() {
 function loadFromLocalStorage() {
 	
 	try {
-		const saved = localStorage.getItem('teamMakerData');
-		
-		if (saved) {
-			const data = JSON.parse(saved);
+		// key 모드에서는 자동 복원을 사용하지 않음
+		if (currentRoomKey) return;
+
+		if (!database && !initFirebase()) return;
+		if (!currentUserCode) return;
+
+		database.ref(`users/${currentUserCode}`).once('value')
+			.then((snapshot) => {
+				const data = snapshot.val();
+				if (!data) return;
 			
-			// cmd 콘솔에도 출력
-			setTimeout(() => {
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					commandConsole.log(`✅ 로컬 데이터 복원: 참가자 ${data.people?.length || 0}명`);
-				}
-			}, 200);
-			
-			state.people = data.people || [];
-			state.inactivePeople = data.inactivePeople || []; // 미참가자 목록 복원
-			// 참가자 목록을 이름순으로 정렬
-			state.people.sort((a, b) => a.name.localeCompare(b.name));
-			// 그룹 내부를 가나다순으로 정렬하여 복원
-			state.requiredGroups = (data.requiredGroups || []).map(group => {
-				return [...group].sort((a, b) => {
-					const pa = state.people.find(p => p.id === a);
-					const pb = state.people.find(p => p.id === b);
-					if (!pa || !pb) return 0;
-					return pa.name.localeCompare(pb.name, 'ko');
+				// cmd 콘솔에도 출력
+				setTimeout(() => {
+					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+						commandConsole.log(`✅ 자동 데이터 복원: 참가자 ${data.people?.length || 0}명`);
+					}
+				}, 200);
+				
+				state.people = data.people || [];
+				state.inactivePeople = data.inactivePeople || []; // 미참가자 목록 복원
+				// 참가자 목록을 이름순으로 정렬
+				state.people.sort((a, b) => a.name.localeCompare(b.name));
+				// 그룹 내부를 가나다순으로 정렬하여 복원
+				state.requiredGroups = (data.requiredGroups || []).map(group => {
+					return [...group].sort((a, b) => {
+						const pa = state.people.find(p => p.id === a);
+						const pb = state.people.find(p => p.id === b);
+						if (!pa || !pb) return 0;
+						return pa.name.localeCompare(pb.name, 'ko');
+					});
 				});
-			});
-			state.nextId = data.nextId || 1;
-			state.forbiddenPairs = data.forbiddenPairs || [];
-			state.pendingConstraints = data.pendingConstraints || [];
-			state.reservations = data.reservations || []; // 예약 목록 복원
-			// hiddenGroups, pendingHiddenGroups, hiddenGroupChains, pendingHiddenGroupChains는 항상 빈 배열로 초기화 (저장하지 않음)
-			state.hiddenGroups = [];
-			state.pendingHiddenGroups = [];
-			state.hiddenGroupChains = [];
-			state.pendingHiddenGroupChains = [];
-			state.probabilisticForbiddenPairs = [];
-			state.activeProbabilisticForbiddenPairs = [];
-			
-			// 설정 값 복원
-			if (typeof data.maxTeamSizeEnabled !== 'undefined') {
-				state.maxTeamSizeEnabled = data.maxTeamSizeEnabled;
-				elements.maxTeamSizeCheckbox.checked = data.maxTeamSizeEnabled;
-			}
-			if (typeof data.genderBalanceEnabled !== 'undefined') {
-				state.genderBalanceEnabled = data.genderBalanceEnabled;
-				elements.genderBalanceCheckbox.checked = data.genderBalanceEnabled;
-			}
-			if (typeof data.weightBalanceEnabled !== 'undefined') {
-				state.weightBalanceEnabled = data.weightBalanceEnabled;
-				elements.weightBalanceCheckbox.checked = data.weightBalanceEnabled;
-			}
-			if (typeof data.membersPerTeam !== 'undefined') {
-				state.membersPerTeam = data.membersPerTeam;
-				elements.teamSizeInput.value = data.membersPerTeam;
-			}
-			
-			// cmd 콘솔에도 출력
-			setTimeout(() => {
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					commandConsole.log(commandConsoleMessages.comments.allSettingsRestored);
+				state.nextId = data.nextId || 1;
+				state.forbiddenPairs = data.forbiddenPairs || [];
+				state.pendingConstraints = data.pendingConstraints || [];
+				state.reservations = data.reservations || []; // 예약 목록 복원
+				// hiddenGroups, pendingHiddenGroups, hiddenGroupChains, pendingHiddenGroupChains는 항상 빈 배열로 초기화 (저장하지 않음)
+				state.hiddenGroups = [];
+				state.pendingHiddenGroups = [];
+				state.hiddenGroupChains = [];
+				state.pendingHiddenGroupChains = [];
+				state.probabilisticForbiddenPairs = [];
+				state.activeProbabilisticForbiddenPairs = [];
+				
+				// 설정 값 복원
+				if (typeof data.maxTeamSizeEnabled !== 'undefined') {
+					state.maxTeamSizeEnabled = data.maxTeamSizeEnabled;
+					elements.maxTeamSizeCheckbox.checked = data.maxTeamSizeEnabled;
 				}
-			}, 250);
-		}
+				if (typeof data.genderBalanceEnabled !== 'undefined') {
+					state.genderBalanceEnabled = data.genderBalanceEnabled;
+					elements.genderBalanceCheckbox.checked = data.genderBalanceEnabled;
+				}
+				if (typeof data.weightBalanceEnabled !== 'undefined') {
+					state.weightBalanceEnabled = data.weightBalanceEnabled;
+					elements.weightBalanceCheckbox.checked = data.weightBalanceEnabled;
+				}
+				if (typeof data.membersPerTeam !== 'undefined') {
+					state.membersPerTeam = data.membersPerTeam;
+					elements.teamSizeInput.value = data.membersPerTeam;
+				}
+
+				// 복원된 데이터 기반으로 참가자 UI 재구성
+				buildForbiddenMap();
+				renderPeople();
+				tryResolvePendingConstraints();
+				tryResolveHiddenGroups();
+			
+			})
+			.catch((e) => {
+				console.error('자동 데이터 복원 실패:', e);
+			});
 	} catch (e) {
 		
 		// cmd 콘솔에도 출력
@@ -1407,11 +1425,10 @@ function addPerson(fromConsole = false, options = {}) {
 						}
 					}
 				} else {
-					// 파라미터가 없는 경우 - 프로필 생성 플로우 시작
-					commandConsole.log(commandConsoleMessages.comments.profileInput);
-					commandConsole.inputMode = 'profile';
-					commandConsole.input.placeholder = commandConsoleMessages.placeholders.profile;
-					commandConsole.restoreInputField(true);
+					// 파라미터가 없는 경우: 자동 프롬프트 없이 일반 입력 모드 유지
+					commandConsole.inputMode = 'normal';
+					commandConsole.restoreInputField(false);
+					commandConsole.input.placeholder = commandConsoleMessages.placeholders.input;
 					setTimeout(() => commandConsole.input && commandConsole.input.focus(), 100);
 				}
 			}
@@ -3389,7 +3406,7 @@ function shuffleTeams() {
 		database.ref(`rooms/${currentRoomKey}/reservations`).set(state.reservations)
 			.then(() => {
 				// syncTrigger 설정하여 다른 창에 알림
-				const syncTrigger = { timestamp: Date.now(), type: 'reservation' };
+				const syncTrigger = { timestamp: getCurrentDbTimestamp(), type: 'reservation' };
 				if (typeof lastSyncTrigger !== 'undefined') {
 					lastSyncTrigger = syncTrigger;
 				}
@@ -4371,6 +4388,44 @@ function logTeamResultsToConsole(teams) {
 	commandConsole.log(outputMessage);
 }
 
+// 팀 생성 이력 저장
+function saveGenerateHistory(teams) {
+	try {
+		if (!database || !currentUserCode) return;
+		if (!Array.isArray(teams) || teams.length === 0) return;
+
+		const timestamp = getCurrentDbTimestamp();
+		const historyData = {
+			createdAt: timestamp,
+			profile: currentRoomKey || '',
+			teams: teams.map(team => team.map(person => {
+				const details = [];
+				if (state.genderBalanceEnabled && person.gender) {
+					if (person.gender === 'male') details.push('남');
+					else if (person.gender === 'female') details.push('여');
+					else details.push(person.gender);
+				}
+				if (state.weightBalanceEnabled) {
+					details.push(person.weight ?? 0);
+				}
+				return details.length > 0 ? `${person.name}(${details.join('/')})` : person.name;
+			}))
+		};
+
+		database.ref(`users/${currentUserCode}/generateHistory`).push(historyData)
+			.then(() => {
+				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
+					commandConsole.log(`✅ generateHistory 저장 완료 (${teams.length}팀)`);
+				}
+			})
+			.catch((error) => {
+				console.error('generateHistory 저장 실패:', error);
+			});
+	} catch (error) {
+		console.error('generateHistory 저장 실패:', error);
+	}
+}
+
 // 검증 루프 시작
 async function startValidationLoop(initialTeams) {
 	let currentTeams = initialTeams.map(team => [...team]);
@@ -4445,6 +4500,9 @@ async function startValidationLoop(initialTeams) {
 	
 	// 최종 검증된 팀을 결과창에 표시
 	await displayTeams(currentTeams);
+
+	// 팀 생성 시 generateHistory 저장
+	saveGenerateHistory(currentTeams);
 }
 
 // 검증 단계 비교 화면 표시
