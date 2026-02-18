@@ -87,6 +87,25 @@ const elements = {
 let captureSuccessTimer = null;
 let lastProfileConsoleMessage = '';
 let lastProfileConsoleMessageAt = 0;
+let isTeamGenerationInProgress = false;
+
+function setTeamGenerationButtonState(isGenerating) {
+	const btn = elements.shuffleBtn;
+	if (!btn) return;
+
+	if (isGenerating) {
+		if (!btn.dataset.originalLabel) {
+			btn.dataset.originalLabel = btn.textContent || '팀 생성';
+		}
+		btn.textContent = '팀 생성중...';
+		btn.disabled = true;
+		return;
+	}
+
+	btn.textContent = btn.dataset.originalLabel || '팀 생성';
+	btn.disabled = false;
+	delete btn.dataset.originalLabel;
+}
 
 function logProfileConsole(message) {
 	const now = Date.now();
@@ -3439,7 +3458,9 @@ function getPotentialDuplicatesFromInput() {
 	return duplicateNames;
 }
 
-function shuffleTeams() {
+async function shuffleTeams() {
+	if (isTeamGenerationInProgress) return;
+
 	if (state.people.length === 0) {
 		showError(commandConsoleMessages.comments.addParticipant);
 		return;
@@ -3460,6 +3481,11 @@ function shuffleTeams() {
 		showError(commandConsoleMessages.comments.notEnoughParticipants);
 		return;
 	}
+
+	isTeamGenerationInProgress = true;
+	setTeamGenerationButtonState(true);
+
+	try {
 
 	// 예약 처리: 첫 번째 예약을 꺼내서 전달
 	let consumedReservation = null;
@@ -3542,7 +3568,11 @@ function shuffleTeams() {
 	setTeamAnimDurationFromDelay();
 	
 	// 검증 루프 실행 후 최종 결과만 표시
-	startValidationLoop(teams);
+	await startValidationLoop(teams);
+	} finally {
+		isTeamGenerationInProgress = false;
+		setTeamGenerationButtonState(false);
+	}
 }
 // 팀 생성 전에 내부적으로 한 번 셔플: 그룹 내 인원은 제외(비그룹 인원만 무작위화)
 function preShufflePeopleForGeneration(people) {
