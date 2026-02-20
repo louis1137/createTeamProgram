@@ -475,6 +475,24 @@ function renderGenerateHistoryTable() {
 	applyHistoryExpandedState();
 }
 
+function closeAllHistoryDetailRows(container = getEl('historyTableBody')) {
+	if (!(container instanceof HTMLElement)) {
+		return;
+	}
+	const detailRows = Array.from(container.querySelectorAll('tr.history-detail-row'));
+	const toggleButtons = Array.from(container.querySelectorAll('button[data-role="toggle-history"]'));
+	detailRows.forEach((row) => {
+		row.setAttribute('hidden', '');
+	});
+	toggleButtons.forEach((button) => {
+		button.setAttribute('aria-expanded', 'false');
+		const chevron = button.querySelector('.history-chevron');
+		if (chevron) {
+			chevron.textContent = '▸';
+		}
+	});
+}
+
 function getGenderLabel(gender) {
 	return gender === 'female' ? '♀️' : '♂️';
 }
@@ -945,6 +963,7 @@ function refreshHistoryExpandButton() {
 	const shouldShow = shouldShowHistoryExpandButton();
 	if (!shouldShow) {
 		row.classList.remove('expanded');
+		closeAllHistoryDetailRows();
 		button.style.display = 'none';
 		return;
 	}
@@ -1918,26 +1937,17 @@ function bindEvents() {
 			if (!index) {
 				return;
 			}
-
-			const detailRows = Array.from(historyTableBody.querySelectorAll('tr.history-detail-row'));
-			const toggleButtons = Array.from(historyTableBody.querySelectorAll('button[data-role="toggle-history"]'));
 			const targetDetailRow = historyTableBody.querySelector(`tr.history-detail-row[data-index="${index}"]`);
 			if (!(targetDetailRow instanceof HTMLElement)) {
 				return;
 			}
+			const historyTableRow = getEl('historyTableRow');
+			const isMultiExpandMode = Boolean(historyTableRow?.classList.contains('expanded'));
 
 			const shouldOpen = targetDetailRow.hasAttribute('hidden');
-
-			detailRows.forEach((row) => {
-				row.setAttribute('hidden', '');
-			});
-			toggleButtons.forEach((item) => {
-				item.setAttribute('aria-expanded', 'false');
-				const chevron = item.querySelector('.history-chevron');
-				if (chevron) {
-					chevron.textContent = '▸';
-				}
-			});
+			if (!isMultiExpandMode) {
+				closeAllHistoryDetailRows(historyTableBody);
+			}
 
 			if (shouldOpen) {
 				targetDetailRow.removeAttribute('hidden');
@@ -1946,6 +1956,14 @@ function bindEvents() {
 				if (chevron) {
 					chevron.textContent = '▾';
 				}
+				return;
+			}
+
+			targetDetailRow.setAttribute('hidden', '');
+			button.setAttribute('aria-expanded', 'false');
+			const chevron = button.querySelector('.history-chevron');
+			if (chevron) {
+				chevron.textContent = '▸';
 			}
 		});
 	}
@@ -1955,6 +1973,9 @@ function bindEvents() {
 	if (historyExpandBtn instanceof HTMLButtonElement && historyTableRow) {
 		historyExpandBtn.addEventListener('click', () => {
 			historyTableRow.classList.toggle('expanded');
+			if (!historyTableRow.classList.contains('expanded')) {
+				closeAllHistoryDetailRows();
+			}
 			applyHistoryExpandedState();
 			refreshHistoryExpandButton();
 		});
