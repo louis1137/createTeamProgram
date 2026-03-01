@@ -3656,19 +3656,18 @@ function generateTeams(people, reservation = null) {
 	
 	// 팀 인원수와 정확히 일치하는 그룹들을 미리 분리
 	const completeTeamGroups = []; // 완성된 팀으로 사용할 그룹들
-	const validGroups = state.requiredGroups.filter(group => 
-		group.every(id => people.some(p => p.id === id))
-	);
-	
-	const regularGroups = []; // 일반 그룹들
+	const regularGroups = []; // 일반 그룹들 [{ group, requiredGroupIndex }]
 	const completeTeamMemberIds = new Set(); // 완성된 팀에 속한 멤버 ID들
 	
-	validGroups.forEach(group => {
+	state.requiredGroups.forEach((group, requiredGroupIndex) => {
+		if (!group.every(id => people.some(p => p.id === id))) {
+			return;
+		}
 		if (group.length === state.membersPerTeam) {
 			completeTeamGroups.push(group);
 			group.forEach(id => completeTeamMemberIds.add(id));
 		} else {
-			regularGroups.push(group);
+			regularGroups.push({ group, requiredGroupIndex });
 		}
 	});
 	
@@ -3691,10 +3690,47 @@ function generateTeams(people, reservation = null) {
 	// 나머지 참가자에서 최소 성별(소수 성별) 계산
 	const maleCount = remainingPeople.filter(p => p.gender === 'male').length;
 	const femaleCount = remainingPeople.filter(p => p.gender === 'female').length;
+	const minorityCount = Math.min(maleCount, femaleCount);
 	const minorityGender = maleCount === femaleCount ? null : (femaleCount < maleCount ? 'female' : 'male');
 	const getTeamMinorityCount = (team) => {
 		if (!minorityGender) return 0;
 		return team.filter(p => p.gender === minorityGender).length;
+	};
+	const isMinorityForcedTogether = () => {
+		if (!minorityGender) return false;
+		const minorityIds = new Set(
+			people.filter((p) => p.gender === minorityGender).map((p) => p.id)
+		);
+		if (minorityIds.size <= 1) return false;
+
+		for (const group of state.requiredGroups) {
+			let count = 0;
+			for (const id of group) {
+				if (minorityIds.has(id)) count += 1;
+				if (count >= 2) return true;
+			}
+		}
+
+		const visited = new Set();
+		for (const startId of minorityIds) {
+			if (visited.has(startId)) continue;
+			const queue = [startId];
+			const componentMinorityIds = new Set();
+			while (queue.length > 0) {
+				const current = queue.shift();
+				if (visited.has(current)) continue;
+				visited.add(current);
+				if (minorityIds.has(current)) componentMinorityIds.add(current);
+				const neighbors = state.activeHiddenGroupMap[current];
+				if (!neighbors) continue;
+				neighbors.forEach((nextId) => {
+					if (!visited.has(nextId)) queue.push(nextId);
+				});
+			}
+			if (componentMinorityIds.size >= 2) return true;
+		}
+
+		return false;
 	};
 
 	for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -3710,6 +3746,7 @@ function generateTeams(people, reservation = null) {
 				}
 			});
 		}
+		const minorityForcedTogether = isMinorityForcedTogether();
 		
 		// 나머지 사람들만 셔플
 		const shuffledPeople = [...remainingPeople].sort(() => Math.random() - 0.5);
@@ -3810,15 +3847,15 @@ function generateTeams(people, reservation = null) {
 
 		// 일반 그룹들만 처리 - 히든 그룹에 영향받은 그룹은 제외
 		// (히든 그룹 블록에 이미 포함된 멤버들은 assigned되었으므로)
-		const unaffectedRegularGroups = regularGroups.filter((group, idx) => 
-			!hiddenGroupAffectedGroupIndices.has(idx)
+		const unaffectedRegularGroups = regularGroups.filter(({ requiredGroupIndex }) => 
+			!hiddenGroupAffectedGroupIndices.has(requiredGroupIndex)
 		);
 		
 		// 가중치 균등이 활성화된 경우 그룹을 가중치 순으로 정렬 (높은 순)
 		let processGroups;
 		if (state.weightBalanceEnabled) {
 			// 각 그룹의 평균 가중치 계산
-			const groupsWithWeight = unaffectedRegularGroups.map(group => {
+			const groupsWithWeight = unaffectedRegularGroups.map(({ group }) => {
 				const groupMembers = group.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
 				const totalWeight = groupMembers.reduce((sum, p) => sum + (p.weight || 0), 0);
 				const avgWeight = groupMembers.length > 0 ? totalWeight / groupMembers.length : 0;
@@ -3829,13 +3866,18 @@ function generateTeams(people, reservation = null) {
 			processGroups = groupsWithWeight.map(g => g.group);
 		} else {
 			// 가중치 균등이 없으면 셔플
-			processGroups = [...unaffectedRegularGroups].sort(() => Math.random() - 0.5);
+			processGroups = [...unaffectedRegularGroups]
+				.map(({ group }) => group)
+				.sort(() => Math.random() - 0.5);
 		}
 		
 		let groupFailed = false;
 
 		for (const group of processGroups) {
 			const groupMembers = group.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
+			if (groupMembers.some(member => assigned.has(member.id))) {
+				continue;
+			}
 			
 			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
 			let teamOrder;
@@ -3884,7 +3926,7 @@ function generateTeams(people, reservation = null) {
 				if (hasConflict) continue;
 				
 				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
-				if (state.genderBalanceEnabled && minorityGender) {
+				if (state.genderBalanceEnabled && minorityGender && !minorityForcedTogether) {
 					const currentMinGender = getTeamMinorityCount(teams[i]);
 					const allTeamMinGenders = teams.map(getTeamMinorityCount);
 					const globalMinGender = Math.min(...allTeamMinGenders);
@@ -4005,7 +4047,7 @@ function generateTeams(people, reservation = null) {
 				
 				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
 				// 가중치 균등 모드에서는 가중치 우선, 성별 균형은 참고만
-				if (state.genderBalanceEnabled && isMinorityPerson && !state.weightBalanceEnabled) {
+				if (state.genderBalanceEnabled && isMinorityPerson && !minorityForcedTogether) {
 					const currentMinGender = getTeamMinorityCount(teams[i]);
 					const allTeamMinGenders = teams.map(getTeamMinorityCount);
 					const globalMinGender = Math.min(...allTeamMinGenders);
@@ -4054,6 +4096,17 @@ function generateTeams(people, reservation = null) {
 		}
 		
 		if (!allValid) continue;
+
+		if (state.genderBalanceEnabled && minorityGender && !minorityForcedTogether) {
+			const minorityDistribution = teams.map(getTeamMinorityCount);
+			const maxMinorityPerTeam = Math.max(...minorityDistribution);
+			const minMinorityPerTeam = Math.min(...minorityDistribution);
+			if (minorityCount <= teams.length) {
+				if (maxMinorityPerTeam > 1) continue;
+			} else if (maxMinorityPerTeam - minMinorityPerTeam > 1) {
+				continue;
+			}
+		}
 		
 		// 최대인원 모드: 마지막 팀이 아닌 팀이 최대인원보다 적으면 재정렬
 		if (state.maxTeamSizeEnabled) {

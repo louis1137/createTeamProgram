@@ -279,13 +279,7 @@ function cloneRules(data) {
 		rows.push({ member1, member2, probability: -probability });
 	});
 
-	ruleDraft = rows.sort((a, b) => {
-		const byMember1 = normalizeName(a.member1).localeCompare(normalizeName(b.member1), 'ko');
-		if (byMember1 !== 0) {
-			return byMember1;
-		}
-		return normalizeName(a.member2).localeCompare(normalizeName(b.member2), 'ko');
-	});
+	ruleDraft = rows;
 }
 
 function normalizeReservation(item) {
