@@ -18,6 +18,10 @@ let ruleDraft = [];
 let reservationDraft = [];
 let historyDraft = [];
 
+const ADMIN_ACCESS_PASSWORD_STORAGE_KEY = 'adminAccessPassword';
+const ADMIN_ACCESS_SESSION_KEY = 'adminAccessAuthenticated';
+const DEFAULT_ADMIN_ACCESS_PASSWORD = 'admin1234';
+
 const fieldIds = {
 	key: 'fieldKey',
 	membersPerTeam: 'fieldMembersPerTeam',
@@ -130,6 +134,32 @@ function showToast(message) {
 function initFirebase() {
 	const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
 	database = app.database();
+}
+
+function getAdminAccessPassword() {
+	const customPassword = window.localStorage.getItem(ADMIN_ACCESS_PASSWORD_STORAGE_KEY);
+	if (customPassword && customPassword.trim().length > 0) {
+		return customPassword;
+	}
+	return DEFAULT_ADMIN_ACCESS_PASSWORD;
+}
+
+function blockAdminAccess() {
+	window.location.replace('login.html');
+}
+
+function logoutAdminAccess() {
+	window.sessionStorage.removeItem(ADMIN_ACCESS_SESSION_KEY);
+	window.location.replace('login.html');
+}
+
+function guardAdminAccess() {
+	const sessionAuthenticated = window.sessionStorage.getItem(ADMIN_ACCESS_SESSION_KEY) === 'true';
+	if (!sessionAuthenticated) {
+		blockAdminAccess();
+		return false;
+	}
+	return true;
 }
 
 function setButtonsEnabled(enabled) {
@@ -1560,6 +1590,9 @@ function initTheme() {
 }
 
 function bindEvents() {
+	getEl('logoutBtn').addEventListener('click', () => {
+		logoutAdminAccess();
+	});
 	getEl('refreshListsBtn').addEventListener('click', async () => {
 		await loadLists();
 		if (selected.type && selected.key) {
@@ -2004,6 +2037,9 @@ function bindEvents() {
 }
 
 async function bootstrap() {
+	if (!guardAdminAccess()) {
+		return;
+	}
 	initFirebase();
 	initAccordion();
 	initTheme();

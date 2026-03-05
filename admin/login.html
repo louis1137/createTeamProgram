@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Admin Login</title>
+	<link rel="stylesheet" href="admin.css">
+	<style>
+		.login-shell {
+			min-height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 16px;
+		}
+
+		.login-card {
+			width: 100%;
+			max-width: 420px;
+			border: 1px solid var(--line);
+			background: var(--panel);
+			padding: 20px;
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+		}
+
+		.login-card h1 {
+			margin: 0;
+			font-size: 20px;
+		}
+
+		.login-card p {
+			margin: 0;
+			font-size: 13px;
+			color: var(--muted);
+		}
+
+		.login-input {
+			width: 100%;
+			height: 38px;
+			padding: 9px 10px;
+			border: 1px solid var(--line);
+			background: var(--panel-2);
+			color: var(--text);
+			outline: none;
+		}
+
+		.login-error {
+			margin-top: 10px;
+			min-height: 20px;
+			font-size: 12px;
+			color: var(--muted);
+		}
+
+		.login-actions {
+			display: flex;
+			justify-content: flex-end;
+		}
+
+		.login-section.hidden {
+			display: none;
+		}
+
+		.login-change-wrap {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		.change-toggle {
+			display: inline-flex;
+			align-self: center;
+			padding: 0;
+			border: none;
+			background: transparent;
+			color: #5f6576;
+			font-size: 13px;
+			text-decoration: underline;
+			cursor: pointer;
+		}
+
+		.change-toggle.hidden {
+			display: none;
+		}
+
+		.change-form {
+			display: none;
+			flex-direction: column;
+			gap: 8px;
+			padding: 10px;
+			border: 1px solid var(--line);
+			background: var(--panel-2);
+		}
+
+		.change-form.show {
+			display: flex;
+		}
+
+		.change-actions {
+			display: flex;
+			justify-content: flex-end;
+			gap: 8px;
+		}
+
+		.change-message {
+			min-height: 18px;
+			font-size: 12px;
+			color: var(--muted);
+		}
+	</style>
+</head>
+<body>
+	<div class="login-shell">
+		<form id="adminLoginForm" class="login-card" autocomplete="off">
+			<h1>관리자 로그인</h1>
+			<p>비밀번호를 입력하면 관리자 페이지로 이동합니다.</p>
+			<div id="loginSection" class="login-section">
+				<input id="adminPasswordInput" class="login-input" type="password" placeholder="비밀번호" required>
+				<div id="loginErrorText" class="login-error" role="status" aria-live="polite"></div>
+				<div class="login-actions">
+					<button class="btn" type="submit">로그인</button>
+				</div>
+			</div>
+			<div class="login-change-wrap">
+				<button id="showChangePasswordBtn" class="change-toggle" type="button">비밀번호 변경</button>
+				<div id="changePasswordForm" class="change-form">
+					<input id="currentPasswordInput" class="login-input" type="password" placeholder="기존 비밀번호" autocomplete="off">
+					<input id="newPasswordInput" class="login-input" type="password" placeholder="새 비밀번호 입력" autocomplete="off">
+					<input id="confirmPasswordInput" class="login-input" type="password" placeholder="새 비밀번호 확인" autocomplete="off">
+					<div id="changePasswordMessage" class="change-message" role="status" aria-live="polite"></div>
+					<div class="change-actions">
+						<button id="submitChangePasswordBtn" class="btn" type="button">변경 저장</button>
+						<button id="cancelChangePasswordBtn" class="btn btn-secondary" type="button">취소</button>
+					</div>
+				</div>
+			</div>
+		</form>
+	</div>
+
+	<script>
+		const ADMIN_ACCESS_PASSWORD_STORAGE_KEY = 'adminAccessPassword';
+		const ADMIN_ACCESS_SESSION_KEY = 'adminAccessAuthenticated';
+		const DEFAULT_ADMIN_ACCESS_PASSWORD = 'admin1234';
+
+		function getAdminAccessPassword() {
+			const customPassword = window.localStorage.getItem(ADMIN_ACCESS_PASSWORD_STORAGE_KEY);
+			if (customPassword && customPassword.trim().length > 0) {
+				return customPassword;
+			}
+			return DEFAULT_ADMIN_ACCESS_PASSWORD;
+		}
+
+		function redirectToAdmin() {
+			window.location.replace('index.html');
+		}
+
+		if (window.sessionStorage.getItem(ADMIN_ACCESS_SESSION_KEY) === 'true') {
+			redirectToAdmin();
+		}
+
+		const form = document.getElementById('adminLoginForm');
+		const loginSection = document.getElementById('loginSection');
+		const passwordInput = document.getElementById('adminPasswordInput');
+		const errorText = document.getElementById('loginErrorText');
+		const showChangePasswordBtn = document.getElementById('showChangePasswordBtn');
+		const changePasswordForm = document.getElementById('changePasswordForm');
+		const currentPasswordInput = document.getElementById('currentPasswordInput');
+		const newPasswordInput = document.getElementById('newPasswordInput');
+		const confirmPasswordInput = document.getElementById('confirmPasswordInput');
+		const changePasswordMessage = document.getElementById('changePasswordMessage');
+		const cancelChangePasswordBtn = document.getElementById('cancelChangePasswordBtn');
+		const submitChangePasswordBtn = document.getElementById('submitChangePasswordBtn');
+
+		function setChangePasswordMode(enabled) {
+			changePasswordForm.classList.toggle('show', enabled);
+			loginSection.classList.toggle('hidden', enabled);
+			showChangePasswordBtn.classList.toggle('hidden', enabled);
+			changePasswordMessage.textContent = '';
+			if (enabled) {
+				currentPasswordInput.focus();
+				return;
+			}
+			currentPasswordInput.value = '';
+			newPasswordInput.value = '';
+			confirmPasswordInput.value = '';
+			passwordInput.focus();
+		}
+
+		form.addEventListener('submit', (event) => {
+			event.preventDefault();
+			errorText.textContent = '';
+			const entered = passwordInput.value;
+			if (entered !== getAdminAccessPassword()) {
+				errorText.textContent = '비밀번호가 올바르지 않습니다.';
+				passwordInput.value = '';
+				passwordInput.focus();
+				return;
+			}
+			window.sessionStorage.setItem(ADMIN_ACCESS_SESSION_KEY, 'true');
+			redirectToAdmin();
+		});
+
+		showChangePasswordBtn.addEventListener('click', () => {
+			const isOpen = changePasswordForm.classList.contains('show');
+			setChangePasswordMode(!isOpen);
+		});
+
+		cancelChangePasswordBtn.addEventListener('click', () => {
+			setChangePasswordMode(false);
+		});
+
+		submitChangePasswordBtn.addEventListener('click', () => {
+			changePasswordMessage.textContent = '';
+			const currentPassword = currentPasswordInput.value;
+			const newPassword = newPasswordInput.value;
+			const confirmPassword = confirmPasswordInput.value;
+
+			if (currentPassword !== getAdminAccessPassword()) {
+				changePasswordMessage.textContent = '기존 비밀번호가 올바르지 않습니다.';
+				currentPasswordInput.focus();
+				return;
+			}
+
+			if (!newPassword || newPassword.trim().length === 0) {
+				changePasswordMessage.textContent = '새 비밀번호를 입력하세요.';
+				newPasswordInput.focus();
+				return;
+			}
+
+			if (newPassword !== confirmPassword) {
+				changePasswordMessage.textContent = '새 비밀번호 확인이 일치하지 않습니다.';
+				confirmPasswordInput.focus();
+				return;
+			}
+
+			window.localStorage.setItem(ADMIN_ACCESS_PASSWORD_STORAGE_KEY, newPassword);
+			changePasswordMessage.textContent = '비밀번호가 변경되었습니다.';
+			setChangePasswordMode(false);
+		});
+
+		passwordInput.focus();
+	</script>
+</body>
+</html>

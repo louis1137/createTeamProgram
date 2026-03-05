@@ -4,6 +4,11 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Admin Dashboard</title>
+	<script>
+		if (window.sessionStorage.getItem('adminAccessAuthenticated') !== 'true') {
+			window.location.replace('login.html');
+		}
+	</script>
 	<link rel="stylesheet" href="admin.css">
 	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
@@ -19,6 +24,7 @@
 			<div class="top-actions">
 				<button id="themeToggleBtn" class="btn btn-secondary" type="button">라이트 모드</button>
 				<button id="refreshListsBtn" class="btn" type="button">리스트 새로고침</button>
+				<button id="logoutBtn" class="btn btn-secondary" type="button">로그아웃</button>
 			</div>
 		</header>
 
