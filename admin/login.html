@@ -160,11 +160,6 @@
 		const ADMIN_REMEMBER_PASSWORD_ENABLED_KEY = 'adminRememberPasswordEnabled';
 		const REMEMBER_PASSWORD_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;
 		const GLOBAL_APP_PASSWORD_PATH = 'admin/password';
-		const LEGACY_GLOBAL_APP_PASSWORD_PATHS = [
-			'settings/globalPassword',
-			'profiles/__global_admin__/password',
-			'profile/__global_admin__/password'
-		];
 		const DEFAULT_ADMIN_ACCESS_PASSWORD = 'admin1234';
 
 		const firebaseConfig = {
@@ -197,17 +192,6 @@
 				const value = snapshot.val();
 				if (typeof value === 'string' && value.length > 0) {
 					return value;
-				}
-				for (const path of LEGACY_GLOBAL_APP_PASSWORD_PATHS) {
-					try {
-						const legacySnapshot = await loginDatabase.ref(path).once('value');
-						const legacyValue = legacySnapshot.val();
-						if (typeof legacyValue === 'string' && legacyValue.length > 0) {
-							return legacyValue;
-						}
-					} catch (legacyError) {
-						continue;
-					}
 				}
 				return DEFAULT_ADMIN_ACCESS_PASSWORD;
 			} catch (error) {

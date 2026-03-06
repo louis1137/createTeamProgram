@@ -21,11 +21,6 @@ let syncEnabled = false;
 let authenticatedPassword = ''; // 인증된 비밀번호 저장
 
 const GLOBAL_APP_PASSWORD_PATH = 'admin/password';
-const LEGACY_GLOBAL_APP_PASSWORD_PATHS = [
-	'settings/globalPassword',
-	'profiles/__global_admin__/password',
-	'profile/__global_admin__/password'
-];
 const DEFAULT_GLOBAL_APP_PASSWORD = 'admin1234';
 
 function normalizeReservations(value) {
@@ -48,7 +43,7 @@ function normalizeReservations(value) {
 }
 
 function setCurrentProfileSource(source) {
-	if (source === 'users' || source === 'profile' || source === 'profiles') {
+	if (source === 'users' || source === 'profiles') {
 		currentProfileSource = source;
 		return;
 	}
@@ -69,22 +64,7 @@ function getGlobalAppPassword() {
 			if (typeof value === 'string' && value.length > 0) {
 				return value;
 			}
-			const readLegacyAt = (index) => {
-				if (index >= LEGACY_GLOBAL_APP_PASSWORD_PATHS.length) {
-					return Promise.resolve(DEFAULT_GLOBAL_APP_PASSWORD);
-				}
-				const path = LEGACY_GLOBAL_APP_PASSWORD_PATHS[index];
-				return database.ref(path).once('value')
-					.then((legacySnapshot) => {
-						const legacyValue = legacySnapshot.val();
-						if (typeof legacyValue === 'string' && legacyValue.length > 0) {
-							return legacyValue;
-						}
-						return readLegacyAt(index + 1);
-					})
-					.catch(() => readLegacyAt(index + 1));
-			};
-			return readLegacyAt(0);
+			return DEFAULT_GLOBAL_APP_PASSWORD;
 		})
 		.catch(() => DEFAULT_GLOBAL_APP_PASSWORD);
 }
@@ -104,18 +84,11 @@ function resolveProfileRecord(profileKey) {
 	}
 
 	return Promise.all([
-		database.ref(`profile/${profileKey}`).once('value'),
 		database.ref(`profiles/${profileKey}`).once('value'),
 		database.ref(`users/${profileKey}`).once('value')
-	]).then(([legacyProfileSnapshot, profileSnapshot, userSnapshot]) => {
-		const legacyProfileData = legacyProfileSnapshot.val();
+	]).then(([profileSnapshot, userSnapshot]) => {
 		const profileData = profileSnapshot.val();
 		const userData = userSnapshot.val();
-
-		if (legacyProfileData !== null) {
-			setCurrentProfileSource('profile');
-			return { exists: true, source: 'profile', data: legacyProfileData };
-		}
 
 		if (profileData !== null) {
 			setCurrentProfileSource('profiles');
@@ -227,14 +200,6 @@ function initFirebase() {
 							return originalRef(`users/${currentProfileKey}/${path.slice(profilePrefix.length + 1)}`);
 						}
 					}
-					if (currentProfileSource === 'profile') {
-						if (path === profilePrefix) {
-							return originalRef(`profile/${currentProfileKey}`);
-						}
-						if (path.startsWith(`${profilePrefix}/`)) {
-							return originalRef(`profile/${currentProfileKey}/${path.slice(profilePrefix.length + 1)}`);
-						}
-					}
 				}
 				return originalRef(path);
 			};
@@ -300,8 +265,7 @@ function setupRealtimeSync() {
 	const triggerPaths = currentProfileKey
 		? [
 			`profiles/${currentProfileKey}/syncTrigger`,
-			`users/${currentProfileKey}/syncTrigger`,
-			`profile/${currentProfileKey}/syncTrigger`
+			`users/${currentProfileKey}/syncTrigger`
 		]
 		: [`users/${currentUserCode}/syncTrigger`];
 

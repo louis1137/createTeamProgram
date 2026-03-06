@@ -71,9 +71,6 @@ function getSyncTriggerPath(type, key) {
 	if (type === 'profiles') {
 		return `profiles/${key}/syncTrigger`;
 	}
-	if (type === 'profile') {
-		return `profile/${key}/syncTrigger`;
-	}
 	return '';
 }
 

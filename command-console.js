@@ -845,18 +845,16 @@ const commandConsole = {
 				return;
 			}
 			
-			// 프로필 전체 데이터 확인 (profile + profiles + users)
+			// 프로필 전체 데이터 확인 (profiles + users)
 			Promise.all([
-				database.ref(`profile/${cmd}`).once('value'),
 				database.ref(`profiles/${cmd}`).once('value'),
 				database.ref(`users/${cmd}`).once('value')
-			]).then(async ([legacyProfileSnapshot, profileSnapshot, userSnapshot]) => {
-				const legacyProfileData = legacyProfileSnapshot.val();
+			]).then(async ([profileSnapshot, userSnapshot]) => {
 				const profileNodeData = profileSnapshot.val();
 				const userData = userSnapshot.val();
-				const source = legacyProfileData !== null ? 'profile' : (profileNodeData !== null ? 'profiles' : (userData !== null ? 'users' : 'profiles'));
+				const source = profileNodeData !== null ? 'profiles' : (userData !== null ? 'users' : 'profiles');
 				const isUsersSource = source === 'users';
-				const profileData = legacyProfileData !== null ? legacyProfileData : (profileNodeData !== null ? profileNodeData : userData);
+				const profileData = profileNodeData !== null ? profileNodeData : userData;
 				const isProfileSwitch = this.inputMode === 'profile-switch';
 				
 				// 프로필이 존재하는지 확인 (password 또는 다른 데이터가 있으면 존재)
