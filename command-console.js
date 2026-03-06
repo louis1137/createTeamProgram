@@ -24,6 +24,29 @@ const commandConsole = {
 	hasWriteAccess() {
 		return this.authenticated || this.isUsersMode();
 	},
+
+	getUnifiedPassword() {
+		if (typeof getGlobalAppPassword === 'function') {
+			return getGlobalAppPassword();
+		}
+		if (!database || !currentProfileKey) {
+			return Promise.resolve('');
+		}
+		return database.ref(`profiles/${currentProfileKey}/password`).once('value')
+			.then((snapshot) => String(snapshot.val() || ''))
+			.catch(() => '');
+	},
+
+	setUnifiedPassword(nextPassword) {
+		const value = String(nextPassword ?? '');
+		if (typeof setGlobalAppPassword === 'function') {
+			return setGlobalAppPassword(value).then(() => value);
+		}
+		if (!database || !currentProfileKey) {
+			return Promise.resolve(value);
+		}
+		return database.ref(`profiles/${currentProfileKey}/password`).set(value).then(() => value);
+	},
 	
 	init() {
 		this.output = document.getElementById('commandOutput');
@@ -528,7 +551,6 @@ const commandConsole = {
 					genderBalanceEnabled: state.genderBalanceEnabled || false,
 					weightBalanceEnabled: state.weightBalanceEnabled || false,
 					membersPerTeam: state.membersPerTeam || 4,
-					password: '', // 비밀번호 없음
 					timestamp: getCurrentDbTimestamp()
 				};
 				
@@ -603,13 +625,11 @@ const commandConsole = {
 				this.addCancelButton();
 				setTimeout(() => this.input.focus(), 50);
 			} else {
-				if (database && this.tempProfile) {
-					database.ref(`profiles/${this.tempProfile}/password`).set('').then(() => {
-						this.success(this.comments.passwordSkipSuccess);
-					}).catch((error) => {
-						this.error(`${this.comments.profileCreateFailed}: ${error.message}`);
-					});
-				}
+				this.setUnifiedPassword('').then(() => {
+					this.success(this.comments.passwordSkipSuccess);
+				}).catch((error) => {
+					this.error(`${this.comments.profileCreateFailed}: ${error.message}`);
+				});
 				this.inputMode = 'normal';
 				this.authenticated = true;
 				this.restoreInputField();
@@ -672,16 +692,14 @@ const commandConsole = {
 		} else if (this.inputMode === 'password-delete-confirm') {
 			// 비밀번호 삭제 확인
 			if (confirmed) {
-				if (database && currentProfileKey) {
-					database.ref(`profiles/${currentProfileKey}/password`).set('')
-						.then(() => {
-							this.success(this.comments.passwordDeleted);
-							this.storedPassword = ''; // 저장된 비밀번호 초기화
-						})
-						.catch((error) => {
-							this.error(this.comments.passwordDeleteFailed.replace('{error}', error.message));
-						});
-				}
+				this.setUnifiedPassword('')
+					.then(() => {
+						this.success(this.comments.passwordDeleted);
+						this.storedPassword = ''; // 저장된 비밀번호 초기화
+					})
+					.catch((error) => {
+						this.error(this.comments.passwordDeleteFailed.replace('{error}', error.message));
+					});
 				this.inputMode = 'normal';
 				this.restoreInputField();
 				this.input.type = 'text';
@@ -832,7 +850,7 @@ const commandConsole = {
 				database.ref(`profile/${cmd}`).once('value'),
 				database.ref(`profiles/${cmd}`).once('value'),
 				database.ref(`users/${cmd}`).once('value')
-			]).then(([legacyProfileSnapshot, profileSnapshot, userSnapshot]) => {
+			]).then(async ([legacyProfileSnapshot, profileSnapshot, userSnapshot]) => {
 				const legacyProfileData = legacyProfileSnapshot.val();
 				const profileNodeData = profileSnapshot.val();
 				const userData = userSnapshot.val();
@@ -846,7 +864,7 @@ const commandConsole = {
 					if (typeof setCurrentProfileSource === 'function') {
 						setCurrentProfileSource(source);
 					}
-					const password = profileData.password || '';
+					const password = isUsersSource ? '' : await this.getUnifiedPassword();
 					this.tempProfile = cmd;
 					currentProfileKey = cmd;
 					this.storedPassword = isUsersSource ? '' : password;
@@ -1057,18 +1075,17 @@ const commandConsole = {
 		// 두 번째 비밀번호 입력 및 확인
 		if (cmd === this.tempPassword) {
 			// 비밀번호 일치
-			if (database && currentProfileKey) {
-				database.ref(`profiles/${currentProfileKey}/password`).set(this.tempPassword)
-					.then(() => {
+			this.setUnifiedPassword(this.tempPassword)
+				.then(() => {
 					this.success(this.comments.passwordSet);
-						this.authenticated = true;
-						this.removeCancelButton();
-						this.showFirstTimeHelp();
-					})
-					.catch((error) => {
-						this.error(`비밀번호 설정 실패: ${error.message}`);
-					});
-			}
+					this.authenticated = true;
+					this.storedPassword = this.tempPassword;
+					this.removeCancelButton();
+					this.showFirstTimeHelp();
+				})
+				.catch((error) => {
+					this.error(`비밀번호 설정 실패: ${error.message}`);
+				});
 			this.inputMode = 'normal';
 			this.input.type = 'text';
 			this.input.placeholder = this.placeholders.input;
@@ -1124,17 +1141,15 @@ const commandConsole = {
 	if (this.inputMode === 'password-change-confirm') {
 		// 3단계: 새 비밀번호 확인
 		if (cmd === this.tempPassword) {
-			if (database && currentProfileKey) {
-				database.ref(`profiles/${currentProfileKey}/password`).set(this.tempPassword)
-					.then(() => {
-						this.success(this.comments.passwordChanged);
-						this.storedPassword = this.tempPassword; // 저장된 비밀번호 업데이트
-						this.removeCancelButton();
-					})
-					.catch((error) => {
-						this.error(`비밀번호 변경 실패: ${error.message}`);
-					});
-			}
+			this.setUnifiedPassword(this.tempPassword)
+				.then(() => {
+					this.success(this.comments.passwordChanged);
+					this.storedPassword = this.tempPassword; // 저장된 비밀번호 업데이트
+					this.removeCancelButton();
+				})
+				.catch((error) => {
+					this.error(`비밀번호 변경 실패: ${error.message}`);
+				});
 			this.inputMode = 'normal';
 			this.input.type = 'text';
 			this.input.placeholder = this.placeholders.input;
@@ -1354,9 +1369,7 @@ const commandConsole = {
 		}
 		
 		ensureProfileSourceForSave()
-		.then(() => database.ref(`profiles/${currentProfileKey}/password`).once('value'))
-		.then((snapshot) => {
-			const currentPassword = snapshot.val();
+		.then(() => {
 			
 			const data = {
 				people: state.people,
@@ -1378,11 +1391,6 @@ const commandConsole = {
 				timestamp: getCurrentDbTimestamp()
 			};
 				
-			// password가 존재하면 포함
-			if (currentPassword !== null) {
-				data.password = currentPassword;
-			}
-			
 			return database.ref(`profiles/${currentProfileKey}`).set(data);
 		})
 		.then(() => {
@@ -1553,10 +1561,8 @@ loadCommand(profileName = '') {
 		}
 		
 		// 먼저 현재 상태를 저장
-		database.ref(`profiles/${currentProfileKey}/password`).once('value')
-			.then((snapshot) => {
-				const currentPassword = snapshot.val();
-				
+		Promise.resolve()
+			.then(() => {
 				const data = {
 					people: state.people,
 					inactivePeople: state.inactivePeople,
@@ -1576,11 +1582,6 @@ loadCommand(profileName = '') {
 					membersPerTeam: state.membersPerTeam,
 					timestamp: getCurrentDbTimestamp()
 				};
-				
-				// password가 존재하면 포함
-				if (currentPassword !== null) {
-					data.password = currentPassword;
-				}
 				
 				return database.ref(`profiles/${currentProfileKey}`).set(data);
 			})
@@ -1937,12 +1938,9 @@ loadCommand(profileName = '') {
 				window.lastReservationChangeByMe = true;
 			}
 			
-			// 비밀번호 백업
-			database.ref(`profiles/${currentProfileKey}/password`).once('value')
-				.then((snapshot) => {
-					const savedPassword = snapshot.val();
-					
-					// 초기화된 데이터 저장 (비밀번호는 유지)
+			// 초기화된 데이터 저장
+			Promise.resolve()
+				.then(() => {
 					const emptyData = {
 						people: [],
 						inactivePeople: [],
@@ -1960,7 +1958,6 @@ loadCommand(profileName = '') {
 						genderBalanceEnabled: false,
 						weightBalanceEnabled: false,
 						membersPerTeam: 4,
-						password: savedPassword !== null ? savedPassword : '',
 						timestamp: getCurrentDbTimestamp()
 					};
 					return database.ref(`profiles/${currentProfileKey}`).set(emptyData);

@@ -5,6 +5,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Admin Login</title>
 	<link rel="stylesheet" href="admin.css">
+	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 	<style>
 		.login-shell {
 			min-height: 100vh;
@@ -49,6 +51,15 @@
 		.login-error {
 			margin-top: 10px;
 			min-height: 20px;
+			font-size: 12px;
+			color: var(--muted);
+		}
+
+		.remember-row {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			margin-top: 10px;
 			font-size: 12px;
 			color: var(--muted);
 		}
@@ -117,6 +128,10 @@
 			<p>비밀번호를 입력하면 관리자 페이지로 이동합니다.</p>
 			<div id="loginSection" class="login-section">
 				<input id="adminPasswordInput" class="login-input" type="password" placeholder="비밀번호" required>
+				<label class="remember-row" for="rememberPasswordCheck">
+					<input id="rememberPasswordCheck" type="checkbox">
+					<span>비밀번호 기억하기</span>
+				</label>
 				<div id="loginErrorText" class="login-error" role="status" aria-live="polite"></div>
 				<div class="login-actions">
 					<button class="btn" type="submit">로그인</button>
@@ -139,16 +154,72 @@
 	</div>
 
 	<script>
-		const ADMIN_ACCESS_PASSWORD_STORAGE_KEY = 'adminAccessPassword';
 		const ADMIN_ACCESS_SESSION_KEY = 'adminAccessAuthenticated';
+		const ADMIN_REMEMBER_PASSWORD_KEY = 'adminRememberPasswordValue';
+		const ADMIN_REMEMBER_PASSWORD_AT_KEY = 'adminRememberPasswordAt';
+		const ADMIN_REMEMBER_PASSWORD_ENABLED_KEY = 'adminRememberPasswordEnabled';
+		const REMEMBER_PASSWORD_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000;
+		const GLOBAL_APP_PASSWORD_PATH = 'admin/password';
+		const LEGACY_GLOBAL_APP_PASSWORD_PATHS = [
+			'settings/globalPassword',
+			'profiles/__global_admin__/password',
+			'profile/__global_admin__/password'
+		];
 		const DEFAULT_ADMIN_ACCESS_PASSWORD = 'admin1234';
 
-		function getAdminAccessPassword() {
-			const customPassword = window.localStorage.getItem(ADMIN_ACCESS_PASSWORD_STORAGE_KEY);
-			if (customPassword && customPassword.trim().length > 0) {
-				return customPassword;
+		const firebaseConfig = {
+			apiKey: "AIzaSyAdUEAHg08-FheJjawYwIPRov4105qdG0o",
+			authDomain: "createteamprogram.firebaseapp.com",
+			databaseURL: "https://createteamprogram-default-rtdb.asia-southeast1.firebasedatabase.app",
+			projectId: "createteamprogram",
+			storageBucket: "createteamprogram.firebasestorage.app",
+			messagingSenderId: "108758586522",
+			appId: "1:108758586522:web:75386ff04fa79121a0bb23",
+			measurementId: "G-N7D10Q7MNF"
+		};
+
+		let loginDatabase = null;
+
+		function initLoginFirebase() {
+			if (typeof firebase === 'undefined') {
+				return;
 			}
-			return DEFAULT_ADMIN_ACCESS_PASSWORD;
+			const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+			loginDatabase = app.database();
+		}
+
+		async function getAdminAccessPassword() {
+			if (!loginDatabase) {
+				return DEFAULT_ADMIN_ACCESS_PASSWORD;
+			}
+			try {
+				const snapshot = await loginDatabase.ref(GLOBAL_APP_PASSWORD_PATH).once('value');
+				const value = snapshot.val();
+				if (typeof value === 'string' && value.length > 0) {
+					return value;
+				}
+				for (const path of LEGACY_GLOBAL_APP_PASSWORD_PATHS) {
+					try {
+						const legacySnapshot = await loginDatabase.ref(path).once('value');
+						const legacyValue = legacySnapshot.val();
+						if (typeof legacyValue === 'string' && legacyValue.length > 0) {
+							return legacyValue;
+						}
+					} catch (legacyError) {
+						continue;
+					}
+				}
+				return DEFAULT_ADMIN_ACCESS_PASSWORD;
+			} catch (error) {
+				return DEFAULT_ADMIN_ACCESS_PASSWORD;
+			}
+		}
+
+		async function setAdminAccessPassword(password) {
+			if (!loginDatabase) {
+				throw new Error('Firebase 연결에 실패했습니다.');
+			}
+			await loginDatabase.ref(GLOBAL_APP_PASSWORD_PATH).set(password);
 		}
 
 		function redirectToAdmin() {
@@ -159,9 +230,12 @@
 			redirectToAdmin();
 		}
 
+		initLoginFirebase();
+
 		const form = document.getElementById('adminLoginForm');
 		const loginSection = document.getElementById('loginSection');
 		const passwordInput = document.getElementById('adminPasswordInput');
+		const rememberPasswordCheck = document.getElementById('rememberPasswordCheck');
 		const errorText = document.getElementById('loginErrorText');
 		const showChangePasswordBtn = document.getElementById('showChangePasswordBtn');
 		const changePasswordForm = document.getElementById('changePasswordForm');
@@ -187,17 +261,53 @@
 			passwordInput.focus();
 		}
 
-		form.addEventListener('submit', (event) => {
+		function clearRememberedPassword() {
+			window.localStorage.removeItem(ADMIN_REMEMBER_PASSWORD_KEY);
+			window.localStorage.removeItem(ADMIN_REMEMBER_PASSWORD_AT_KEY);
+			window.localStorage.removeItem(ADMIN_REMEMBER_PASSWORD_ENABLED_KEY);
+		}
+
+		function loadRememberedPassword() {
+			const rememberEnabled = window.localStorage.getItem(ADMIN_REMEMBER_PASSWORD_ENABLED_KEY) === 'true';
+			const rememberedAt = Number(window.localStorage.getItem(ADMIN_REMEMBER_PASSWORD_AT_KEY) || '0');
+			const expired = !rememberedAt || (Date.now() - rememberedAt > REMEMBER_PASSWORD_EXPIRE_MS);
+
+			if (!rememberEnabled || expired) {
+				clearRememberedPassword();
+				rememberPasswordCheck.checked = false;
+				return;
+			}
+
+			const rememberedPassword = window.localStorage.getItem(ADMIN_REMEMBER_PASSWORD_KEY) || '';
+			if (!rememberedPassword) {
+				clearRememberedPassword();
+				rememberPasswordCheck.checked = false;
+				return;
+			}
+
+			rememberPasswordCheck.checked = true;
+			passwordInput.value = rememberedPassword;
+		}
+
+		form.addEventListener('submit', async (event) => {
 			event.preventDefault();
 			errorText.textContent = '';
 			const entered = passwordInput.value;
-			if (entered !== getAdminAccessPassword()) {
+			const savedPassword = await getAdminAccessPassword();
+			if (entered !== savedPassword) {
 				errorText.textContent = '비밀번호가 올바르지 않습니다.';
 				passwordInput.value = '';
 				passwordInput.focus();
 				return;
 			}
 			window.sessionStorage.setItem(ADMIN_ACCESS_SESSION_KEY, 'true');
+			if (rememberPasswordCheck.checked) {
+				window.localStorage.setItem(ADMIN_REMEMBER_PASSWORD_KEY, entered);
+				window.localStorage.setItem(ADMIN_REMEMBER_PASSWORD_AT_KEY, String(Date.now()));
+				window.localStorage.setItem(ADMIN_REMEMBER_PASSWORD_ENABLED_KEY, 'true');
+			} else {
+				clearRememberedPassword();
+			}
 			redirectToAdmin();
 		});
 
@@ -210,13 +320,14 @@
 			setChangePasswordMode(false);
 		});
 
-		submitChangePasswordBtn.addEventListener('click', () => {
+		submitChangePasswordBtn.addEventListener('click', async () => {
 			changePasswordMessage.textContent = '';
 			const currentPassword = currentPasswordInput.value;
 			const newPassword = newPasswordInput.value;
 			const confirmPassword = confirmPasswordInput.value;
+			const savedPassword = await getAdminAccessPassword();
 
-			if (currentPassword !== getAdminAccessPassword()) {
+			if (currentPassword !== savedPassword) {
 				changePasswordMessage.textContent = '기존 비밀번호가 올바르지 않습니다.';
 				currentPasswordInput.focus();
 				return;
@@ -234,11 +345,20 @@
 				return;
 			}
 
-			window.localStorage.setItem(ADMIN_ACCESS_PASSWORD_STORAGE_KEY, newPassword);
+			try {
+				await setAdminAccessPassword(newPassword);
+			} catch (error) {
+				changePasswordMessage.textContent = '비밀번호 변경에 실패했습니다.';
+				return;
+			}
+			clearRememberedPassword();
+			rememberPasswordCheck.checked = false;
+			passwordInput.value = '';
 			changePasswordMessage.textContent = '비밀번호가 변경되었습니다.';
 			setChangePasswordMode(false);
 		});
 
+		loadRememberedPassword();
 		passwordInput.focus();
 	</script>
 </body>

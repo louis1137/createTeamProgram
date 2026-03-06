@@ -20,6 +20,14 @@ let currentUserCode = null;
 let syncEnabled = false;
 let authenticatedPassword = ''; // 인증된 비밀번호 저장
 
+const GLOBAL_APP_PASSWORD_PATH = 'admin/password';
+const LEGACY_GLOBAL_APP_PASSWORD_PATHS = [
+	'settings/globalPassword',
+	'profiles/__global_admin__/password',
+	'profile/__global_admin__/password'
+];
+const DEFAULT_GLOBAL_APP_PASSWORD = 'admin1234';
+
 function normalizeReservations(value) {
 	const toRow = (item) => {
 		if (Array.isArray(item)) {
@@ -49,6 +57,45 @@ function setCurrentProfileSource(source) {
 
 function getCurrentProfileSource() {
 	return currentProfileSource;
+}
+
+function getGlobalAppPassword() {
+	if (!database) {
+		return Promise.resolve(DEFAULT_GLOBAL_APP_PASSWORD);
+	}
+	return database.ref(GLOBAL_APP_PASSWORD_PATH).once('value')
+		.then((snapshot) => {
+			const value = snapshot.val();
+			if (typeof value === 'string' && value.length > 0) {
+				return value;
+			}
+			const readLegacyAt = (index) => {
+				if (index >= LEGACY_GLOBAL_APP_PASSWORD_PATHS.length) {
+					return Promise.resolve(DEFAULT_GLOBAL_APP_PASSWORD);
+				}
+				const path = LEGACY_GLOBAL_APP_PASSWORD_PATHS[index];
+				return database.ref(path).once('value')
+					.then((legacySnapshot) => {
+						const legacyValue = legacySnapshot.val();
+						if (typeof legacyValue === 'string' && legacyValue.length > 0) {
+							return legacyValue;
+						}
+						return readLegacyAt(index + 1);
+					})
+					.catch(() => readLegacyAt(index + 1));
+			};
+			return readLegacyAt(0);
+		})
+		.catch(() => DEFAULT_GLOBAL_APP_PASSWORD);
+}
+
+function setGlobalAppPassword(newPassword) {
+	if (!database) {
+		return Promise.reject(new Error('Firebase not initialized'));
+	}
+	const nextPassword = String(newPassword ?? '');
+	return database.ref(GLOBAL_APP_PASSWORD_PATH).set(nextPassword)
+		.then(() => nextPassword);
 }
 
 function resolveProfileRecord(profileKey) {

@@ -18,9 +18,7 @@ let ruleDraft = [];
 let reservationDraft = [];
 let historyDraft = [];
 
-const ADMIN_ACCESS_PASSWORD_STORAGE_KEY = 'adminAccessPassword';
 const ADMIN_ACCESS_SESSION_KEY = 'adminAccessAuthenticated';
-const DEFAULT_ADMIN_ACCESS_PASSWORD = 'admin1234';
 
 const fieldIds = {
 	key: 'fieldKey',
@@ -134,14 +132,6 @@ function showToast(message) {
 function initFirebase() {
 	const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
 	database = app.database();
-}
-
-function getAdminAccessPassword() {
-	const customPassword = window.localStorage.getItem(ADMIN_ACCESS_PASSWORD_STORAGE_KEY);
-	if (customPassword && customPassword.trim().length > 0) {
-		return customPassword;
-	}
-	return DEFAULT_ADMIN_ACCESS_PASSWORD;
 }
 
 function blockAdminAccess() {
@@ -1089,7 +1079,7 @@ function updateConditionalRows(type) {
 	if (!passwordRow) {
 		return;
 	}
-	passwordRow.style.display = type === 'users' ? 'none' : 'flex';
+	passwordRow.style.display = 'none';
 	if (historyRow) {
 		historyRow.style.display = type === 'users' ? 'flex' : 'none';
 	}
@@ -1103,7 +1093,6 @@ function readFormData() {
 		weightBalanceEnabled: getEl(fieldIds.weightBalanceEnabled).checked,
 		createdAt: getEl(fieldIds.createdAt).value.trim(),
 		lastAccess: getEl(fieldIds.lastAccess).value.trim(),
-		password: getEl(fieldIds.password).value,
 		timestamp: getEl(fieldIds.timestamp).value.trim()
 	};
 }
@@ -1352,7 +1341,6 @@ function buildPayloadFromForm(type) {
 		genderBalanceEnabled: form.genderBalanceEnabled,
 		maxTeamSizeEnabled: form.maxTeamSizeEnabled,
 		weightBalanceEnabled: form.weightBalanceEnabled,
-		password: form.password,
 		people: memberDraft.people,
 		inactivePeople: memberDraft.inactivePeople,
 		forbiddenPairs,

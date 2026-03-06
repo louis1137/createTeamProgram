@@ -125,8 +125,7 @@ body {
 }
 
 .accordion-body {
-	max-height: 38vh;
-	overflow-y: auto;
+	
 }
 
 .item-btn {
