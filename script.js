@@ -1,7 +1,7 @@
 ﻿
 // let console = window.console;
-const teamDisplayDelay = isLocalView() ? 50 : 400;
-const maxTimer = isLocalView() ? 0 : 3000;
+const teamDisplayDelay = isLocalView() ? 40 : 600;
+const maxTimer = isLocalView() ? 0 : 5000;
 const blindDelay = isLocalView() ? null : 5000;
 // 검증 비교창 표시 여부 (true: 표시, false: 숨김)
 const SHOW_VALIDATION_COMPARISON = isLocalView() ? false : false;
@@ -11,7 +11,7 @@ try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 (function() {
 	const moonPhases = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌝', '🌝', '🌝', '🌕', '🌖', '🌗', '🌘', '🌑', '🌚', '🌚', '🌚'];
 	let currentPhase = 0;
-	
+
 	function updateFavicon() {
 		const emoji = moonPhases[currentPhase];
 		const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='-0.1em' y='1em' font-size='90'>${emoji}</text></svg>`;
@@ -22,7 +22,7 @@ try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
 		if (!document.querySelector("link[rel*='icon']")) document.head.appendChild(favicon);
 		currentPhase = (currentPhase + 1) % moonPhases.length;
 	}
-	
+
 	setInterval(updateFavicon, 350); // 350ms마다 변경
 	updateFavicon(); // 즉시 실행
 })();
@@ -138,7 +138,7 @@ function init() {
 	if (elements.captureBtn) {
 		elements.captureBtn.addEventListener('click', captureResultsSection);
 		// 호버 시 캡처 영역 하이라이트
-		elements.captureBtn.addEventListener('mouseenter', () => { 
+		elements.captureBtn.addEventListener('mouseenter', () => {
 			if (elements.resultsSection.classList.contains('visible')) elements.resultsSection.classList.add('capture-highlight');
 		});
 		elements.captureBtn.addEventListener('mouseleave', () => {
@@ -184,16 +184,16 @@ function init() {
 	tryResolvePendingConstraints();
 	// 이전에 참가자가 추가되어 있다면 보류 중인 히든 그룹을 해결 시도
 	tryResolveHiddenGroups();
-	
+
 	// 제약 목록 확인 레이어 이벤트 리스너
 	const constraintNotificationConfirm = document.getElementById('constraintNotificationConfirm');
 	const constraintNotificationCancel = document.getElementById('constraintNotificationCancel');
-	
+
 	if (constraintNotificationConfirm) constraintNotificationConfirm.addEventListener('click', () => {
 		hideConstraintNotification();
 		safeOpenForbiddenWindow();
 	});
-	
+
 	if (constraintNotificationCancel) constraintNotificationCancel.addEventListener('click', () => {
 		// 제약 초기화
 		state.forbiddenPairs = [];
@@ -209,7 +209,7 @@ function init() {
 	const duplicateCancelBtn = document.getElementById('duplicateCancelBtn');
 	if (duplicateConfirmBtn) duplicateConfirmBtn.addEventListener('click', handleDuplicateConfirm);
 	if (duplicateCancelBtn) duplicateCancelBtn.addEventListener('click', handleDuplicateCancel);
-	
+
 	// 개발자 도구가 열려있으면 cmd 콘솔 자동으로 열기
 	checkDevToolsAndOpenConsole();
 }
@@ -220,7 +220,7 @@ function checkDevToolsAndOpenConsole() {
 	const widthThreshold = window.outerWidth - window.innerWidth > threshold;
 	const heightThreshold = window.outerHeight - window.innerHeight > threshold;
 	const isDevToolsOpen = widthThreshold || heightThreshold;
-	
+
 	// 로컬 환경이면서 개발자 도구가 열려있을 때만 콘솔 자동 열기
 	if (isLocalView() && isDevToolsOpen) {
 		// 개발자 도구가 열려있으면 콘솔 자동 열기
@@ -231,12 +231,12 @@ function checkDevToolsAndOpenConsole() {
 				consoleEl.style.transform = 'translate(0, 0)';
 				consoleEl.style.width = '900px';
 				consoleEl.style.height = '600px';
-				
+
 				const content = document.querySelector('.command-content');
 				if (content) content.style.display = 'flex';
 				const toggleBtn = document.getElementById('toggleConsoleBtn');
 				if (toggleBtn) toggleBtn.textContent = '−';
-				
+
 				if (commandConsole.output) {
 					if (currentProfileKey) {
 						// 프로필이 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
@@ -311,11 +311,11 @@ function checkDevToolsAndOpenConsole() {
 // 입력 내용에서 성별/가중치 패턴 감지하여 자동 체크
 function autoDetectAndCheckOptions() {
 	const text = elements.nameInput.value;
-	
+
 	// 패턴 감지 (괄호 안에 남/여가 있는지, 숫자가 있는지)
 	const hasGenderPattern = text.includes('(남)') || text.includes('(여)') || /\(.*남.*\)/.test(text) || /\(.*여.*\)/.test(text);
 	const hasWeightPattern = /\(\d+\)/.test(text) || /\(.*\d+.*\)/.test(text);
-	
+
 	// 성별 패턴이 있으면 성별균등 자동 체크
 	if (hasGenderPattern && !state.genderBalanceEnabled) {
 		if (elements.genderBalanceCheckbox) {
@@ -324,7 +324,7 @@ function autoDetectAndCheckOptions() {
 			saveToLocalStorage();
 		}
 	}
-	
+
 	// 가중치 패턴이 있으면 가중치균등 자동 체크
 	if (hasWeightPattern && !state.weightBalanceEnabled) {
 		if (elements.weightBalanceCheckbox) {
@@ -379,9 +379,9 @@ function showDuplicateConfirmModal(duplicateNames) {
 	const warningEl = document.getElementById('duplicateWarning');
 	const arrowEl = document.querySelector('.duplicate-arrow');
 	const existingSectionEl = existingListEl?.parentElement;
-	
+
 	if (!modal) return;
-	
+
 	// 입력 데이터 내에서 중복된 이름 검사
 	const allNewNames = [];
 	if (pendingAddData && pendingAddData.pendingNamesData) {
@@ -391,7 +391,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			});
 		});
 	}
-	
+
 	// 중복 검사
 	const nameCount = {};
 	const duplicatesInInput = [];
@@ -399,18 +399,18 @@ function showDuplicateConfirmModal(duplicateNames) {
 		nameCount[name] = (nameCount[name] || 0) + 1;
 		if (nameCount[name] === 2) duplicatesInInput.push(name);
 	});
-	
+
 	const hasInputDuplicates = duplicatesInInput.length > 0;
-	
+
 	// 입력 내 중복인 경우 기존 필드와 화살표 숨김/표시
 	if (existingSectionEl) existingSectionEl.style.display = hasInputDuplicates ? 'none' : 'block';
 	if (arrowEl) arrowEl.style.display = hasInputDuplicates ? 'none' : 'flex';
-	
+
 	// 기존 참가자 목록 표시
 	existingListEl.innerHTML = '';
 	const duplicateNormalized = duplicateNames.map(name => normalizeName(name));
 	const duplicatePeople = state.people.filter(p => duplicateNormalized.includes(normalizeName(p.name)));
-	
+
 	// 그룹 정보 맵 생성
 	const groupMap = new Map();
 	state.requiredGroups.forEach((group, groupIndex) => {
@@ -418,24 +418,24 @@ function showDuplicateConfirmModal(duplicateNames) {
 			groupMap.set(personId, groupIndex);
 		});
 	});
-	
+
 	// 이미 처리된 그룹 추적
 	const processedGroups = new Set();
-	
+
 	// 기존 참가자 렌더링 (중복으로 영향받는 전체 그룹 표시)
 	duplicatePeople.forEach(person => {
 		const groupIndex = groupMap.get(person.id);
-		
+
 		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
 			// 그룹에 속한 경우 - 전체 그룹을 표시
 			processedGroups.add(groupIndex);
 			const group = state.requiredGroups[groupIndex];
-			
+
 			const groupContainer = document.createElement('div');
 			groupContainer.className = 'group-container';
 			const color = getGroupColor(groupIndex);
 			groupContainer.style.border = `2px solid ${color}`;
-			
+
 			// 그룹의 모든 멤버를 표시 (중복된 사람은 진하게, 남을 사람은 연하게)
 			group.forEach(personId => {
 				const groupPerson = state.people.find(p => p.id === personId);
@@ -454,7 +454,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 					groupContainer.appendChild(personTag);
 				}
 			});
-			
+
 			existingListEl.appendChild(groupContainer);
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 참가자
@@ -465,7 +465,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			existingListEl.appendChild(personTag);
 		}
 	});
-	
+
 	// 변경 필드: 영향받는 그룹들의 변화 + 새 그룹만 표시
 	newListEl.innerHTML = '';
 	if (pendingAddData && pendingAddData.pendingNamesData) {
@@ -475,7 +475,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			const groupIndex = groupMap.get(person.id);
 			if (groupIndex !== undefined) affectedGroupIndices.add(groupIndex);
 		});
-		
+
 		// 영향받는 그룹들이 어떻게 변하는지 보여주기 (연한 색상으로)
 		affectedGroupIndices.forEach(groupIndex => {
 			const group = state.requiredGroups[groupIndex];
@@ -483,7 +483,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 				const person = state.people.find(p => p.id === personId);
 				return person && !duplicateNormalized.includes(normalizeName(person.name));
 			});
-			
+
 			if (remainingMembers.length === 1) {
 				// 1명만 남으면 개별 참가자로 표시
 				const person = state.people.find(p => p.id === remainingMembers[0]);
@@ -499,7 +499,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 				const color = getGroupColor(groupIndex);
 				groupContainer.style.border = `2px solid ${color}`;
 				groupContainer.style.opacity = '0.5';
-				
+
 				remainingMembers.forEach(personId => {
 					const person = state.people.find(p => p.id === personId);
 					if (person) {
@@ -507,22 +507,22 @@ function showDuplicateConfirmModal(duplicateNames) {
 						groupContainer.appendChild(personTag);
 					}
 				});
-				
+
 				newListEl.appendChild(groupContainer);
 			}
 		});
-		
+
 		// 새로 추가될 그룹들 렌더링
 		const usedColors = [];
 		state.requiredGroups.forEach((group, idx) => {
 			const color = getGroupColor(idx);
 			if (color && color !== state.ungroupedColor) usedColors.push(color);
 		});
-		
+
 		const previewColors = [];
 		pendingAddData.pendingNamesData.forEach(({ names }, index) => {
 			const colorIndex = pendingAddData.newGroupColorIndices ? pendingAddData.newGroupColorIndices[index] : -1;
-			
+
 			if (names.length > 1 && colorIndex >= 0) {
 				// 그룹으로 등록될 경우 - 새로 추가되는 그룹은 진하게
 				const groupContainer = document.createElement('div');
@@ -530,13 +530,13 @@ function showDuplicateConfirmModal(duplicateNames) {
 				const color = getGroupColor(colorIndex);
 				groupContainer.style.border = `2px solid ${color}`; // border 전체를 설정
 				previewColors.push(color);
-				
+
 				names.forEach(name => {
 					// 이름에서 괄호 패턴 파싱
 					let actualName = name;
 					let parsedGender = 'male'; // 기본값: 남
 					let parsedWeight = 0; // 기본값: 0
-					
+
 				const match = name.match(/^(.+?)\(([^)]+)\)$/);
 				if (match) {
 					actualName = match[1].trim();
@@ -550,7 +550,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 					const normalized = normalizeName(actualName);
 					const existingPerson = state.people.find(p => normalizeName(p.name) === normalized);
 					const inactivePerson = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
-					
+
 					if (existingPerson) {
 						parsedGender = existingPerson.gender;
 						parsedWeight = existingPerson.weight ?? 0;
@@ -559,21 +559,21 @@ function showDuplicateConfirmModal(duplicateNames) {
 						parsedWeight = inactivePerson.weight ?? 0;
 					}
 				}
-				
+
 				const personTag = document.createElement('div');
 				personTag.className = 'person-tag';
-				
+
 				// 성별 배경색 (기본값 포함)
 				if (state.genderBalanceEnabled) {
 					personTag.style.backgroundColor = parsedGender === 'male' ? '#e0f2fe' : '#fce7f3';
 				}
-				
+
 				const nameSpan = document.createElement('span');
 				nameSpan.className = 'name';
 				nameSpan.textContent = actualName;
 				nameSpan.style.fontWeight = 'bold';
 				personTag.appendChild(nameSpan);
-				
+
 				// 성별 아이콘 (기본값 포함)
 				if (state.genderBalanceEnabled) {
 					const genderDisplay = document.createElement('span');
@@ -581,7 +581,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 					genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
 					personTag.appendChild(genderDisplay);
 				}
-				
+
 				// 가중치 표시 (기본값 포함)
 				if (state.weightBalanceEnabled) {
 					const weightDisplay = document.createElement('span');
@@ -589,15 +589,15 @@ function showDuplicateConfirmModal(duplicateNames) {
 					weightDisplay.textContent = `${parsedWeight}`;
 					personTag.appendChild(weightDisplay);
 				}
-				
+
 				// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
 				if (duplicatesInInput.includes(normalizeName(name))) {
 					personTag.classList.add('is-duplicate');
 				}
-				
+
 				groupContainer.appendChild(personTag);
 			});
-			
+
 			newListEl.appendChild(groupContainer);
 		} else {
 			// 개별 참가자로 등록될 경우
@@ -606,7 +606,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 				let actualName = name;
 				let parsedGender = 'male'; // 기본값: 남
 				let parsedWeight = 0; // 기본값: 0
-				
+
 				const match = name.match(/^(.+?)\(([^)]+)\)$/);
 				if (match) {
 					actualName = match[1].trim();
@@ -620,7 +620,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 					const normalized = normalizeName(actualName);
 					const existingPerson = state.people.find(p => normalizeName(p.name) === normalized);
 					const inactivePerson = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
-					
+
 					if (existingPerson) {
 						parsedGender = existingPerson.gender;
 						parsedWeight = existingPerson.weight ?? 0;
@@ -629,21 +629,21 @@ function showDuplicateConfirmModal(duplicateNames) {
 						parsedWeight = inactivePerson.weight ?? 0;
 					}
 			}
-			
+
 			const personTag = document.createElement('div');
 			personTag.className = 'person-tag';
-			
+
 			// 성별 배경색 (기본값 포함)
 			if (state.genderBalanceEnabled) {
 				personTag.style.backgroundColor = parsedGender === 'male' ? '#e0f2fe' : '#fce7f3';
 			}
-			
+
 			const nameSpan = document.createElement('span');
 			nameSpan.className = 'name';
 			nameSpan.textContent = actualName;
 			nameSpan.style.fontWeight = 'bold';
 			personTag.appendChild(nameSpan);
-		
+
 		// 성별 아이콘 (기본값 포함)
 		if (state.genderBalanceEnabled) {
 			const genderDisplay = document.createElement('span');
@@ -651,7 +651,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
 			personTag.appendChild(genderDisplay);
 		}
-		
+
 		// 가중치 표시 (기본값 포함)
 		if (state.weightBalanceEnabled) {
 			const weightDisplay = document.createElement('span');
@@ -659,12 +659,12 @@ function showDuplicateConfirmModal(duplicateNames) {
 			weightDisplay.textContent = `${parsedWeight}`;
 			personTag.appendChild(weightDisplay);
 		}
-		
+
 		// 입력 데이터 내 중복된 이름이면 빨간 테두리와 pulse 애니메이션
 		if (duplicatesInInput.includes(normalizeName(name))) {
 			personTag.classList.add('is-duplicate');
 		}
-		
+
 		newListEl.appendChild(personTag);
 	});
 }
@@ -672,7 +672,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 // 미리보기에서 사용한 색상 배열 저장
 pendingAddData.previewColors = previewColors;
 	}
-	
+
 	// 메시지 업데이트 및 확인 버튼 상태 설정
 	if (hasInputDuplicates) {
 		// 입력 내 중복이 있는 경우
@@ -691,10 +691,10 @@ pendingAddData.previewColors = previewColors;
 		confirmBtn.style.opacity = hasInputDuplicates ? '0.5' : '1';
 		confirmBtn.style.cursor = hasInputDuplicates ? 'not-allowed' : 'pointer';
 	}
-	
+
 	// 키보드 이벤트 리스너 추가
 	document.addEventListener('keydown', handleDuplicateModalKeydown);
-	
+
 	// 모달 표시
 	modal.style.display = 'flex';
 	setTimeout(() => {
@@ -706,28 +706,28 @@ pendingAddData.previewColors = previewColors;
 function createDuplicatePersonTag(person) {
 	const personTag = document.createElement('div');
 	personTag.className = 'person-tag';
-	
+
 	if (state.genderBalanceEnabled) personTag.style.backgroundColor = person.gender === 'male' ? '#e0f2fe' : '#fce7f3';
-	
+
 	const nameSpan = document.createElement('span');
 	nameSpan.className = 'name';
 	nameSpan.textContent = person.name;
 	personTag.appendChild(nameSpan);
-	
+
 	if (state.genderBalanceEnabled) {
 		const genderDisplay = document.createElement('span');
 		genderDisplay.className = 'gender-display';
 		genderDisplay.textContent = person.gender === 'male' ? '♂️' : '♀️';
 		personTag.appendChild(genderDisplay);
 	}
-	
+
 	if (state.weightBalanceEnabled) {
 		const weightDisplay = document.createElement('span');
 		weightDisplay.className = 'weight-display';
 		weightDisplay.textContent = `${person.weight ?? 0}`;
 		personTag.appendChild(weightDisplay);
 	}
-	
+
 	return personTag;
 }
 
@@ -746,10 +746,10 @@ function handleDuplicateModalKeydown(e) {
 function hideDuplicateConfirmModal() {
 	const modal = document.getElementById('duplicateConfirmModal');
 	if (!modal) return;
-	
+
 	// 키보드 이벤트 리스너 제거
 	document.removeEventListener('keydown', handleDuplicateModalKeydown);
-	
+
 	modal.classList.remove('visible');
 	setTimeout(() => {
 		modal.style.display = 'none';
@@ -759,19 +759,19 @@ function hideDuplicateConfirmModal() {
 // 중복 확인 - 확인 버튼 처리
 function handleDuplicateConfirm() {
 	if (!pendingAddData) return;
-	
+
 	// 입력창 먼저 초기화 (실시간 하이라이트 제거를 위해)
 	elements.nameInput.value = '';
-	
+
 	// 중복된 이름들을 제거하고 새로 등록 (미리 계산된 색상 인덱스 전달)
 	processAddPerson(pendingAddData.pendingNamesData, pendingAddData.newGroupColorIndices);
-	
+
 	// 포커스
 	elements.nameInput.focus();
-	
+
 	// 모달 숨김
 	hideDuplicateConfirmModal();
-	
+
 	// 대기 데이터 초기화
 	pendingAddData = null;
 }
@@ -780,10 +780,10 @@ function handleDuplicateConfirm() {
 function handleDuplicateCancel() {
 	// 폼 내용은 유지하고 모달만 닫음
 	hideDuplicateConfirmModal();
-	
+
 	// 대기 데이터 초기화
 	pendingAddData = null;
-	
+
 	// 포커스는 입력창에 유지
 	elements.nameInput.focus();
 }
@@ -839,7 +839,7 @@ function saveToLocalStorage() {
 
 // localStorage에서 복원
 function loadFromLocalStorage() {
-	
+
 	try {
 		// key 모드에서는 자동 복원을 사용하지 않음
 		if (currentProfileKey) return;
@@ -870,14 +870,14 @@ function loadFromLocalStorage() {
 					}
 					return [];
 				};
-			
+
 				// cmd 콘솔에도 출력
 				setTimeout(() => {
 					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
 						commandConsole.log(`✅ 자동 데이터 복원: 참가자 ${data.people?.length || 0}명`);
 					}
 				}, 200);
-				
+
 				state.people = data.people || [];
 				state.inactivePeople = data.inactivePeople || []; // 미참가자 목록 복원
 				// 참가자 목록을 이름순으로 정렬
@@ -901,7 +901,7 @@ function loadFromLocalStorage() {
 				state.pendingHiddenGroupChains = data.pendingHiddenGroupChains || [];
 				state.probabilisticForbiddenPairs = data.probabilisticForbiddenPairs || [];
 				state.activeProbabilisticForbiddenPairs = [];
-				
+
 				// 설정 값 복원
 				if (typeof data.maxTeamSizeEnabled !== 'undefined') {
 					state.maxTeamSizeEnabled = data.maxTeamSizeEnabled;
@@ -925,13 +925,13 @@ function loadFromLocalStorage() {
 				renderPeople();
 				tryResolvePendingConstraints();
 				tryResolveHiddenGroups();
-			
+
 			})
 			.catch((e) => {
 				console.error('자동 데이터 복원 실패:', e);
 			});
 	} catch (e) {
-		
+
 		// cmd 콘솔에도 출력
 		setTimeout(() => {
 			if (typeof commandConsole !== 'undefined' && commandConsole.error) {
@@ -939,7 +939,7 @@ function loadFromLocalStorage() {
 			}
 		}, 300);
 	}
-	
+
 }
 
 // 이름별 기본값 가져오기
@@ -951,37 +951,37 @@ function captureResultsSection() {
 		alert(commandConsoleMessages.comments.noTeamResults);
 		return;
 	}
-	
+
 	// html2canvas가 로드되었는지 확인
 	if (typeof html2canvas === 'undefined') {
 		alert(commandConsoleMessages.comments.html2canvasNotFound);
 		return;
 	}
-	
+
 	// 캡처할 실제 영역 (::after 효과 제외)
 	const captureArea = section.querySelector('.results-capture-area');
 	if (!captureArea) {
 		alert(commandConsoleMessages.comments.captureAreaNotFound);
 		return;
 	}
-	
+
 	// 기존 타이머 클리어 및 버튼 상태 초기화
 	if (captureSuccessTimer) {
 		clearTimeout(captureSuccessTimer);
 		captureSuccessTimer = null;
 	}
-	
+
 	// 플래시 효과 추가 (::after 가상요소)
 	section.classList.add('capture-flash');
-	
+
 	// 찰칵 사운드 재생
 	playCameraShutterSound();
-	
+
 	// 애니메이션 종료 후 클래스 제거
 	setTimeout(() => {
 		section.classList.remove('capture-flash');
 	}, 600);
-	
+
 	// 캐처 버튼 임시 비활성화 (원본 HTML은 변경 전에 저장)
 	const btn = elements.captureBtn;
 	const originalHTML = btn ? btn.innerHTML : '';
@@ -989,7 +989,7 @@ function captureResultsSection() {
 		btn.textContent = commandConsoleMessages.comments.capturingInProgress;
 		btn.disabled = true;
 	}
-	
+
 	// 플래시 효과 후 약간 대기
 	setTimeout(() => {
 		html2canvas(captureArea, {
@@ -1007,7 +1007,7 @@ function captureResultsSection() {
 				btn.disabled = false;
 				return;
 			}
-			
+
 			// 클립보드 API 확인
 			if (!navigator.clipboard || !navigator.clipboard.write) {
 				alert(commandConsoleMessages.comments.clipboardHttpsRequired);
@@ -1015,7 +1015,7 @@ function captureResultsSection() {
 				btn.disabled = false;
 				return;
 			}
-			
+
 			// 클립보드에 이미지 복사
 			const item = new ClipboardItem({ 'image/png': blob });
 			navigator.clipboard.write([item]).then(() => {
@@ -1058,7 +1058,7 @@ function playCameraShutterSound() {
 			const osc = audioContext.createOscillator();
 			const gain = audioContext.createGain();
 
-			osc.type = 'square'; 
+			osc.type = 'square';
 			osc.frequency.setValueAtTime(freq, startTime);
 
 			gain.gain.setValueAtTime(0, startTime);
@@ -1089,34 +1089,34 @@ function handleParticipantCopy(e) {
 	// Ctrl+C 또는 Cmd+C 감지 (Mac 지원)
 	// e.key는 대소문자 구분하므로 소문자로 변환
 	const key = e.key.toLowerCase();
-	
+
 	if ((e.ctrlKey || e.metaKey) && key === 'c') {
 		// 텍스트 선택 여부 확인 - 텍스트가 선택되어 있으면 기본 복사 동작 유지
 		const selection = window.getSelection();
 		if (selection && selection.toString().length > 0) {
 			return; // 텍스트가 선택되어 있으면 기본 복사 동작
 		}
-		
+
 		// 입력창에 포커스가 있으면 기본 복사 동작 유지
 		const activeElement = document.activeElement;
 		if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
 			return;
 		}
-		
+
 		// 참가자가 없으면 아무것도 하지 않음
 		if (state.people.length === 0) {
 			return;
 		}
-		
+
 		// 기본 동작 방지
 		e.preventDefault();
-		
+
 		// 참가자 데이터를 문자열로 변환
 		const participantString = convertParticipantsToString();
-		
+
 		// 클립보드에 복사
 		copyToClipboard(participantString);
-		
+
 		// 플래시 효과 발생
 		triggerParticipantFlash();
 	}
@@ -1127,7 +1127,7 @@ function convertParticipantsToString() {
 	const result = [];
 	const grouped = new Set();
 	const groupMap = new Map();
-	
+
 	// 그룹 정보를 맵으로 저장
 	state.requiredGroups.forEach((group, groupIndex) => {
 		group.forEach(personId => {
@@ -1135,12 +1135,12 @@ function convertParticipantsToString() {
 			groupMap.set(personId, groupIndex);
 		});
 	});
-	
+
 	const processedGroups = new Set();
-	
+
 	state.people.forEach(person => {
 		const groupIndex = groupMap.get(person.id);
-		
+
 		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
 			// 그룹 처리
 			processedGroups.add(groupIndex);
@@ -1149,44 +1149,44 @@ function convertParticipantsToString() {
 				const groupPerson = state.people.find(p => p.id === personId);
 				return groupPerson ? formatPersonString(groupPerson) : '';
 			}).filter(s => s);
-			
+
 			result.push(groupMembers.join(','));
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 항목
 			result.push(formatPersonString(person));
 		}
 	});
-	
+
 	return result.join('/');
 }
 
 // 개별 참가자를 문자열로 포맷
 function formatPersonString(person) {
 	let result = person.name;
-	
+
 	const genderEnabled = state.genderBalanceEnabled;
 	const weightEnabled = state.weightBalanceEnabled;
-	
+
 	// 둘 다 체크되어 있지 않으면 이름만
 	if (!genderEnabled && !weightEnabled) {
 		return result;
 	}
-	
+
 	// 괄호 안에 들어갈 내용 구성
 	let bracketContent = '';
-	
+
 	// 성별 추가 (체크되어 있을 때)
 	if (genderEnabled) {
 		const genderStr = person.gender === 'female' ? commandConsoleMessages.comments.genderFemale : commandConsoleMessages.comments.genderMale;
 		bracketContent += genderStr;
 	}
-	
+
 	// 가중치 추가 (체크되어 있을 때)
 	if (weightEnabled) {
 		const weightStr = person.weight || 0;
 		bracketContent += weightStr;
 	}
-	
+
 	result += `(${bracketContent})`;
 	return result;
 }
@@ -1214,14 +1214,14 @@ function fallbackCopyToClipboard(text) {
 	document.body.appendChild(textArea);
 	textArea.focus();
 	textArea.select();
-	
+
 	try {
 		document.execCommand('copy');
 		console.log(commandConsoleMessages.comments.participantsCopiedToClipboard, text);
 	} catch (err) {
 		console.error('클립보드 복사 실패:', err);
 	}
-	
+
 	document.body.removeChild(textArea);
 }
 
@@ -1229,13 +1229,13 @@ function fallbackCopyToClipboard(text) {
 function triggerParticipantFlash() {
 	const peopleList = elements.peopleList;
 	if (!peopleList) return;
-	
+
 	// 플래시 효과 클래스 추가
 	peopleList.classList.add('capture-flash');
-	
+
 	// 찰칵 사운드 재생
 	playCameraShutterSound();
-	
+
 	// 애니메이션 종료 후 클래스 제거
 	setTimeout(() => {
 		peopleList.classList.remove('capture-flash');
@@ -1245,7 +1245,7 @@ function triggerParticipantFlash() {
 function resetAll(e) {
 	// Shift 키를 누른 상태로 클릭한 경우 완전 초기화
 	const isCompleteReset = e && e.shiftKey;
-	
+
 	if (isCompleteReset) {
 		if (!confirm(commandConsoleMessages.comments.completeResetConfirm)) {
 			return;
@@ -1267,7 +1267,7 @@ function resetAll(e) {
 		console.log(commandConsoleMessages.comments.resetConstraintsConverted.replace('{count}', converted));
 		safeOpenForbiddenWindow();
 	}
-	
+
 	// Shift 키를 누른 경우: 미참가자도 모두 삭제
 	if (isCompleteReset) {
 		state.inactivePeople = [];
@@ -1287,7 +1287,7 @@ function resetAll(e) {
 			}
 		});
 	}
-	
+
 	// 참가자 및 그룹 목록 초기화(보류 제약은 유지)
 	state.people = [];
 	state.requiredGroups = [];
@@ -1334,7 +1334,7 @@ function shuffleOrder() {
 		alert(commandConsoleMessages.comments.noParticipants);
 		return;
 	}
-	
+
 		// Fisher-Yates 셔플 알고리즘 (전체 참가자 배열)
 		for (let i = state.people.length - 1; i > 0; i--) {
 			const j = Math.floor(Math.random() * (i + 1));
@@ -1384,7 +1384,7 @@ function addPerson(fromConsole = false, options = {}) {
 			const toggleBtn = document.getElementById('toggleConsoleBtn');
 			if (toggleBtn) toggleBtn.textContent = '−';
 			elements.nameInput.value = '';
-			
+
 			if (commandConsole.output) {
 				if (currentProfileKey) {
 					// 파라미터가 있는 경우 - 이미 인증되었다면 비밀번호를 묻지 않음
@@ -1517,14 +1517,14 @@ function addPerson(fromConsole = false, options = {}) {
 					const parts = [];
 					let current = token;
 					let firstPart = null;
-					
+
 					// 첫 번째 부분 추출
 					const firstMatch = current.match(/^([^(]+)\(!/);
 					if (firstMatch) {
 						firstPart = firstMatch[1].trim();
 						current = current.substring(firstMatch[1].length);
 					}
-					
+
 					// 나머지 (!확률)이름 패턴 반복 추출
 					const pairPattern = /\(!\s*(\d+)\s*\)([^(]*?)(?=\(!|$)/g;
 					let match;
@@ -1536,7 +1536,7 @@ function addPerson(fromConsole = false, options = {}) {
 							parts.push({ name, probability: prob });
 						}
 					}
-					
+
 					if (firstPart && parts.length > 0) {
 						// 각 쌍에 대해 확률 제약 등록
 						const primaryName = firstPart.trim();
@@ -1554,7 +1554,7 @@ function addPerson(fromConsole = false, options = {}) {
 						return; // 확률 제약 체인 처리 완료
 					}
 				}
-				
+
 				// 확률 제약 등록: A(!10)B
 				const probabilisticForbiddenPattern = /^([^()!]+)\(!\s*(\d+)\s*\)([^()!]+)$/;
 				const probabilisticMatch = token.match(probabilisticForbiddenPattern);
@@ -1578,14 +1578,14 @@ function addPerson(fromConsole = false, options = {}) {
 			if (removeMatch) {
 				const primaryName = removeMatch[1].trim();
 				const rest = removeMatch[2].trim();
-				
+
 				const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryName);
-				
+
 				if (!existingChain) {
 					console.log(commandConsoleMessages.comments.chainRuleDeleteFailed.replace('{name}', primaryName));
 					return;
 				}
-				
+
 				if (!rest) {
 					// A(!) - 모든 체이닝 제거
 					state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
@@ -1596,7 +1596,7 @@ function addPerson(fromConsole = false, options = {}) {
 				} else {
 					// A(!)B 또는 A(!)B(!)C - 특정 후보 제거
 					const removeTargets = rest.split('(!)').map(n => n.trim()).filter(n => n);
-					
+
 					let removedCount = 0;
 					const removedNames = [];
 					const removedProbTargets = [];
@@ -1611,7 +1611,7 @@ function addPerson(fromConsole = false, options = {}) {
 						const probRemoved = removeProbabilisticForbiddenPairByNames(primaryName, targetName);
 						if (probRemoved > 0) removedProbTargets.push(targetName);
 					});
-					
+
 					// 후보가 모두 제거되면 체인 자체를 제거
 					if (existingChain.candidates.length === 0) {
 						state.hiddenGroupChains = state.hiddenGroupChains.filter(chain => chain.primary !== primaryName);
@@ -1621,7 +1621,7 @@ function addPerson(fromConsole = false, options = {}) {
 					} else {
 						console.log(commandConsoleMessages.comments.chainCandidateDeleteFailed);
 					}
-					
+
 					if (removedCount > 0 || removedProbTargets.length > 0) {
 						saveToLocalStorage();
 						constraintsTouched = true;
@@ -1686,7 +1686,7 @@ function addPerson(fromConsole = false, options = {}) {
 				}
 				return;
 			}
-			
+
 			// 히든 그룹 체이닝 체크: A(50)B(50)C(50)D 패턴
 			const chainPattern = /^([^(]+)(?:\((\d+)\)([^(]*?))+$/;
 			if (chainPattern.test(token)) {
@@ -1694,14 +1694,14 @@ function addPerson(fromConsole = false, options = {}) {
 				const parts = [];
 				let current = token;
 				let firstPart = null;
-				
+
 				// 첫 번째 부분 추출
 				const firstMatch = current.match(/^([^(]+)\(/);
 				if (firstMatch) {
 					firstPart = firstMatch[1].trim();
 					current = current.substring(firstMatch[1].length);
 				}
-				
+
 				// 나머지 (확률)이름 패턴 반복 추출
 				const pairPattern = /\((\d+)\)([^(]*?)(?=\(|$)/g;
 				let match;
@@ -1713,7 +1713,7 @@ function addPerson(fromConsole = false, options = {}) {
 						parts.push({ name, probability: prob });
 					}
 				}
-				
+
 				if (firstPart && parts.length > 0) {
 					// 규칙으로 등록 (참가자 존재 여부와 무관)
 					const primaryName = firstPart.trim();
@@ -1725,7 +1725,7 @@ function addPerson(fromConsole = false, options = {}) {
 							constraintsTouched = true;
 						}
 					});
-					
+
 					// 기존 체인이 있으면 후보를 병합
 					const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryName);
 					if (existingChain) {
@@ -1750,7 +1750,7 @@ function addPerson(fromConsole = false, options = {}) {
 					return; // 체인 처리 완료
 				}
 			}
-			
+
 			// 히든 그룹 단일 쌍 체크: A(50)B 패턴 (체이닝이 아닌 경우)
 			const hiddenGroupMatch = token.match(/^([^(]+)\((\d+)\)([^(]+)$/);
 			if (hiddenGroupMatch) {
@@ -1787,12 +1787,12 @@ function addPerson(fromConsole = false, options = {}) {
 			}
 		}
 		// fromConsole 블록 종료
-		
+
 		if (token.includes('!')) {
 			// 한 입력에서 여러 제약 처리: "A!B!C!D" 또는 "A!B,C!E"
 			// 먼저 쉼표로 분리하여 "A!B,C!E" -> ["A!B", "C!E"] 형태로 처리
 			const constraintParts = token.split(',').map(p => p.trim()).filter(p => p !== '');
-			
+
 			constraintParts.forEach(constraint => {
 				// 제거 처리: A!!B
 				if (constraint.includes('!!')) {
@@ -1808,14 +1808,14 @@ function addPerson(fromConsole = false, options = {}) {
 				// 쌍 제약 처리: A!B!C!D -> 모든 조합 쌍 생성
 				else if (constraint.includes('!')) {
 					const names = constraint.split('!').map(s => s.trim()).filter(s => s !== '');
-					
+
 					// 모든 조합에 대해 쌍 제약 생성
 					for (let i = 0; i < names.length; i++) {
 						for (let j = i + 1; j < names.length; j++) {
 							const ln = names[i];
 							const rn = names[j];
 							if (!ln || !rn) continue;
-							
+
 							const pa = findPersonByName(ln);
 							const pb = findPersonByName(rn);
 							if (pa && pb) {
@@ -1852,7 +1852,7 @@ function addPerson(fromConsole = false, options = {}) {
 
 			// 등록 대기 데이터에 추가
 			pendingNamesData.push({ names, hasDuplicates: groupDuplicates.length > 0 });
-			
+
 			// 모든 입력 이름을 수집 (정규화된 형태)
 			names.forEach(name => {
 				allInputNames.push(normalizeName(name));
@@ -1881,7 +1881,7 @@ function addPerson(fromConsole = false, options = {}) {
 	if (duplicateHits.length > 0 || hasInputDuplicates) {
 		// 중복 확인 모달 표시
 		// 중복 제거 후 남을 그룹 개수를 예측하여 색상 인덱스 계산
-		
+
 		// 제거될 참가자들이 속한 그룹 찾기
 		const groupsToRemove = new Set();
 		duplicateHits.forEach(name => {
@@ -1895,14 +1895,14 @@ function addPerson(fromConsole = false, options = {}) {
 				});
 			}
 		});
-		
+
 		// 중복 제거 후 남을 그룹 개수
 		const remainingGroupCount = state.requiredGroups.length - groupsToRemove.size;
-		
+
 		// 새 그룹들에 할당할 색상 인덱스 계산
 		const newGroupColorIndices = [];
 		let nextColorIndex = remainingGroupCount;
-		
+
 		pendingNamesData.forEach(({ names }) => {
 			if (names.length > 1) {
 				// 그룹인 경우에만 색상 인덱스 할당
@@ -1912,7 +1912,7 @@ function addPerson(fromConsole = false, options = {}) {
 				newGroupColorIndices.push(-1); // 개별 참가자는 -1
 			}
 		});
-		
+
 		pendingAddData = {
 			input: input,
 			pendingNamesData: pendingNamesData,
@@ -1944,7 +1944,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 			if (existing) duplicateIds.push(existing.id);
 		});
 	});
-	
+
 	// 1단계: 중복된 사람들을 미참가자 목록에 추가 (성별/가중치 보존)
 	duplicateIds.forEach(id => {
 		const person = state.people.find(p => p.id === id);
@@ -1964,15 +1964,15 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 			}
 		}
 	});
-	
+
 	// 2단계: 중복된 사람들을 state.people에서 제거
 	state.people = state.people.filter(p => !duplicateIds.includes(p.id));
-	
+
 	// 3단계: 각 그룹에서 중복된 사람들 제거 (그룹은 유지, 1명 이하가 되면 그룹 해체)
 	state.requiredGroups = state.requiredGroups.map(group => {
 		return group.filter(pid => !duplicateIds.includes(pid));
 	}).filter(group => group.length > 1);
-	
+
 	// 4단계: 제약 조건에서도 중복된 사람들 제거
 	duplicateIds.forEach(id => {
 		const before = state.forbiddenPairs.length;
@@ -1986,7 +1986,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 
 	// 4단계: 새 참가자 추가
 	const newGroupsToAdd = [];
-	
+
 		pendingNamesData.forEach(({ names }, index) => {
 			const newIds = [];
 				names.forEach(name => {
@@ -1994,18 +1994,18 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 					let actualName = name;
 					let parsedGender = null;
 					let parsedWeight = null;
-					
+
 					// 괄호가 있는지 확인
 					const match = name.match(/^(.+?)\(([^)]+)\)$/);
 					if (match) {
 						actualName = match[1].trim();
 						const content = match[2].trim();
-						
+
 						// 괄호 안 내용 분석
 						// 패턴: 숫자만, 남/여만, 숫자+남/여 (순서 무관)
 						const numberMatch = content.match(/\d+/);
 						const genderMatch = content.match(/[남여]/);
-						
+
 						if (numberMatch) {
 							parsedWeight = parseInt(numberMatch[0]);
 						}
@@ -2013,19 +2013,19 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 							parsedGender = genderMatch[0] === '남' ? 'male' : 'female';
 						}
 					}
-					
+
 					// 기본값 설정
 					let weight = 0;
 					let gender = 'male';
-					
+
 					// 미참가자 목록에서 찾기
 					const normalized = normalizeName(actualName);
 					const inactivePerson = state.inactivePeople.find(p => normalizeName(p.name) === normalized);
-					
+
 					// 우선순위: 1. 명령어 입력값 (parsedGender/parsedWeight)
 					//          2. 미참가자 목록 값
 					//          3. 기본값만 (입력 필드 값 사용 안 함)
-					
+
 					// 성별 결정
 					if (parsedGender !== null) {
 						// 1순위: 명령어로 지정된 성별
@@ -2035,7 +2035,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 						gender = inactivePerson.gender;
 					}
 					// else: 3순위 기본값 'male' 유지
-					
+
 					// 가중치 결정
 					if (parsedWeight !== null) {
 						// 1순위: 명령어로 지정된 가중치
@@ -2045,7 +2045,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 						weight = inactivePerson.weight;
 					}
 					// else: 3순위 기본값 0 유지 (입력 필드 값 사용 안 함)
-					
+
 					const person = {
 						id: state.nextId++,
 						name: actualName,
@@ -2055,7 +2055,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 					state.people.push(person);
 					newIds.push(person.id);
 					addedAny = true;
-					
+
 					// 미참가자 목록에서 제거
 					if (inactivePerson) {
 						state.inactivePeople = state.inactivePeople.filter(p => normalizeName(p.name) !== normalized);
@@ -2068,7 +2068,7 @@ function processAddPerson(pendingNamesData, groupColorIndices) {
 	newGroupsToAdd.forEach((group, idx) => {
 		const newGroupIndex = state.requiredGroups.length;
 		state.requiredGroups.push(group);
-		
+
 		// 미리보기 색상이 있으면 해당 위치에 색상 설정
 		if (groupColorIndices && pendingAddData && pendingAddData.previewColors && pendingAddData.previewColors[idx]) {
 			// state.groupColors 배열을 확장하여 해당 인덱스에 색상 저장
@@ -2110,11 +2110,11 @@ function removePerson(id, isCompleteDelete = false) {
 			console.log(`완전 삭제: ${person.name}이(가) 완전히 삭제되었습니다.`);
 		}
 	}
-	
+
 	state.people = state.people.filter(p => p.id !== id);
 	state.requiredGroups = state.requiredGroups.map(group => group.filter(pid => pid !== id));
 	state.requiredGroups = state.requiredGroups.filter(group => group.length > 1);
-	
+
 	// 이 사람이 포함된 제약을 이름 기반 보류 제약으로 변환 (제약 유지)
 	if (person) {
 		const personName = normalizeName(person.name);
@@ -2124,7 +2124,7 @@ function removePerson(id, isCompleteDelete = false) {
 				if (otherPerson) {
 					const otherName = normalizeName(otherPerson.name);
 					// 보류 제약으로 변환
-					const exists = state.pendingConstraints.some(pc => 
+					const exists = state.pendingConstraints.some(pc =>
 						(pc.left === personName && pc.right === otherName) ||
 						(pc.left === otherName && pc.right === personName)
 					);
@@ -2136,11 +2136,11 @@ function removePerson(id, isCompleteDelete = false) {
 			}
 		});
 	}
-	
+
 	// id 기반 제약 제거 (이미 보류로 변환됨)
 	state.forbiddenPairs = state.forbiddenPairs.filter(([a, b]) => a !== id && b !== id);
 	buildForbiddenMap();
-	
+
 	// 히든 그룹도 이름 기반 보류로 변환 (규칙 유지)
 	if (person) {
 		const personName = person.name;
@@ -2154,10 +2154,10 @@ function removePerson(id, isCompleteDelete = false) {
 						(pg.left === otherPerson.name && pg.right === personName)
 					);
 					if (!exists) {
-						state.pendingHiddenGroups.push({ 
-							left: personName, 
-							right: otherPerson.name, 
-							probability: prob 
+						state.pendingHiddenGroups.push({
+							left: personName,
+							right: otherPerson.name,
+							probability: prob
 						});
 						console.log(`히든 그룹 보존: ${personName} - ${otherPerson.name}(${prob}%) 규칙이 보류 상태로 변환되었습니다.`);
 					}
@@ -2165,10 +2165,10 @@ function removePerson(id, isCompleteDelete = false) {
 			}
 		});
 	}
-	
+
 	// id 기반 히든 그룹 제거 (이미 보류로 변환됨)
 	state.hiddenGroups = state.hiddenGroups.filter(([a, b]) => a !== id && b !== id);
-	
+
 	saveToLocalStorage();
 	renderPeople();
 }
@@ -2233,7 +2233,7 @@ function addForbiddenPairByNames(nameA, nameB) {
 		saveToLocalStorage();
 	}
 	return { ok: true, added: !exists };
-} 
+}
 
 function removeProbabilisticForbiddenPairByNames(nameA, nameB) {
 	const left = normalizeName(nameA);
@@ -2361,7 +2361,7 @@ function addPendingConstraint(leftName, rightName) {
 	if (existsPending) { return { ok: true }; }
 	state.pendingConstraints.push({ left: l, right: r });
 	saveToLocalStorage();
-	return { ok: true }; 
+	return { ok: true };
 }
 
 // 새 참가자 추가 시 보류 제약을 해결하려 시도
@@ -2383,7 +2383,7 @@ function tryResolvePendingConstraints() {
 		buildForbiddenMap();
 		saveToLocalStorage();
 		// 제약 관리창 자동 열기 제거 - 참가자 입력 시 !가 없으면 창이 열리지 않아야 함
-	} 
+	}
 }
 
 // 로컬 보기(file:// 또는 localhost) 감지 — 개발 편의를 위해 동작을 조정
@@ -2466,11 +2466,11 @@ function buildForbiddenMap() {
 // 예약을 임시 히든 그룹으로 적용 (팀 생성 시에만 사용)
 function applyReservationAsHiddenGroup(reservationNames) {
 	if (!reservationNames || reservationNames.length === 0) return;
-	
+
 	// 예약된 이름들을 ID로 변환 (참가자 목록에 있는 것만)
 	const reservationIds = [];
 	const notFoundNames = [];
-	
+
 	reservationNames.forEach(name => {
 		const person = state.people.find(p => p.name === name);
 		if (person) {
@@ -2479,11 +2479,11 @@ function applyReservationAsHiddenGroup(reservationNames) {
 			notFoundNames.push(name);
 		}
 	});
-	
+
 	// 팀 인원수보다 많은 경우 앞에서부터 membersPerTeam 만큼만 사용
 	const maxReservationSize = state.membersPerTeam || reservationIds.length;
 	const limitedReservationIds = reservationIds.slice(0, maxReservationSize);
-	const excludedNames = reservationIds.slice(maxReservationSize).map(id => 
+	const excludedNames = reservationIds.slice(maxReservationSize).map(id =>
 		state.people.find(p => p.id === id)?.name
 	).filter(Boolean);
 	if (limitedReservationIds.length <= 1) {
@@ -2496,21 +2496,21 @@ function applyReservationAsHiddenGroup(reservationNames) {
 		};
 		return [...limitedReservationIds];
 	}
-	
+
 	// 예약 그룹과 규칙의 상호작용 처리
 	// 규칙 A(확률)B가 있고 예약에 B가 포함되어 있으면, A도 예약 그룹에 확률적으로 추가
 	const additionalIds = [];
-	
+
 	// hiddenGroupChains 확인 (A(확률)B(확률)C 형태)
 	state.hiddenGroupChains.forEach(chain => {
 		const primaryPerson = state.people.find(p => p.name === chain.primary);
 		if (!primaryPerson) return;
-		
+
 		// chain의 candidates 중에 예약에 포함된 사람이 있는지 확인
 		for (const candidate of chain.candidates) {
 			const candidatePerson = state.people.find(p => p.name === candidate.name);
 			if (!candidatePerson) continue;
-			
+
 			// 예약에 candidate가 포함되어 있는지 확인 (제한된 예약 ID 기준)
 			if (limitedReservationIds.includes(candidatePerson.id)) {
 				// 확률 체크
@@ -2519,7 +2519,7 @@ function applyReservationAsHiddenGroup(reservationNames) {
 					// primary를 예약 그룹에 추가
 					if (!limitedReservationIds.includes(primaryPerson.id) && !additionalIds.includes(primaryPerson.id)) {
 						additionalIds.push(primaryPerson.id);
-						
+
 						// 적용된 규칙 정보 저장
 						if (!window.appliedReservationRules) {
 							window.appliedReservationRules = [];
@@ -2535,10 +2535,10 @@ function applyReservationAsHiddenGroup(reservationNames) {
 			}
 		}
 	});
-	
+
 	// 추가 ID들을 예약 그룹에 포함 (제한된 예약 ID 사용)
 	const finalReservationIds = [...limitedReservationIds, ...additionalIds];
-	
+
 	// 예약된 참가자들을 activeHiddenGroupMap에 직접 추가 (히든 그룹으로 처리)
 	// 모든 예약 참가자를 서로 연결하여 하나의 클러스터로 만듦
 	finalReservationIds.forEach(id1 => {
@@ -2551,7 +2551,7 @@ function applyReservationAsHiddenGroup(reservationNames) {
 			}
 		});
 	});
-	
+
 	// 예약 적용 정보 저장 (나중에 CMD 출력용)
 	window.appliedReservation = {
 		names: reservationNames,
@@ -2598,7 +2598,7 @@ function activateProbabilisticForbiddenPairsForTeamGeneration() {
 function activateHiddenGroupsForTeamGeneration() {
 	state.activeHiddenGroupMap = {};
 	state.activeHiddenGroupChainInfo = [];
-	
+
 	// 단일 쌍 히든 그룹 처리
 	state.hiddenGroups.forEach(([a, b, probability]) => {
 		// 확률에 따라 활성화 여부 결정
@@ -2608,7 +2608,7 @@ function activateHiddenGroupsForTeamGeneration() {
 		const personB = state.people.find(p => p.id === b);
 		const nameA = personA ? personA.name : `ID ${a}`;
 		const nameB = personB ? personB.name : `ID ${b}`;
-		
+
 		if (random < probability) {
 			if (!state.activeHiddenGroupMap[a]) state.activeHiddenGroupMap[a] = new Set();
 			if (!state.activeHiddenGroupMap[b]) state.activeHiddenGroupMap[b] = new Set();
@@ -2616,7 +2616,7 @@ function activateHiddenGroupsForTeamGeneration() {
 			state.activeHiddenGroupMap[b].add(a);
 		}
 	});
-	
+
 	// 체인 히든 그룹 처리
 	state.hiddenGroupChains.forEach(chain => {
 		// primary 이름으로 참가자 찾기
@@ -2625,7 +2625,7 @@ function activateHiddenGroupsForTeamGeneration() {
 			return; // 주 참가자가 없으면 스킵
 		}
 		const primaryName = primaryPerson.name;
-		
+
 		let activated = false;
 		for (const candidate of chain.candidates) {
 			// candidate 이름으로 참가자 찾기
@@ -2633,29 +2633,29 @@ function activateHiddenGroupsForTeamGeneration() {
 			if (!candidatePerson) {
 				continue; // 후보가 없으면 다음 후보로
 			}
-			
+
 			const random = Math.random() * 100;
 			const candidateName = candidatePerson.name;
-			
+
 			if (random < candidate.probability) {
 				// 활성화 성공
 				if (!state.activeHiddenGroupMap[primaryPerson.id]) state.activeHiddenGroupMap[primaryPerson.id] = new Set();
 				if (!state.activeHiddenGroupMap[candidatePerson.id]) state.activeHiddenGroupMap[candidatePerson.id] = new Set();
 				state.activeHiddenGroupMap[primaryPerson.id].add(candidatePerson.id);
 				state.activeHiddenGroupMap[candidatePerson.id].add(primaryPerson.id);
-				
+
 				// 체이닝 정보 저장 (배열에 추가)
 				state.activeHiddenGroupChainInfo.push({
 					primaryName: primaryName,
 					candidateName: candidateName,
 					probability: candidate.probability
 				});
-				
+
 				activated = true;
 				break; // 체인에서 첫 번째 성공하면 중단
 			}
 		}
-		
+
 		if (!activated) {
 			// 체인 모두 실패
 		}
@@ -2672,19 +2672,19 @@ function deactivateHiddenGroups() {
 			const pairKey = [parseInt(aId), parseInt(bId)].sort((x, y) => x - y).join('-');
 			if (!activatedPairs.has(pairKey)) {
 				activatedPairs.add(pairKey);
-				
+
 				// 참가자 이름 가져오기
 				const personA = state.people.find(p => p.id === parseInt(aId));
 				const personB = state.people.find(p => p.id === parseInt(bId));
 				const nameA = personA ? personA.name : `ID ${aId}`;
 				const nameB = personB ? personB.name : `ID ${bId}`;
-				
+
 				// 체이닝으로 생성된 히든 그룹인지 확인
 				let isChain = false;
 				let primaryName = null;
 				let partnerName = null;
 				let probability = null;
-				
+
 				if (state.activeHiddenGroupChainInfo[aId] && state.activeHiddenGroupChainInfo[aId][bId]) {
 					// aId가 primary
 					isChain = true;
@@ -2698,12 +2698,12 @@ function deactivateHiddenGroups() {
 					partnerName = nameA;
 					probability = state.activeHiddenGroupChainInfo[bId][aId];
 				}
-				
+
 				if (isChain) {
 					// 체이닝 형식: "A(체이닝의 맨앞에 선언된 참가자) - B(히든그룹으로 묶인 멤버) (확률)"
 				} else {
 					// 일반 히든 그룹 형식
-					const hiddenGroup = state.hiddenGroups.find(([a, b]) => 
+					const hiddenGroup = state.hiddenGroups.find(([a, b]) =>
 						(a === parseInt(aId) && b === parseInt(bId)) || (a === parseInt(bId) && b === parseInt(aId))
 					);
 					probability = hiddenGroup ? hiddenGroup[2] : '?';
@@ -2711,10 +2711,10 @@ function deactivateHiddenGroups() {
 			}
 		});
 	});
-	
+
 	state.activeHiddenGroupMap = {};
 	state.activeHiddenGroupChainInfo = {};
-	
+
 	// 예약 정보 초기화 (팀 표시 완료 후)
 	window.appliedReservation = null;
 	window.appliedReservationRules = null;
@@ -2733,11 +2733,11 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		console.log(commandConsoleMessages.comments.hiddenGroupAddFailed, msg);
 		return { ok: false, message: msg };
 	}
-	
+
 	// 이미 체인으로 등록되어 있는지 확인
 	const existingChainAsA = state.hiddenGroupChains.find(chain => chain.primary === nameA);
 	const existingChainAsB = state.hiddenGroupChains.find(chain => chain.primary === nameB);
-	
+
 	if (existingChainAsA) {
 		// nameA가 primary인 체인이 있으면 nameB를 후보로 추가
 		const existingCandidate = existingChainAsA.candidates.find(c => c.name === nameB);
@@ -2751,7 +2751,7 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		saveToLocalStorage();
 		return { ok: true, added: true };
 	}
-	
+
 	if (existingChainAsB) {
 		// nameB가 primary인 체인이 있으면 nameA를 후보로 추가
 		const existingCandidate = existingChainAsB.candidates.find(c => c.name === nameA);
@@ -2765,7 +2765,7 @@ function addHiddenGroupByNames(nameA, nameB, probability) {
 		saveToLocalStorage();
 		return { ok: true, added: true };
 	}
-	
+
 	// 새 체인 생성 (참가자 확인 없이 이름만으로)
 	state.hiddenGroupChains.push({
 		primary: nameA,
@@ -2781,12 +2781,12 @@ function addPendingHiddenGroup(leftName, rightName, probability) {
 	const l = normalizeName(leftName);
 	const r = normalizeName(rightName);
 	if (l === r) return { ok: false, message: commandConsoleMessages.comments.samePersonHiddenGroupError };
-	
+
 	// 기존 보류 히든 그룹 찾기 (양방향 체크)
 	const existingIndex = state.pendingHiddenGroups.findIndex(
 		pg => (pg.left === l && pg.right === r) || (pg.left === r && pg.right === l)
 	);
-	
+
 	if (existingIndex === -1) {
 		// 새로 추가
 		state.pendingHiddenGroups.push({ left: l, right: r, probability: probability });
@@ -2799,7 +2799,7 @@ function addPendingHiddenGroup(leftName, rightName, probability) {
 		saveToLocalStorage();
 		console.log(commandConsoleMessages.comments.pendingHiddenGroupUpdated + ` (${oldProb}% → ${probability}%): ${leftName} ↔ ${rightName}`);
 	}
-	
+
 	return { ok: true };
 }
 
@@ -2807,7 +2807,7 @@ function addPendingHiddenGroup(leftName, rightName, probability) {
 function tryResolveHiddenGroups() {
 	if (!state.pendingHiddenGroups.length && !state.pendingHiddenGroupChains.length) return;
 	let changed = false;
-	
+
 	// 단일 쌍 해결
 	state.pendingHiddenGroups = state.pendingHiddenGroups.filter(pg => {
 		const pa = findPersonByName(pg.left);
@@ -2819,15 +2819,15 @@ function tryResolveHiddenGroups() {
 		}
 		return true; // 보류 유지
 	});
-	
+
 	// 체인 해결
 	state.pendingHiddenGroupChains = state.pendingHiddenGroupChains.filter(chain => {
 		const primaryPerson = findPersonByName(chain.primary);
 		if (!primaryPerson) return true; // 주 참가자가 없으면 보류 유지
-		
+
 		const candidateIds = [];
 		let allFound = true;
-		
+
 		for (const cand of chain.candidates) {
 			const candidate = findPersonByName(cand.name);
 			if (candidate) {
@@ -2837,7 +2837,7 @@ function tryResolveHiddenGroups() {
 				break;
 			}
 		}
-		
+
 		if (allFound) {
 			addHiddenGroupChain(primaryPerson.id, candidateIds);
 			changed = true;
@@ -2845,7 +2845,7 @@ function tryResolveHiddenGroups() {
 		}
 		return true; // 보류 유지
 	});
-	
+
 	if (changed) saveToLocalStorage();
 }
 
@@ -2853,7 +2853,7 @@ function tryResolveHiddenGroups() {
 function addHiddenGroupChain(primaryName, candidates) {
 	// 기존 체인 찾기
 	const existingChain = state.hiddenGroupChains.find(chain => chain.primary === primaryName);
-	
+
 	if (existingChain) {
 		// 기존 체인이 있으면 후보들을 병합 (덮어쓰지 않고 추가)
 		candidates.forEach(newCandidate => {
@@ -2873,17 +2873,17 @@ function addHiddenGroupChain(primaryName, candidates) {
 			candidates: candidates
 		});
 	}
-	
+
 	saveToLocalStorage();
 }
 
 // 보류 히든 그룹 체인 추가
 function addPendingHiddenGroupChain(primaryName, candidates) {
 	const normalizedPrimary = normalizeName(primaryName);
-	
+
 	// 기존 보류 체인 찾기
 	const existingChain = state.pendingHiddenGroupChains.find(chain => chain.primary === normalizedPrimary);
-	
+
 	if (existingChain) {
 		// 기존 체인이 있으면 후보들을 병합 (덮어쓰지 않고 추가)
 		candidates.forEach(newCandidate => {
@@ -2904,7 +2904,7 @@ function addPendingHiddenGroupChain(primaryName, candidates) {
 			candidates: candidates.map(c => ({ name: normalizeName(c.name), probability: c.probability }))
 		});
 	}
-	
+
 	saveToLocalStorage();
 }
 
@@ -2918,13 +2918,13 @@ function getDefinedHiddenGroupCluster(personId) {
 	const visited = new Set();
 	const cluster = new Set();
 	const queue = [personId];
-	
+
 	while (queue.length > 0) {
 		const current = queue.shift();
 		if (visited.has(current)) continue;
 		visited.add(current);
 		cluster.add(current);
-		
+
 		// 정의된 히든 그룹으로 연결된 모든 ID 찾기
 		state.hiddenGroups.forEach(([a, b, prob]) => {
 			if (a === current && !visited.has(b)) {
@@ -2934,7 +2934,7 @@ function getDefinedHiddenGroupCluster(personId) {
 			}
 		});
 	}
-	
+
 	return cluster;
 }
 
@@ -2943,13 +2943,13 @@ function getActiveHiddenGroupCluster(personId) {
 	const visited = new Set();
 	const cluster = new Set();
 	const queue = [personId];
-	
+
 	while (queue.length > 0) {
 		const current = queue.shift();
 		if (visited.has(current)) continue;
 		visited.add(current);
 		cluster.add(current);
-		
+
 		// 활성화된 히든 그룹으로 연결된 모든 ID 찾기
 		if (state.activeHiddenGroupMap[current]) {
 			state.activeHiddenGroupMap[current].forEach(connectedId => {
@@ -2959,7 +2959,7 @@ function getActiveHiddenGroupCluster(personId) {
 			});
 		}
 	}
-	
+
 	return cluster;
 }
 
@@ -2967,7 +2967,7 @@ function getActiveHiddenGroupCluster(personId) {
 function getActiveHiddenGroupBlockIds(personId) {
 	const cluster = getActiveHiddenGroupCluster(personId);
 	const blockIds = new Set();
-	
+
 	cluster.forEach(id => {
 		// 그룹에 속한 경우 그룹의 모든 멤버 추가
 		const groupIndex = getPersonGroupIndex(id);
@@ -2980,7 +2980,7 @@ function getActiveHiddenGroupBlockIds(personId) {
 			blockIds.add(id);
 		}
 	});
-	
+
 	return Array.from(blockIds);
 }
 
@@ -3103,7 +3103,7 @@ function openForbiddenWindow() {
 						} catch(e){ console.log(commandConsoleMessages.comments.additionFailed, e); }
 					});
 					input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') addBtn.click(); });
-					
+
 					// 초기화 버튼 이벤트
 					if (resetAllBtn) {
 						resetAllBtn.addEventListener('click', ()=>{
@@ -3160,7 +3160,7 @@ function openForbiddenWindow() {
 			</body></html>`);
 			doc.close();
 		}
-		
+
 		// 팝업이 열릴 때마다 모달 상태 초기화
 		if (forbiddenPopup && !forbiddenPopup.closed) {
 			try {
@@ -3170,7 +3170,7 @@ function openForbiddenWindow() {
 				const showWarn = doc.getElementById('showWarn');
 				const appliedSection = doc.getElementById('appliedSection');
 				const pendingSection = doc.getElementById('pendingSection');
-				
+
 				if (modal) {
 					// 항상 모달을 visible 상태로 강제 설정 (blindDelay는 나중에 체크)
 					modal.style.display = '';
@@ -3178,17 +3178,17 @@ function openForbiddenWindow() {
 					// 강제로 reflow 발생
 					void modal.offsetWidth;
 					modal.classList.add('visible');
-					
+
 					if (appliedSection) appliedSection.style.display = 'none';
 					if (pendingSection) pendingSection.style.display = 'none';
 					if (showBtn) showBtn.style.display = '';
 					if (showWarn) showWarn.style.display = '';
 				}
-			} catch(e) { 
+			} catch(e) {
 				console.warn('모달 초기화 실패:', e);
 			}
 		}
-		
+
 		renderForbiddenWindowContent();
 		if (forbiddenPopup && !forbiddenPopup.closed) forbiddenPopup.focus();
 	} catch (e) {
@@ -3306,20 +3306,20 @@ function getGroupColor(groupIndex) {
 function createPersonTag(person, potentialDuplicates = []) {
 	const personTag = document.createElement('div');
 	personTag.className = 'person-tag';
-	
+
 	// 중복 체크: potentialDuplicates 배열에 이 사람의 normalized 이름이 있으면 강조
 	const normalized = normalizeName(person.name);
 	if (potentialDuplicates.includes(normalized)) {
 		personTag.classList.add('is-duplicate');
 	}
-	
+
 	if (state.genderBalanceEnabled) personTag.style.backgroundColor = person.gender === 'male' ? '#e0f2fe' : '#fce7f3';
-	
+
 	const nameSpan = document.createElement('span');
 	nameSpan.className = 'name';
 	nameSpan.textContent = person.name;
 	personTag.appendChild(nameSpan);
-	
+
 	if (state.genderBalanceEnabled) {
 		const genderToggle = document.createElement('button');
 		genderToggle.className = 'gender-toggle-circle';
@@ -3332,7 +3332,7 @@ function createPersonTag(person, potentialDuplicates = []) {
 		});
 		personTag.appendChild(genderToggle);
 	}
-	
+
 	if (state.weightBalanceEnabled) {
 		const weightInput = document.createElement('input');
 		weightInput.type = 'number';
@@ -3344,7 +3344,7 @@ function createPersonTag(person, potentialDuplicates = []) {
 		});
 		personTag.appendChild(weightInput);
 	}
-	
+
 	const removeBtn = document.createElement('button');
 	removeBtn.textContent = '×';
 	removeBtn.className = 'remove-btn';
@@ -3359,9 +3359,9 @@ function createPersonTag(person, potentialDuplicates = []) {
 			removePerson(person.id, false);
 		}
 	});
-	
+
 	personTag.appendChild(removeBtn);
-	
+
 	return personTag;
 }
 
@@ -3381,14 +3381,14 @@ function updateParticipantCount() {
 function renderPeople() {
 	updateParticipantCount();
 	elements.peopleList.innerHTML = '';
-    
-	
+
+
 	// 입력창에서 중복 체크를 위한 이름 목록 가져오기
 	const potentialDuplicates = getPotentialDuplicatesFromInput();
-	
+
 	const grouped = new Set();
 	const groupMap = new Map(); // personId -> groupIndex(그룹 인덱스)
-	
+
 	// 그룹 정보를 맵으로 저장
 	state.requiredGroups.forEach((group, groupIndex) => {
 		// 그룹 내부는 실제 배열 순서대로(셔플 반영)
@@ -3398,13 +3398,13 @@ function renderPeople() {
 		});
 	});
 
-	
+
 	// people 배열 순서대로 표시하되, 그룹 시작 시점에 그룹 전체를 한 번에 표시
 	const processedGroups = new Set();
-	
+
 	state.people.forEach(person => {
 		const groupIndex = groupMap.get(person.id);
-		
+
 		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
 			// 이 그룹을 처음 만났을 때, 그룹 전체를 표시
 			processedGroups.add(groupIndex);
@@ -3428,21 +3428,21 @@ function renderPeople() {
 		}
 		// 이미 처리된 그룹의 멤버는 스킵
 	});
-        
+
 }
 
 // 입력창의 텍스트에서 중복될 가능성이 있는 이름들 추출
 function getPotentialDuplicatesFromInput() {
 	const input = elements.nameInput.value.trim();
 	if (!input) return [];
-	
+
 	const duplicateNames = [];
 	const tokens = input.split('/').map(t => t.trim()).filter(t => t !== '');
-	
+
 	tokens.forEach(token => {
 		// 제약 조건(!로 시작하는 것)은 무시
 		if (token.includes('!')) return;
-		
+
 		// 쉼표로 구분된 이름들 추출
 		const names = token.split(',').map(n => n.trim()).filter(n => n !== '');
 		names.forEach(name => {
@@ -3454,7 +3454,7 @@ function getPotentialDuplicatesFromInput() {
 			}
 		});
 	});
-	
+
 	return duplicateNames;
 }
 
@@ -3496,7 +3496,7 @@ async function shuffleTeams() {
 
 	const teams = generateTeams(preShufflePeopleForGeneration(validPeople), consumedReservation);
 	if (!teams) return; // generateTeams가 불가능할 경우 오류를 표시함
-	
+
 	// 예약 소모 알림 (CMD 콘솔에 출력)
 	if (consumedReservation && typeof commandConsole !== 'undefined' && commandConsole.log) {
 		// appliedReservation 정보 확인 (제외된 인원이 있는지 체크)
@@ -3515,7 +3515,7 @@ async function shuffleTeams() {
 			commandConsole.log(commandConsoleMessages.comments.reservationConsumed.replace('{members}', consumedReservation.join(', ')));
 		}
 	}
-	
+
 	// Firebase에 예약 소모 반영
 	if (consumedReservation && syncEnabled && currentProfileKey) {
 		// 자신이 예약을 소모했다는 플래그 설정 (Firebase 리스너가 알림을 보내지 않도록)
@@ -3546,14 +3546,14 @@ async function shuffleTeams() {
 				}
 			});
 	}
-	
+
 	// 검증된 팀 저장
 	currentTeams = teams;
 	isValidated = false;
-	
+
 	// 팀 생성시 제약 레이어가 열려있으면 내리기
 	hideConstraintNotification();
-	
+
 	// 캡처 버튼 상태 초기화
 	if (captureSuccessTimer) {
 		clearTimeout(captureSuccessTimer);
@@ -3563,10 +3563,10 @@ async function shuffleTeams() {
 		elements.captureBtn.innerHTML = '화면 캡처 <span class="camera-emoji">📸</span>';
 		elements.captureBtn.disabled = false;
 	}
-	
+
 	// teamDisplayDelay가 바뀔 수 있으므로 표시 전 최신값으로 반영
 	setTeamAnimDurationFromDelay();
-	
+
 	// 검증 루프 실행 후 최종 결과만 표시
 	await startValidationLoop(teams);
 	} finally {
@@ -3653,12 +3653,12 @@ function generateTeams(people, reservation = null) {
 			}
 		}
 	}
-	
+
 	// 팀 인원수와 정확히 일치하는 그룹들을 미리 분리
 	const completeTeamGroups = []; // 완성된 팀으로 사용할 그룹들
 	const regularGroups = []; // 일반 그룹들 [{ group, requiredGroupIndex }]
 	const completeTeamMemberIds = new Set(); // 완성된 팀에 속한 멤버 ID들
-	
+
 	state.requiredGroups.forEach((group, requiredGroupIndex) => {
 		if (!group.every(id => people.some(p => p.id === id))) {
 			return;
@@ -3670,21 +3670,21 @@ function generateTeams(people, reservation = null) {
 			regularGroups.push({ group, requiredGroupIndex });
 		}
 	});
-	
+
 	// 완성된 팀 그룹에 속하지 않은 사람들만 필터링
 	const remainingPeople = people.filter(p => !completeTeamMemberIds.has(p.id));
 
 	// 팀 수 계산 (완성된 팀 + 나머지 인원으로 만들 팀)
-	const additionalTeamCount = remainingPeople.length > 0 
+	const additionalTeamCount = remainingPeople.length > 0
 		? Math.max(1, Math.ceil(remainingPeople.length / state.membersPerTeam))
 		: 0;
 	const totalTeamCount = completeTeamGroups.length + additionalTeamCount;
-	
+
 	if (totalTeamCount === 0) {
 		showError(commandConsoleMessages.comments.cannotFormTeams);
 		return null;
 	}
-	
+
 	const maxAttempts = 2000;
 
 	// 나머지 참가자에서 최소 성별(소수 성별) 계산
@@ -3747,13 +3747,13 @@ function generateTeams(people, reservation = null) {
 			});
 		}
 		const minorityForcedTogether = isMinorityForcedTogether();
-		
+
 		// 나머지 사람들만 셔플
 		const shuffledPeople = [...remainingPeople].sort(() => Math.random() - 0.5);
 		// 나머지 사람들로 만들 팀들만 생성
 		const teams = Array.from({ length: additionalTeamCount }, () => []);
 		const assigned = new Set();
-		
+
 		// 헬퍼 함수: 팀의 총 가중치 계산
 		const calcTeamWeight = (team) => team.reduce((sum, p) => sum + (p.weight || 0), 0);
 
@@ -3761,10 +3761,10 @@ function generateTeams(people, reservation = null) {
 		const processedHiddenClusters = new Set();
 		const hiddenGroupAffectedGroupIndices = new Set(); // 히든 그룹에 영향받은 requiredGroups 추적
 		let hiddenGroupFailed = false;
-		
+
 		for (const person of shuffledPeople) {
 			if (assigned.has(person.id)) continue;
-			
+
 			// 활성화된 히든 그룹 클러스터 확인
 			const cluster = getActiveHiddenGroupCluster(person.id);
 			if (cluster.size > 1) {
@@ -3772,19 +3772,19 @@ function generateTeams(people, reservation = null) {
 				const clusterKey = Math.min(...Array.from(cluster));
 				if (processedHiddenClusters.has(clusterKey)) continue;
 				processedHiddenClusters.add(clusterKey);
-				
+
 				// 히든 그룹 클러스터의 모든 블록 멤버 수집
 				const blockIds = getActiveHiddenGroupBlockIds(person.id);
 				const blockMembers = blockIds.map(id => shuffledPeople.find(p => p.id === id)).filter(Boolean);
-				
+
 				if (blockMembers.length === 0) continue;
-				
+
 				// 이 블록에 포함된 모든 requiredGroups를 추적
 				blockMembers.forEach(member => {
 					const gi = getPersonGroupIndex(member.id);
 					if (gi !== -1) hiddenGroupAffectedGroupIndices.add(gi);
 				});
-				
+
 				// 가중치 균등이 활성화된 경우 가중치 낮은 팀부터
 				let teamOrder;
 				if (state.weightBalanceEnabled) {
@@ -3800,9 +3800,9 @@ function generateTeams(people, reservation = null) {
 				} else {
 					teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
 				}
-				
+
 				let selectedTeam = -1;
-				
+
 				for (const i of teamOrder) {
 					// 인원 수 제약 체크
 					if (state.maxTeamSizeEnabled) {
@@ -3810,7 +3810,7 @@ function generateTeams(people, reservation = null) {
 					} else {
 						if (teams[i].length + blockMembers.length > state.membersPerTeam) continue;
 					}
-					
+
 					// 충돌 체크
 					let hasConflict = false;
 					for (const bm of blockMembers) {
@@ -3825,18 +3825,18 @@ function generateTeams(people, reservation = null) {
 						}
 					}
 					if (hasConflict) continue;
-					
+
 					// 조건 만족하면 배치
 					selectedTeam = i;
 					break;
 				}
-				
+
 				if (selectedTeam === -1) {
 					// 히든 그룹 블록을 배치할 수 없으면 이 시도는 실패
 					hiddenGroupFailed = true;
 					break;
 				}
-				
+
 				// 블록 멤버들을 팀에 추가
 				teams[selectedTeam].push(...blockMembers);
 				blockMembers.forEach(m => assigned.add(m.id));
@@ -3847,10 +3847,10 @@ function generateTeams(people, reservation = null) {
 
 		// 일반 그룹들만 처리 - 히든 그룹에 영향받은 그룹은 제외
 		// (히든 그룹 블록에 이미 포함된 멤버들은 assigned되었으므로)
-		const unaffectedRegularGroups = regularGroups.filter(({ requiredGroupIndex }) => 
+		const unaffectedRegularGroups = regularGroups.filter(({ requiredGroupIndex }) =>
 			!hiddenGroupAffectedGroupIndices.has(requiredGroupIndex)
 		);
-		
+
 		// 가중치 균등이 활성화된 경우 그룹을 가중치 순으로 정렬 (높은 순)
 		let processGroups;
 		if (state.weightBalanceEnabled) {
@@ -3870,7 +3870,7 @@ function generateTeams(people, reservation = null) {
 				.map(({ group }) => group)
 				.sort(() => Math.random() - 0.5);
 		}
-		
+
 		let groupFailed = false;
 
 		for (const group of processGroups) {
@@ -3878,7 +3878,7 @@ function generateTeams(people, reservation = null) {
 			if (groupMembers.some(member => assigned.has(member.id))) {
 				continue;
 			}
-			
+
 			// 가중치 균등이 활성화된 경우: 팀을 가중치 낮은 순으로 정렬하여 순차 확인
 			let teamOrder;
 			if (state.weightBalanceEnabled) {
@@ -3898,9 +3898,9 @@ function generateTeams(people, reservation = null) {
 				// 가중치 균등이 없으면 랜덤 순서
 				teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
 			}
-			
+
 			let selectedTeam = -1;
-			
+
 			// 가중치 낮은 팀부터 조건 확인
 			for (const i of teamOrder) {
 				// 체크 1: 인원 수 제약
@@ -3909,7 +3909,7 @@ function generateTeams(people, reservation = null) {
 				} else {
 					if (teams[i].length + groupMembers.length > state.membersPerTeam) continue;
 				}
-				
+
 				// 체크 2: 충돌(금지 제약) 없음
 				let hasConflict = false;
 				for (const gm of groupMembers) {
@@ -3924,7 +3924,7 @@ function generateTeams(people, reservation = null) {
 					}
 				}
 				if (hasConflict) continue;
-				
+
 				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
 				if (state.genderBalanceEnabled && minorityGender && !minorityForcedTogether) {
 					const currentMinGender = getTeamMinorityCount(teams[i]);
@@ -3932,17 +3932,17 @@ function generateTeams(people, reservation = null) {
 					const globalMinGender = Math.min(...allTeamMinGenders);
 					if (currentMinGender > globalMinGender) continue;
 				}
-				
+
 				// 모든 조건을 만족하면 이 팀 선택
 				selectedTeam = i;
 				break;
 			}
-			
+
 			if (selectedTeam === -1) {
 				groupFailed = true;
 				break;
 			}
-			
+
 			teams[selectedTeam].push(...groupMembers);
 			groupMembers.forEach(m => assigned.add(m.id));
 		}
@@ -3951,7 +3951,7 @@ function generateTeams(people, reservation = null) {
 
 		// 개별 참가자 배치 - shuffledPeople 사용으로 매 시도마다 다른 순서 보장
 		const unassignedPeople = shuffledPeople.filter(p => !assigned.has(p.id));
-		
+
 		// 가중치 균등이 활성화된 경우: 가중치별로 그룹화 후 각 그룹 내에서 랜덤
 		if (state.weightBalanceEnabled) {
 			// 1. 가중치별로 그룹화
@@ -3961,7 +3961,7 @@ function generateTeams(people, reservation = null) {
 				if (!weightGroups.has(w)) weightGroups.set(w, []);
 				weightGroups.get(w).push(p);
 			});
-			
+
 			// 2. 각 가중치 그룹 내에서 랜덤 셔플
 			weightGroups.forEach(group => {
 				for (let i = group.length - 1; i > 0; i--) {
@@ -3969,7 +3969,7 @@ function generateTeams(people, reservation = null) {
 					[group[i], group[j]] = [group[j], group[i]];
 				}
 			});
-			
+
 			// 3. 가중치 높은 순으로 재구성
 			const sortedWeights = Array.from(weightGroups.keys()).sort((a, b) => b - a);
 			unassignedPeople.length = 0;
@@ -3977,12 +3977,12 @@ function generateTeams(people, reservation = null) {
 				unassignedPeople.push(...weightGroups.get(w));
 			});
 		}
-		
+
 		let personFailed = false;
 
 		for (const person of unassignedPeople) {
 			const isMinorityPerson = minorityGender && person.gender === minorityGender;
-			
+
 			// 팀 순서 결정: 최대인원 모드, 일반 모드 + 가중치, 일반 모드 구분
 			let teamOrder;
 			if (state.maxTeamSizeEnabled) {
@@ -4013,20 +4013,20 @@ function generateTeams(people, reservation = null) {
 					}
 					return { idx, units: groupSet.size + ungroupedCount, size: team.length };
 				});
-				
+
 				const needUnit = teamUnits.filter(t => t.units < 2);
 				let candidateTeams = needUnit.length > 0 ? needUnit : teamUnits;
-				
+
 				// 작은 팀 우선
 				const minSize = Math.min(...candidateTeams.map(t => t.size));
 				candidateTeams = candidateTeams.filter(t => t.size === minSize);
-				
+
 				// 랜덤 순서
 				teamOrder = candidateTeams.map(t => t.idx).sort(() => Math.random() - 0.5);
 			}
-			
+
 			let selectedTeam = -1;
-			
+
 			// 우선순위 팀부터 조건 확인
 			for (const i of teamOrder) {
 				// 체크 1: 인원 수 제약
@@ -4036,7 +4036,7 @@ function generateTeams(people, reservation = null) {
 					// 일반 모드: 최대 인원만 체크 (가중치 균등 시에도 동일)
 					if (teams[i].length >= state.membersPerTeam) continue;
 				}
-				
+
 				// 체크 2: 충돌(금지 제약) 없음
 				if (teams[i].some((tm) => {
 					if (isReservationOverridePair(tm.id, person.id, activeReservationIdSet)) {
@@ -4044,27 +4044,27 @@ function generateTeams(people, reservation = null) {
 					}
 					return isForbidden(tm.id, person.id);
 				})) continue;
-				
+
 				// 체크 3: 성별 균형 - 활성화된 경우에만 적용
 				// 가중치 균등 모드에서는 가중치 우선, 성별 균형은 참고만
 				if (state.genderBalanceEnabled && isMinorityPerson && !minorityForcedTogether) {
 					const currentMinGender = getTeamMinorityCount(teams[i]);
 					const allTeamMinGenders = teams.map(getTeamMinorityCount);
 					const globalMinGender = Math.min(...allTeamMinGenders);
-					
+
 					if (currentMinGender > globalMinGender) continue;
 				}
-				
+
 				// 모든 조건을 만족하면 이 팀 선택
 				selectedTeam = i;
 				break;
 			}
-			
+
 			if (selectedTeam === -1) {
 				personFailed = true;
 				break;
 			}
-			
+
 			teams[selectedTeam].push(person);
 		}
 
@@ -4072,7 +4072,7 @@ function generateTeams(people, reservation = null) {
 
 		// 검증: 충돌 없음 및 팀당 최소 2개의 유닛 확보
 		if (conflictExistsWithReservation(teams, activeReservationIdSet)) continue;
-		
+
 		// 각 팀이 최소 2개의 유닛을 갖추었는지 확인
 		let allValid = true;
 		for (let ti = 0; ti < teams.length; ti++) {
@@ -4094,7 +4094,7 @@ function generateTeams(people, reservation = null) {
 				break;
 			}
 		}
-		
+
 		if (!allValid) continue;
 
 		if (state.genderBalanceEnabled && minorityGender && !minorityForcedTogether) {
@@ -4107,7 +4107,7 @@ function generateTeams(people, reservation = null) {
 				continue;
 			}
 		}
-		
+
 		// 최대인원 모드: 마지막 팀이 아닌 팀이 최대인원보다 적으면 재정렬
 		if (state.maxTeamSizeEnabled) {
 			// 인원이 부족한 팀(마지막 팀 제외)이 있는지 확인
@@ -4118,7 +4118,7 @@ function generateTeams(people, reservation = null) {
 					break;
 				}
 			}
-			
+
 			if (needsReorder) {
 				// 기존: 전체 팀을 정렬하면 작은 팀이 중간에 섞여 버려 원하는 "마지막 팀만 언더플로우" 결과가 나오지 않음.
 				// 대신 마지막 팀에서 앞쪽 팀들을 채울 수 있으면 옮겨 채우도록 재분배한다.
@@ -4136,7 +4136,7 @@ function generateTeams(people, reservation = null) {
 				// 반영: teams[lastIdx]는 이미 레퍼런스로 수정됨
 			}
 		}
-		
+
 		// 결과 반환 전 셔플: 팀 순서 + 각 팀 내 블럭 순서
 		// 1. 최대인원 모드인 경우 마지막 팀(나머지 팀)을 분리
 		let lastTeamForShuffle = null;
@@ -4149,23 +4149,23 @@ function generateTeams(people, reservation = null) {
 				teamsToShuffle = teams.slice(0, lastIdx);
 			}
 		}
-		
+
 		// 2. 팀 순서 셔플 (Fisher-Yates)
 		for (let i = teamsToShuffle.length - 1; i > 0; i--) {
 			const j = Math.floor(Math.random() * (i + 1));
 			[teamsToShuffle[i], teamsToShuffle[j]] = [teamsToShuffle[j], teamsToShuffle[i]];
 		}
-		
+
 		// 3. 각 팀 내에서 블럭 단위로 셔플 (개인은 그대로, 그룹만 셔플)
 		const allTeamsIncludingLast = lastTeamForShuffle ? [...teamsToShuffle, lastTeamForShuffle] : teamsToShuffle;
 		for (const team of allTeamsIncludingLast) {
 			// 팀 멤버를 블럭 단위로 분해
 			const blocks = [];
 			const processed = new Set();
-			
+
 			for (const person of team) {
 				if (processed.has(person.id)) continue;
-				
+
 				const gi = getPersonGroupIndex(person.id);
 				if (gi === -1) {
 					// 개인: 단일 블럭
@@ -4181,18 +4181,18 @@ function generateTeams(people, reservation = null) {
 					blocks.push(groupBlock);
 				}
 			}
-			
+
 			// 블럭 순서 셔플 (Fisher-Yates)
 			for (let i = blocks.length - 1; i > 0; i--) {
 				const j = Math.floor(Math.random() * (i + 1));
 				[blocks[i], blocks[j]] = [blocks[j], blocks[i]];
 			}
-			
+
 			// 팀 재구성
 			team.length = 0;
 			blocks.forEach(block => team.push(...block));
 		}
-		
+
 		// 4. 완성된 팀 그룹들을 랜덤 위치에 끼워넣기
 		if (completeTeamGroups.length > 0) {
 			// 완성된 팀들을 person 객체 배열로 변환하고 내부 팀원 순서 셔플
@@ -4205,13 +4205,13 @@ function generateTeams(people, reservation = null) {
 				}
 				return team;
 			});
-			
+
 			// 완성된 팀들을 랜덤하게 섞기
 			for (let i = completeTeams.length - 1; i > 0; i--) {
 				const j = Math.floor(Math.random() * (i + 1));
 				[completeTeams[i], completeTeams[j]] = [completeTeams[j], completeTeams[i]];
 			}
-			
+
 			// 최대인원 모드일 때는 마지막 팀을 제외하고 끼워넣기
 			if (lastTeamForShuffle) {
 				// 마지막 팀 제외한 배열에 끼워넣기
@@ -4230,7 +4230,7 @@ function generateTeams(people, reservation = null) {
 				return allTeamsIncludingLast;
 			}
 		}
-		
+
 		return allTeamsIncludingLast;
 	}
 
@@ -4248,38 +4248,38 @@ async function displayTeams(teams) {
 	const faqSection = document.querySelector('.faq-section');
 	if (faqSection) faqSection.style.display = 'none';
 	elements.teamsDisplay.innerHTML = '';
-	
+
 	// 1단계: 모든 팀 카드를 빈 상태로 생성
 	const teamCards = [];
 	teams.forEach((team, index) => {
 		const teamCard = document.createElement('div');
 		teamCard.className = 'team-card';
-		
+
 		const teamTitle = document.createElement('h3');
 		teamTitle.dataset.teamIndex = index;
 		// 초기에는 팀 번호만 표시 (0명이므로 인원 수 숨김)
 		let titleText = `팀 ${index + 1}`;
 		teamTitle.textContent = titleText;
 		teamCard.appendChild(teamTitle);
-		
+
 		const membersList = document.createElement('ul');
 		membersList.className = 'team-members-list';
 		teamCard.appendChild(membersList);
-		
+
 		elements.teamsDisplay.appendChild(teamCard);
 		teamCards.push({ card: teamCard, title: teamTitle, list: membersList, team: team, currentWeight: 0, currentCount: 0 });
 	});
-	
+
 	elements.resultsSection.classList.add('visible');
 
-    
-	
+
+
 	// 캡처 기능 사용 가능 여부 확인 후 버튼 컨테이너 표시
 	if (elements.captureButtonContainer) {
 		const canUseCapture = typeof html2canvas !== 'undefined' && navigator.clipboard && navigator.clipboard.write;
 		elements.captureButtonContainer.style.display = canUseCapture ? 'block' : 'none';
 	}
-	
+
 	// 2단계: 모든 팀에 돌아가면서 인원을 추가 (라운드 로빈)
 	const maxMembers = Math.max(...teams.map(t => t.length));
 
@@ -4317,7 +4317,7 @@ async function displayTeams(teams) {
 			cards.forEach(card => { card.style.minHeight = minCardHeight + 'px'; });
 		}
 	} catch (_) { /* 측정 실패 시 무시하고 진행 */ }
-	
+
 	// 팀 배열을 그룹 단위(연속된 동일 그룹 인원)와 단일 인원으로 분할하여 블록 단위로 애니메이션
 	const teamChunks = teamCards.map(({ team }) => {
 		const chunks = [];
@@ -4347,7 +4347,7 @@ async function displayTeams(teams) {
 
 	// 총 딜레이 횟수 계산 및 조정된 딜레이 시간 계산
 	let totalDelays = Math.max(0, teamChunks.reduce((sum, chunks) => sum + chunks.length, 0) - 1);
-	
+
 	// 총 소요 시간이 maxTimer를 초과하면 딜레이를 조정
 	let adjustedDelay = state.teamDisplayDelay;
 	if (totalDelays > 0 && maxTimer > 0) {
@@ -4366,19 +4366,19 @@ async function displayTeams(teams) {
 			const teamCardData = teamCards[teamIdx];
 			const { list, title } = teamCardData;
 			const chunks = teamChunks[teamIdx];
-			
+
 			// 이 팀의 모든 청크를 순서대로 표시
 			for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
 				const chunk = chunks[chunkIdx];
 				let addedWeight = 0;
-				
+
 				for (const person of chunk) {
 					const li = createResultListItem(person);
 					list.appendChild(li);
 					teamCardData.currentCount += 1;
 					if (state.weightBalanceEnabled) addedWeight += person.weight || 0;
 				}
-				
+
 				if (chunk.length) pulseTeamCard(teamCardData.card);
 				if (state.weightBalanceEnabled) {
 					teamCardData.currentWeight += addedWeight;
@@ -4411,7 +4411,7 @@ async function displayTeams(teams) {
 					pick = i;
 				}
 			}
-			
+
 			if (pick === -1) break; // 방어적
 			const teamCardData = teamCards[pick];
 			const { list, title } = teamCardData;
@@ -4436,7 +4436,7 @@ async function displayTeams(teams) {
 			if (!isLastStep) await new Promise(r => setTimeout(r, adjustedDelay));
 		}
 	}
-	
+
 	// 팀 표시 완료 후 히든 그룹 해제
 	deactivateHiddenGroups();
 }
@@ -4473,7 +4473,7 @@ function createResultListItem(person) {
 	const li = document.createElement('li');
 	let displayText = person.name;
 	if (state.weightBalanceEnabled) displayText += ` (${person.weight ?? 0})`;
-	li.textContent = displayText;	
+	li.textContent = displayText;
 	li.classList.add('jelly-in');
 	if (state.genderBalanceEnabled) {
 		const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
@@ -4513,43 +4513,43 @@ function logTeamResultsToConsole(teams) {
 			console.warn('적용 규칙/예약 저장 실패:', error);
 		});
 	};
-	
+
 	// 인증이 안 되어 있으면 읽기 모드로 전환
 	if (!commandConsole.authenticated && commandConsole.inputMode !== 'normal') {
 		commandConsole.inputMode = 'normal';
-		
+
 		// 확인/취소 버튼을 명령어 입력 필드로 복원
 		if (commandConsole.restoreInputField) {
 			commandConsole.restoreInputField();
 		}
-		
+
 		if (commandConsole.input) {
 			commandConsole.input.type = 'text';
 			commandConsole.input.placeholder = '명령어를 입력하세요... (예: save, load, clear)';
 		}
 		commandConsole.log(commandConsoleMessages.comments.readOnlyModeSwitch);
 	}
-	
+
 	// 팀 생성 결과 출력
 	const teamResults = teams.map((team, index) => {
 		const teamNumber = index + 1;
 		const teamMembers = team.map(person => {
 			let parts = [];
-			
+
 			// 이름
 			parts.push(person.name);
-			
+
 			// 성별 정보 추가
 			if (state.genderBalanceEnabled && person.gender) {
 				const genderEmoji = person.gender === 'male' ? '♂️' : person.gender === 'female' ? '♀️' : '';
 				if (genderEmoji) parts.push(genderEmoji);
 			}
-			
+
 			// 가중치 정보 추가
 			if (state.weightBalanceEnabled && person.weight !== undefined) {
 				parts.push(person.weight);
 			}
-			
+
 			// 이름(성별/가중치) 형식으로 조합
 			if (parts.length > 1) {
 				return `${parts[0]}(${parts.slice(1).join('/')})`;
@@ -4557,15 +4557,15 @@ function logTeamResultsToConsole(teams) {
 				return parts[0];
 			}
 		}).join(', ');
-		
+
 		return `${teamNumber}팀: ${teamMembers}`;
 	}).join('<br>');
-	
+
 	// 적용된 규칙이 있을 경우 추가 (인증된 사용자만)
 	let outputMessage = `${commandConsoleMessages.comments.generatedTeams}<br>${teamResults}`;
 	let appliedReservationSnapshot = null;
 	const appliedRulesSnapshot = [];
-	
+
 	// 적용된 예약 정보 출력
 	if (window.appliedReservation) {
 		const reservation = window.appliedReservation;
@@ -4575,23 +4575,23 @@ function logTeamResultsToConsole(teams) {
 			excluded: reservation.excludedNames || []
 		};
 		let reservationInfo = `<br><br>${commandConsoleMessages.comments.reservationApplied}<br>`;
-		
+
 		// 적용된 참가자 목록
 		const appliedNames = [...reservation.foundNames];
 		if (reservation.additionalNames && reservation.additionalNames.length > 0) {
 			appliedNames.push(...reservation.additionalNames);
 		}
-		
+
 		reservationInfo += `  - ${appliedNames.join(', ')}`;
-		
+
 		// 적용되지 못한 참가자 표시
 		if (reservation.notFoundNames && reservation.notFoundNames.length > 0) {
 			reservationInfo += ` <span style="color: #ff6b6b;">(미참가: ${reservation.notFoundNames.join(', ')})</span>`;
 		}
-		
+
 		outputMessage += reservationInfo;
 	}
-	
+
 	// 적용된 규칙과 예약의 상호작용 출력
 	if (window.appliedReservationRules && window.appliedReservationRules.length > 0) {
 		const ruleResults = window.appliedReservationRules.map(rule => {
@@ -4603,20 +4603,20 @@ function logTeamResultsToConsole(teams) {
 			});
 			return `  - ${rule.primaryName} → ${rule.partnerName} (${rule.probability}%)`;
 		}).join('<br>');
-		
+
 		outputMessage += `<br><br>${commandConsoleMessages.comments.appliedRules}<br>${ruleResults}`;
 	}
-	
+
 	// 일반 규칙 출력 (예약과 무관한 규칙)
 	if (state.activeHiddenGroupChainInfo && state.activeHiddenGroupChainInfo.length > 0) {
 		// 예약 규칙과 중복되지 않는 것만 출력
 		const appliedRuleNames = window.appliedReservationRules ? window.appliedReservationRules.map(r => `${r.primaryName}-${r.partnerName}`) : [];
-		
+
 		const generalRules = state.activeHiddenGroupChainInfo.filter(info => {
 			const ruleName = `${info.primaryName}-${info.candidateName}`;
 			return !appliedRuleNames.includes(ruleName);
 		});
-		
+
 		if (generalRules.length > 0) {
 			const ruleResults = generalRules.map(info => {
 				appliedRulesSnapshot.push({
@@ -4627,7 +4627,7 @@ function logTeamResultsToConsole(teams) {
 				});
 				return `  - ${info.primaryName} → ${info.candidateName} (${info.probability}%)`;
 			}).join('<br>');
-			
+
 			if (window.appliedReservationRules && window.appliedReservationRules.length > 0) {
 				// 이미 규칙 섹션이 있으면 추가
 				outputMessage += `<br>${ruleResults}`;
@@ -4649,7 +4649,7 @@ function logTeamResultsToConsole(teams) {
 			});
 			return `  - ${rule.aName} ⛔ ${rule.bName} (${Math.round(rule.probability)}%)`;
 		}).join('<br>');
-		
+
 		if (outputMessage.includes(commandConsoleMessages.comments.appliedRules)) {
 			outputMessage += `<br>${probRules}`;
 		} else {
@@ -4717,7 +4717,7 @@ function logTeamResultsToConsole(teams) {
 	}
 
 	persistAppliedSummaryToDb(appliedReservationSnapshot, appliedRulesSnapshot);
-	
+
 	commandConsole.log(outputMessage);
 }
 
@@ -4995,16 +4995,16 @@ async function startValidationLoop(initialTeams) {
 	let currentTeams = initialTeams.map(team => [...team]);
 	const maxIterations = 20; // 무한루프 방지
 	let iteration = 0;
-	
+
 	while (iteration < maxIterations) {
 		iteration++;
 		let hasChanges = false;
-		
+
 		// 1. 팀 인원 균형 검증 (최대인원 모드가 아닐 때만) - 가장 먼저 실행
 		if (!state.maxTeamSizeEnabled) {
 			const beforeTeamSize = currentTeams.map(team => [...team]);
 			currentTeams = validateAndFixTeamSizeBalance(currentTeams);
-			
+
 			const sizeChanged = JSON.stringify(beforeTeamSize) !== JSON.stringify(currentTeams);
 			if (sizeChanged) {
 				hasChanges = true;
@@ -5015,12 +5015,12 @@ async function startValidationLoop(initialTeams) {
 				}
 			}
 		}
-		
+
 		// 2. 성비 블록 균형 검증
 		if (state.genderBalanceEnabled) {
 			const beforeGender = currentTeams.map(team => [...team]);
 			currentTeams = validateAndFixGenderBlockBalance(currentTeams);
-			
+
 			const genderChanged = JSON.stringify(beforeGender) !== JSON.stringify(currentTeams);
 			if (genderChanged) {
 				hasChanges = true;
@@ -5031,12 +5031,12 @@ async function startValidationLoop(initialTeams) {
 				}
 			}
 		}
-		
+
 		// 3. 가중치 균형 검증
 		if (state.weightBalanceEnabled) {
 			const beforeWeight = currentTeams.map(team => [...team]);
 			currentTeams = validateAndFixWeightBalance(currentTeams);
-			
+
 			const weightChanged = JSON.stringify(beforeWeight) !== JSON.stringify(currentTeams);
 			if (weightChanged) {
 				hasChanges = true;
@@ -5047,24 +5047,24 @@ async function startValidationLoop(initialTeams) {
 				}
 			}
 		}
-		
+
 		// 변경사항이 없으면 검증 완료
 		if (!hasChanges) {
 			break;
 		}
 	}
-	
+
 	// 최종 검증 완료
 	isValidated = true;
 	// 최종 팀으로 업데이트
 	window.currentTeams = currentTeams;
-	
+
 	// cmd 콘솔에 팀 생성 결과 출력
 	logTeamResultsToConsole(currentTeams);
 
 	// 팀 생성 시 generateHistory 저장 (displayTeams 전에 저장해야 적용 정보가 유지됨)
 	saveGenerateHistory(currentTeams);
-	
+
 	// 최종 검증된 팀을 결과창에 표시
 	await displayTeams(currentTeams);
 }
@@ -5088,7 +5088,7 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 			padding: 40px;
 			overflow-y: auto;
 		`;
-		
+
 		// 헤더
 		const header = document.createElement('div');
 		header.style.cssText = `
@@ -5096,13 +5096,13 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 			color: white;
 			margin-bottom: 30px;
 		`;
-		
+
 		header.innerHTML = `
 			<h2 style="font-size: 32px; margin-bottom: 10px;">${commandConsoleMessages.comments.validationStep}</h2>
 			<p style="font-size: 16px; opacity: 0.8;">${validationType} ${commandConsoleMessages.comments.validationStepName.replace('{stepName}', '조정')}</p>
 		`;
 		comparisonContainer.appendChild(header);
-		
+
 		// 비교 영역
 		const comparisonWrapper = document.createElement('div');
 		comparisonWrapper.style.cssText = `
@@ -5113,16 +5113,16 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 			margin: 0 auto;
 			width: 100%;
 		`;
-		
+
 		// 색상 맵 미리 생성 (전/후 화면에서 공유)
 		const colorMap = createColorMapForComparison(beforeTeams, afterTeams);
-		
+
 		// 전 (Before)
 		const beforeSection = document.createElement('div');
 		beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.beforeAdjustment + '</h3>';
 		const beforeDisplay = createComparisonTeamsDisplay(beforeTeams, afterTeams, colorMap);
 		beforeSection.appendChild(beforeDisplay);
-		
+
 		// 화살표
 		const arrow = document.createElement('div');
 		arrow.style.cssText = `
@@ -5133,18 +5133,18 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 			color: #22c55e;
 		`;
 		arrow.textContent = '→';
-		
+
 		// 후 (After)
 		const afterSection = document.createElement('div');
 		afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.afterAdjustment + '</h3>';
 		const afterDisplay = createComparisonTeamsDisplay(afterTeams, beforeTeams, colorMap);
 		afterSection.appendChild(afterDisplay);
-		
+
 		comparisonWrapper.appendChild(beforeSection);
 		comparisonWrapper.appendChild(arrow);
 		comparisonWrapper.appendChild(afterSection);
 		comparisonContainer.appendChild(comparisonWrapper);
-		
+
 		// 닫기 버튼
 		const closeBtn = document.createElement('button');
 		closeBtn.textContent = commandConsoleMessages.comments.nextButton;
@@ -5162,15 +5162,15 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 		`;
 		closeBtn.onmouseover = () => closeBtn.style.background = '#2563eb';
 		closeBtn.onmouseout = () => closeBtn.style.background = '#3b82f6';
-		
+
 		const closeComparison = () => {
 			comparisonContainer.remove();
 			resolve();
 		};
-		
+
 		closeBtn.onclick = closeComparison;
 		comparisonContainer.appendChild(closeBtn);
-		
+
 		document.body.appendChild(comparisonContainer);
 	});
 }
@@ -5178,7 +5178,7 @@ async function showValidationStep(beforeTeams, afterTeams, validationType) {
 // 스페이스바 안내 메시지 표시
 function showValidationHint() {
 	if (!state.genderBalanceEnabled) return;
-	
+
 	const hint = document.createElement('div');
 	hint.id = 'validationHint';
 	hint.style.cssText = `
@@ -5197,9 +5197,9 @@ function showValidationHint() {
 		animation: fadeInUp 0.3s ease-out;
 	`;
 	hint.textContent = commandConsoleMessages.comments.spacebarHint;
-	
+
 	document.body.appendChild(hint);
-	
+
 	// 5초 후 자동 제거
 	setTimeout(() => {
 		if (hint.parentNode) {
@@ -5212,14 +5212,14 @@ function showValidationHint() {
 // 검증 및 재표시
 async function validateAndRedisplayTeams() {
 	if (!currentTeams || isValidated) return;
-	
+
 	// 검증 로직 실행
 	const validatedTeams = validateAndFixGenderBlockBalance(currentTeams);
-	
+
 	// 검증된 팀으로 업데이트
 	currentTeams = validatedTeams;
 	isValidated = true;
-	
+
 	// 검증된 팀으로 바로 표시
 	await displayTeams(validatedTeams);
 }
@@ -5248,7 +5248,7 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 		padding: 40px;
 		overflow-y: auto;
 	`;
-	
+
 	// 헤더
 	const header = document.createElement('div');
 	header.style.cssText = `
@@ -5256,16 +5256,16 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 		color: white;
 		margin-bottom: 30px;
 	`;
-	
+
 	const titleParts = [];
 	if (state.weightBalanceEnabled) titleParts.push(commandConsoleMessages.comments.weightBalance);
-	
+
 	header.innerHTML = `
 		<h2 style="font-size: 32px; margin-bottom: 10px;">${commandConsoleMessages.comments.validationResult}</h2>
 		<p style="font-size: 16px; opacity: 0.8;">${titleParts.length ? titleParts.join(' 및 ') + commandConsoleMessages.comments.adjustedOptions : commandConsoleMessages.comments.teamsAdjusted}</p>
 	`;
 	comparisonContainer.appendChild(header);
-	
+
 	// 비교 영역
 	const comparisonWrapper = document.createElement('div');
 	comparisonWrapper.style.cssText = `
@@ -5276,16 +5276,16 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 		margin: 0 auto;
 		width: 100%;
 	`;
-	
+
 	// 색상 맵 미리 생성 (전/후 화면에서 공유)
 	const colorMap = createColorMapForComparison(beforeTeams, afterTeams);
-	
+
 	// 전 (Before)
 	const beforeSection = document.createElement('div');
 	beforeSection.innerHTML = '<h3 style="color: #ef4444; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.beforeAdjustment + '</h3>';
 	const beforeDisplay = createComparisonTeamsDisplay(beforeTeams, afterTeams, colorMap);
 	beforeSection.appendChild(beforeDisplay);
-	
+
 	// 화살표
 	const arrow = document.createElement('div');
 	arrow.style.cssText = `
@@ -5296,18 +5296,18 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 		color: #22c55e;
 	`;
 	arrow.textContent = '→';
-	
+
 	// 후 (After)
 	const afterSection = document.createElement('div');
 	afterSection.innerHTML = '<h3 style="color: #22c55e; text-align: center; margin-bottom: 20px; font-size: 24px;">' + commandConsoleMessages.comments.afterAdjustment + '</h3>';
 	const afterDisplay = createComparisonTeamsDisplay(afterTeams, beforeTeams, colorMap);
 	afterSection.appendChild(afterDisplay);
-	
+
 	comparisonWrapper.appendChild(beforeSection);
 	comparisonWrapper.appendChild(arrow);
 	comparisonWrapper.appendChild(afterSection);
 	comparisonContainer.appendChild(comparisonWrapper);
-	
+
 	// 닫기 버튼
 	const closeBtn = document.createElement('button');
 	closeBtn.textContent = commandConsoleMessages.comments.confirmButton;
@@ -5325,29 +5325,29 @@ async function showBeforeAfterComparison(beforeTeams, afterTeams) {
 	`;
 	closeBtn.onmouseover = () => closeBtn.style.background = '#2563eb';
 	closeBtn.onmouseout = () => closeBtn.style.background = '#3b82f6';
-	
+
 	const closeComparison = () => {
 		comparisonContainer.remove();
 		// 검증된 팀으로 재표시
 		displayTeams(afterTeams);
 	};
-	
+
 	closeBtn.onclick = closeComparison;
 	comparisonContainer.appendChild(closeBtn);
-	
+
 	document.body.appendChild(comparisonContainer);
 }
 
 // 색상 맵 생성 함수 (전/후 화면에서 공유)
 function createColorMapForComparison(beforeTeams, afterTeams) {
 	const changedMemberColors = new Map();
-	
+
 	const beforeMembers = beforeTeams.map(team => new Set(team.map(p => p.id)));
 	const afterMembers = afterTeams.map(team => new Set(team.map(p => p.id)));
-	
+
 	// 변경된 모든 멤버 수집 (ID 순으로 정렬하여 일관성 유지)
 	const changedMembersSet = new Set();
-	
+
 	afterTeams.forEach((team, teamIdx) => {
 		team.forEach(person => {
 			if (!beforeMembers[teamIdx].has(person.id)) {
@@ -5355,10 +5355,10 @@ function createColorMapForComparison(beforeTeams, afterTeams) {
 			}
 		});
 	});
-	
+
 	// ID로 정렬하여 일관된 색상 할당
 	const changedMembers = Array.from(changedMembersSet).sort((a, b) => a - b);
-	
+
 	// 각 변경된 멤버에게 groupColors에서 색상 할당 (파스텔 톤으로 투명도 추가)
 	changedMembers.forEach((personId, index) => {
 		const colorIndex = index % state.groupColors.length;
@@ -5367,7 +5367,7 @@ function createColorMapForComparison(beforeTeams, afterTeams) {
 		const pastelColor = baseColor + '40';
 		changedMemberColors.set(personId, pastelColor);
 	});
-	
+
 	return changedMemberColors;
 }
 
@@ -5379,15 +5379,15 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 		flex-direction: column;
 		gap: 15px;
 	`;
-	
+
 	// 비교를 위한 팀 멤버 맵 생성
 	let compareTeamMembers = null;
 	if (compareTeams) {
-		compareTeamMembers = compareTeams.map(team => 
+		compareTeamMembers = compareTeams.map(team =>
 			new Set(team.map(p => p.id))
 		);
 	}
-	
+
 	teams.forEach((team, index) => {
 		const teamCard = document.createElement('div');
 		teamCard.style.cssText = `
@@ -5396,7 +5396,7 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 			padding: 20px;
 			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 		`;
-		
+
 		// 팀 헤더
 		const teamHeader = document.createElement('h4');
 		teamHeader.style.cssText = `
@@ -5404,17 +5404,17 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 			font-size: 20px;
 			color: #1e293b;
 		`;
-		
+
 		let headerText = `팀 ${index + 1} (${team.length}명`;
 		if (state.weightBalanceEnabled) {
 			const totalWeight = team.reduce((sum, p) => sum + (p.weight || 0), 0);
 			headerText += `/${totalWeight}`;
 		}
 		headerText += ')';
-		
+
 		teamHeader.textContent = headerText;
 		teamCard.appendChild(teamHeader);
-		
+
 		// 멤버 리스트
 		const membersList = document.createElement('ul');
 		membersList.style.cssText = `
@@ -5425,10 +5425,10 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 			flex-direction: column;
 			gap: 8px;
 		`;
-		
+
 		team.forEach(person => {
 			const li = document.createElement('li');
-			
+
 			// 비교 대상이 있을 때 변경된 멤버 확인
 			let isChanged = false;
 			let highlightColor = null;
@@ -5440,7 +5440,7 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 					highlightColor = changedMemberColors.get(person.id);
 				}
 			}
-			
+
 			li.style.cssText = `
 				padding: 8px 12px;
 				background: ${isChanged && highlightColor ? highlightColor : '#f8fafc'};
@@ -5448,69 +5448,69 @@ function createComparisonTeamsDisplay(teams, compareTeams = null, changedMemberC
 				font-size: 14px;
 				${isChanged ? 'font-weight: 600;' : ''}
 			`;
-			
+
 			let displayText = person.name;
 			if (state.weightBalanceEnabled) displayText += ` (${person.weight ?? 0})`;
-			
+
 			if (state.genderBalanceEnabled) {
 				const genderColor = person.gender === 'male' ? '#3b82f6' : '#ec4899';
 				li.style.borderLeft = `4px solid ${genderColor}`;
 			}
-			
+
 			const groupIndex = getPersonGroupIndex(person.id);
 			if (groupIndex !== -1) {
 				displayText = '● ' + displayText;
 			}
-			
+
 			li.textContent = displayText;
 			membersList.appendChild(li);
 		});
-		
+
 		teamCard.appendChild(membersList);
 		container.appendChild(teamCard);
 	});
-	
+
 	return container;
 }
 
 // 성별 블록 균형 검증 및 수정
 function validateAndFixGenderBlockBalance(teams) {
 	if (!state.genderBalanceEnabled) return teams;
-	
+
 	// 소수 성별 파악
 	const allPeople = teams.flat();
 	const maleCount = allPeople.filter(p => p.gender === 'male').length;
 	const femaleCount = allPeople.filter(p => p.gender === 'female').length;
-	
+
 	if (maleCount === femaleCount || maleCount === 0 || femaleCount === 0) {
 		return teams; // 성비가 동일하거나 한쪽만 있으면 검증 불필요
 	}
-	
+
 	const minorityGender = femaleCount < maleCount ? 'female' : 'male';
-	
+
 	// 최대 10번 반복 (무한루프 방지)
 	let iterations = 0;
 	const maxIterations = 10;
 	let modified = true;
-	
+
 	while (modified && iterations < maxIterations) {
 		modified = false;
 		iterations++;
-		
+
 		// 각 팀의 소수성별 블록 수 계산
 		const teamBlockCounts = teams.map((team, idx) => ({
 			teamIdx: idx,
 			blocks: getTeamGenderBlockInfo(team, minorityGender).totalBlocks
 		}));
-		
+
 		// 최대/최소 블록 팀 찾기
-		const maxBlockTeam = teamBlockCounts.reduce((max, curr) => 
+		const maxBlockTeam = teamBlockCounts.reduce((max, curr) =>
 			curr.blocks > max.blocks ? curr : max
 		);
-		const minBlockTeam = teamBlockCounts.reduce((min, curr) => 
+		const minBlockTeam = teamBlockCounts.reduce((min, curr) =>
 			curr.blocks < min.blocks ? curr : min
 		);
-		
+
 		// 차이가 2 이상이면 교체
 		if (maxBlockTeam.blocks - minBlockTeam.blocks >= 2) {
 			const swapResult = swapToBalanceBlocks(
@@ -5519,53 +5519,53 @@ function validateAndFixGenderBlockBalance(teams) {
 				minBlockTeam.teamIdx,
 				minorityGender
 			);
-			
+
 			if (swapResult) {
 				modified = true;
 			}
 		}
 	}
-	
+
 	return teams;
 }
 
 // 가중치 균형 검증 및 수정
 function validateAndFixWeightBalance(teams) {
 	if (!state.weightBalanceEnabled) return teams;
-	
+
 	// 최대 10번 반복 (무한루프 방지)
 	let iterations = 0;
 	const maxIterations = 10;
 	let modified = true;
-	
+
 	while (modified && iterations < maxIterations) {
 		modified = false;
 		iterations++;
-		
+
 		// 각 팀의 총 가중치 계산
 		const teamWeights = teams.map((team, idx) => ({
 			teamIdx: idx,
 			totalWeight: team.reduce((sum, p) => sum + (p.weight || 0), 0),
 			team: team
 		}));
-		
+
 		// 가중치 기준 정렬
 		teamWeights.sort((a, b) => a.totalWeight - b.totalWeight);
-		
+
 		// 가장 낮은 팀과 가장 높은 팀
 		const minWeightTeam = teamWeights[0];
 		const maxWeightTeam = teamWeights[teamWeights.length - 1];
-		
+
 		// 가장 낮은 팀의 최고 점수 팀원
-		const minTeamMaxPerson = minWeightTeam.team.reduce((max, p) => 
+		const minTeamMaxPerson = minWeightTeam.team.reduce((max, p) =>
 			(p.weight || 0) > (max.weight || 0) ? p : max
 		);
-		
+
 		// 가장 높은 팀의 최저 점수 팀원
-		const maxTeamMinPerson = maxWeightTeam.team.reduce((min, p) => 
+		const maxTeamMinPerson = maxWeightTeam.team.reduce((min, p) =>
 			(p.weight || 0) < (min.weight || 0) ? p : min
 		);
-		
+
 		// 조건 확인: 낮은 팀의 최고 점수 <= 높은 팀의 최저 점수
 		if ((minTeamMaxPerson.weight || 0) <= (maxTeamMinPerson.weight || 0)) {
 			// 교체 로직 실행
@@ -5575,7 +5575,7 @@ function validateAndFixWeightBalance(teams) {
 				minWeightTeam.teamIdx,
 				maxWeightTeam.teamIdx
 			);
-			
+
 			if (swapResult) {
 				modified = true;
 			} else {
@@ -5593,7 +5593,7 @@ function validateAndFixWeightBalance(teams) {
 			}
 		}
 	}
-	
+
 	return teams;
 }
 
@@ -5601,19 +5601,19 @@ function validateAndFixWeightBalance(teams) {
 function swapToBalanceWeight(teams, teamWeights, minTeamIdx, maxTeamIdx) {
 	const minTeam = teams[minTeamIdx];
 	const maxTeam = teams[maxTeamIdx];
-	
+
 	// 전체 팀 중 최대 소수성별 블록 수 계산
 	let maxMinorityBlocks = 0;
 	let minorityGender = null;
-	
+
 	if (state.genderBalanceEnabled) {
 		const allPeople = teams.flat();
 		const maleCount = allPeople.filter(p => p.gender === 'male').length;
 		const femaleCount = allPeople.filter(p => p.gender === 'female').length;
-		
+
 		if (maleCount !== femaleCount && maleCount !== 0 && femaleCount !== 0) {
 			minorityGender = femaleCount < maleCount ? 'female' : 'male';
-			
+
 			// 모든 팀의 소수성별 블록 수 계산
 			teams.forEach(team => {
 				const blockInfo = getTeamGenderBlockInfo(team, minorityGender);
@@ -5623,7 +5623,7 @@ function swapToBalanceWeight(teams, teamWeights, minTeamIdx, maxTeamIdx) {
 			});
 		}
 	}
-	
+
 	// 1. 낮은 팀의 최고 점수 팀원 찾기 (그룹이 아닌 개인만, 히든 그룹 제외)
 	const minTeamIndividuals = minTeam.filter(person => {
 		const groupIndex = getPersonGroupIndex(person.id);
@@ -5633,16 +5633,16 @@ function swapToBalanceWeight(teams, teamWeights, minTeamIdx, maxTeamIdx) {
 		if (hiddenCluster.size > 1) return false;
 		return true;
 	});
-	
+
 	if (minTeamIndividuals.length === 0) {
 		return false; // 교체할 개인이 없음
 	}
-	
+
 	// 최고 점수 팀원
-	const minTeamMaxPerson = minTeamIndividuals.reduce((max, p) => 
+	const minTeamMaxPerson = minTeamIndividuals.reduce((max, p) =>
 		(p.weight || 0) > (max.weight || 0) ? p : max
 	);
-	
+
 	// 2. 높은 팀에서 최고 가중치 팀원 찾기 (그룹이 아닌 개인만, 히든 그룹 제외)
 	const maxTeamIndividuals = maxTeam.filter(person => {
 		const groupIndex = getPersonGroupIndex(person.id);
@@ -5652,117 +5652,117 @@ function swapToBalanceWeight(teams, teamWeights, minTeamIdx, maxTeamIdx) {
 		if (hiddenCluster.size > 1) return false;
 		return true;
 	});
-	
+
 	if (maxTeamIndividuals.length === 0) {
 		return false; // 교체할 개인이 없음
 	}
-	
+
 	// 후보들을 가중치 높은 순으로 정렬
 	const candidates = maxTeamIndividuals.sort((a, b) => (b.weight || 0) - (a.weight || 0));
-	
+
 	// 각 후보에 대해 교체 가능성 검사
 	for (const maxTeamTargetPerson of candidates) {
 		// 제약 확인
 		if (isForbidden(minTeamMaxPerson.id, maxTeamTargetPerson.id)) {
 			continue;
 		}
-		
+
 		// 점수가 동일한지 확인
 		if ((minTeamMaxPerson.weight || 0) === (maxTeamTargetPerson.weight || 0)) {
 			continue; // 동일하면 교체 불필요
 		}
-		
+
 		// 성비 균등이 활성화된 경우, 교체 후 블록 수 검증
 		if (minorityGender && state.genderBalanceEnabled) {
 			// 교체 후 시뮬레이션
-			const minTeamAfter = minTeam.map(p => 
+			const minTeamAfter = minTeam.map(p =>
 				p.id === minTeamMaxPerson.id ? maxTeamTargetPerson : p
 			);
-			const maxTeamAfter = maxTeam.map(p => 
+			const maxTeamAfter = maxTeam.map(p =>
 				p.id === maxTeamTargetPerson.id ? minTeamMaxPerson : p
 			);
-			
+
 			// 교체 후 양 팀의 소수성별 블록 수 계산
 			const minTeamBlocksAfter = getTeamGenderBlockInfo(minTeamAfter, minorityGender).totalBlocks;
 			const maxTeamBlocksAfter = getTeamGenderBlockInfo(maxTeamAfter, minorityGender).totalBlocks;
-			
+
 			// 양 팀 모두 최대 블록 수를 넘지 않으면 교체 가능
 			if (minTeamBlocksAfter > maxMinorityBlocks || maxTeamBlocksAfter > maxMinorityBlocks) {
 				continue; // 블록 수가 초과되면 다음 후보로
 			}
 		}
-		
+
 		// 교체 실행
 		const minPersonIdx = minTeam.indexOf(minTeamMaxPerson);
 		const maxPersonIdx = maxTeam.indexOf(maxTeamTargetPerson);
-		
+
 		if (minPersonIdx !== -1 && maxPersonIdx !== -1) {
 			// 배열에서 교체
-			[teams[minTeamIdx][minPersonIdx], teams[maxTeamIdx][maxPersonIdx]] = 
+			[teams[minTeamIdx][minPersonIdx], teams[maxTeamIdx][maxPersonIdx]] =
 			[teams[maxTeamIdx][maxPersonIdx], teams[minTeamIdx][minPersonIdx]];
-			
+
 			return true;
 		}
 	}
-	
+
 	return false;
 }
 
 // 팀 인원 균형 검증 및 수정 (최대인원 모드가 아닐 때)
 function validateAndFixTeamSizeBalance(teams) {
 	if (state.maxTeamSizeEnabled) return teams;
-	
+
 	// 최대 10번 반복 (무한루프 방지)
 	let iterations = 0;
 	const maxIterations = 10;
 	let modified = true;
-	
+
 	while (modified && iterations < maxIterations) {
 		modified = false;
 		iterations++;
-		
+
 		// 각 팀의 인원 수 계산
 		const teamSizes = teams.map((team, idx) => ({
 			teamIdx: idx,
 			size: team.length
 		}));
-		
+
 		// 최대/최소 인원 팀 찾기
-		const maxSizeTeam = teamSizes.reduce((max, curr) => 
+		const maxSizeTeam = teamSizes.reduce((max, curr) =>
 			curr.size > max.size ? curr : max
 		);
-		const minSizeTeam = teamSizes.reduce((min, curr) => 
+		const minSizeTeam = teamSizes.reduce((min, curr) =>
 			curr.size < min.size ? curr : min
 		);
-		
+
 		// 차이가 2명 이상이면 조정
 		if (maxSizeTeam.size - minSizeTeam.size >= 2) {
 			// 받는 팀이 이미 최고 가중치 팀인지 확인
 			let isMinTeamMaxWeight = false;
 			if (state.weightBalanceEnabled) {
-				const allWeights = teams.map(team => 
+				const allWeights = teams.map(team =>
 					team.reduce((sum, p) => sum + (p.weight || 0), 0)
 				);
 				const maxWeight = Math.max(...allWeights);
 				const minTeamWeight = teams[minSizeTeam.teamIdx].reduce((sum, p) => sum + (p.weight || 0), 0);
 				isMinTeamMaxWeight = (minTeamWeight === maxWeight);
 			}
-			
+
 			let bestCandidate = null;
 			let bestSourceTeamIdx = -1;
-			
+
 			if (isMinTeamMaxWeight) {
 				// 받는 팀이 이미 최고 가중치 팀 -> 가장 점수가 낮은 개인을 찾되, 성비 블록만 체크
 				let lowestWeight = Infinity;
-				
+
 				for (let sourceTeamIdx = 0; sourceTeamIdx < teams.length; sourceTeamIdx++) {
 					const sourceTeam = teams[sourceTeamIdx];
-					
+
 					// 최소 인원 팀이거나 인원이 2명 이하면 스킵
 					if (sourceTeamIdx === minSizeTeam.teamIdx || sourceTeam.length <= 2) {
 						continue;
 					}
-					
+
 					// 이 팀의 개인 멤버들 (그룹이 아닌, 히든 그룹 제외)
 					const individuals = sourceTeam.filter(person => {
 						const groupIndex = getPersonGroupIndex(person.id);
@@ -5772,11 +5772,11 @@ function validateAndFixTeamSizeBalance(teams) {
 						if (hiddenCluster.size > 1) return false;
 						return true;
 					});
-					
+
 					// 각 후보에 대해 검증
 					for (const candidate of individuals) {
 						const candidateWeight = candidate.weight || 0;
-						
+
 						// 제약 확인
 						let hasConstraint = false;
 						for (const teamMember of teams[minSizeTeam.teamIdx]) {
@@ -5786,7 +5786,7 @@ function validateAndFixTeamSizeBalance(teams) {
 							}
 						}
 						if (hasConstraint) continue;
-						
+
 						// 성비 블록만 체크
 						if (canMoveMemberToTeamGenderOnly(teams, candidate, sourceTeamIdx, minSizeTeam.teamIdx)) {
 							if (candidateWeight < lowestWeight) {
@@ -5801,12 +5801,12 @@ function validateAndFixTeamSizeBalance(teams) {
 				// 받는 팀이 최고 가중치 팀이 아님 -> 기존 로직 (전체 조건 체크)
 				for (let sourceTeamIdx = 0; sourceTeamIdx < teams.length; sourceTeamIdx++) {
 					const sourceTeam = teams[sourceTeamIdx];
-					
+
 					// 최소 인원 팀이거나 인원이 2명 이하면 스킵
 					if (sourceTeamIdx === minSizeTeam.teamIdx || sourceTeam.length <= 2) {
 						continue;
 					}
-					
+
 					// 이 팀의 개인 멤버들 (그룹이 아닌, 히든 그룹 제외)
 					const individuals = sourceTeam.filter(person => {
 						const groupIndex = getPersonGroupIndex(person.id);
@@ -5816,7 +5816,7 @@ function validateAndFixTeamSizeBalance(teams) {
 						if (hiddenCluster.size > 1) return false;
 						return true;
 					});
-					
+
 					// 각 후보에 대해 검증
 					for (const candidate of individuals) {
 						if (canMoveMemberToTeam(teams, candidate, sourceTeamIdx, minSizeTeam.teamIdx)) {
@@ -5825,11 +5825,11 @@ function validateAndFixTeamSizeBalance(teams) {
 							break;
 						}
 					}
-					
+
 					if (bestCandidate) break;
 				}
 			}
-			
+
 			// 적합한 후보를 찾았으면 이동
 			if (bestCandidate && bestSourceTeamIdx !== -1) {
 				const candidateIdx = teams[bestSourceTeamIdx].indexOf(bestCandidate);
@@ -5842,29 +5842,29 @@ function validateAndFixTeamSizeBalance(teams) {
 			}
 		}
 	}
-	
+
 	return teams;
 }
 
 // 멤버를 다른 팀으로 이동 가능한지 검증 (성비만)
 function canMoveMemberToTeamGenderOnly(teams, member, fromTeamIdx, toTeamIdx) {
 	const toTeam = teams[toTeamIdx];
-	
+
 	// 성비 균형 확인만
 	if (state.genderBalanceEnabled) {
 		const allPeople = teams.flat();
 		const maleCount = allPeople.filter(p => p.gender === 'male').length;
 		const femaleCount = allPeople.filter(p => p.gender === 'female').length;
-		
+
 		if (maleCount !== femaleCount && maleCount !== 0 && femaleCount !== 0) {
 			const minorityGender = femaleCount < maleCount ? 'female' : 'male';
-			
+
 			// 이동 후 시뮬레이션
 			const simulatedToTeam = [...toTeam, member];
-			
+
 			// 이동 후 받는 팀의 블록 수
 			const toTeamBlocksAfter = getTeamGenderBlockInfo(simulatedToTeam, minorityGender).totalBlocks;
-			
+
 			// 모든 팀의 현재 블록 수 계산
 			const allBlockCounts = teams.map((team, idx) => {
 				if (idx === toTeamIdx) {
@@ -5872,46 +5872,46 @@ function canMoveMemberToTeamGenderOnly(teams, member, fromTeamIdx, toTeamIdx) {
 				}
 				return getTeamGenderBlockInfo(team, minorityGender).totalBlocks;
 			});
-			
+
 			const maxBlocks = Math.max(...allBlockCounts);
 			const minBlocks = Math.min(...allBlockCounts);
-			
+
 			// 최대-최소 차이가 2 이상이면 안됨
 			if (maxBlocks - minBlocks >= 2) {
 				return false;
 			}
 		}
 	}
-	
+
 	return true;
 }
 
 // 멤버를 다른 팀으로 이동 가능한지 검증
 function canMoveMemberToTeam(teams, member, fromTeamIdx, toTeamIdx) {
 	const toTeam = teams[toTeamIdx];
-	
+
 	// 1. 제약 조건 확인
 	for (const teamMember of toTeam) {
 		if (isForbidden(member.id, teamMember.id)) {
 			return false;
 		}
 	}
-	
+
 	// 2. 성비 균형 확인
 	if (state.genderBalanceEnabled) {
 		const allPeople = teams.flat();
 		const maleCount = allPeople.filter(p => p.gender === 'male').length;
 		const femaleCount = allPeople.filter(p => p.gender === 'female').length;
-		
+
 		if (maleCount !== femaleCount && maleCount !== 0 && femaleCount !== 0) {
 			const minorityGender = femaleCount < maleCount ? 'female' : 'male';
-			
+
 			// 이동 후 시뮬레이션
 			const simulatedToTeam = [...toTeam, member];
-			
+
 			// 이동 후 받는 팀의 블록 수
 			const toTeamBlocksAfter = getTeamGenderBlockInfo(simulatedToTeam, minorityGender).totalBlocks;
-			
+
 			// 모든 팀의 현재 블록 수 계산
 			const allBlockCounts = teams.map((team, idx) => {
 				if (idx === toTeamIdx) {
@@ -5919,22 +5919,22 @@ function canMoveMemberToTeam(teams, member, fromTeamIdx, toTeamIdx) {
 				}
 				return getTeamGenderBlockInfo(team, minorityGender).totalBlocks;
 			});
-			
+
 			const maxBlocks = Math.max(...allBlockCounts);
 			const minBlocks = Math.min(...allBlockCounts);
-			
+
 			// 최대-최소 차이가 2 이상이면 안됨
 			if (maxBlocks - minBlocks >= 2) {
 				return false;
 			}
 		}
 	}
-	
+
 	// 3. 가중치 균형 확인
 	if (state.weightBalanceEnabled) {
 		// 이동 후 받는 팀의 총 가중치
 		const toTeamWeightAfter = toTeam.reduce((sum, p) => sum + (p.weight || 0), 0) + (member.weight || 0);
-		
+
 		// 모든 팀의 가중치 계산 (이동 후 시뮬레이션)
 		const allWeights = teams.map((team, idx) => {
 			if (idx === toTeamIdx) {
@@ -5945,17 +5945,17 @@ function canMoveMemberToTeam(teams, member, fromTeamIdx, toTeamIdx) {
 			}
 			return team.reduce((sum, p) => sum + (p.weight || 0), 0);
 		});
-		
+
 		const maxWeight = Math.max(...allWeights);
-		
+
 		// 받는 팀이 최고 가중치 팀이 되면 안됨
-		if (toTeamWeightAfter >= maxWeight && toTeamIdx !== teams.findIndex(t => 
+		if (toTeamWeightAfter >= maxWeight && toTeamIdx !== teams.findIndex(t =>
 			t.reduce((sum, p) => sum + (p.weight || 0), 0) === maxWeight
 		)) {
 			return false;
 		}
 	}
-	
+
 	return true;
 }
 
@@ -5968,14 +5968,14 @@ function getTeamGenderBlockInfo(team, targetGender = null) {
 		if (maleCount === femaleCount) return { totalBlocks: 0, groupBlocks: 0, individualBlocks: 0 };
 		targetGender = femaleCount < maleCount ? 'female' : 'male';
 	}
-	
+
 	let groupBlocks = 0;
 	let individualBlocks = 0;
 	const processedGroups = new Set();
-	
+
 	team.forEach(person => {
 		const groupIndex = getPersonGroupIndex(person.id);
-		
+
 		if (groupIndex !== -1) {
 			// 그룹에 속한 경우
 			if (!processedGroups.has(groupIndex)) {
@@ -5995,7 +5995,7 @@ function getTeamGenderBlockInfo(team, targetGender = null) {
 			}
 		}
 	});
-	
+
 	return {
 		totalBlocks: groupBlocks + individualBlocks,
 		groupBlocks,
@@ -6007,7 +6007,7 @@ function getTeamGenderBlockInfo(team, targetGender = null) {
 function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 	const maxTeam = teams[maxTeamIdx];
 	const minTeam = teams[minTeamIdx];
-	
+
 	// 1. 최대 블록 팀에서 소수성별 개인 찾기 (히든 그룹 제외)
 	const maxTeamIndividuals = maxTeam.filter(person => {
 		const groupIndex = getPersonGroupIndex(person.id);
@@ -6018,18 +6018,18 @@ function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 		if (hiddenCluster.size > 1) return false;
 		return true;
 	});
-	
+
 	if (maxTeamIndividuals.length === 0) {
 		return false; // 교체할 개인이 없음
 	}
-	
+
 	// 2. 최소 블록 팀에서 교체 대상 찾기
 	let targetPerson = null;
-	
+
 	if (state.weightBalanceEnabled) {
 		// 가중치가 가장 비슷한 사람 찾기
 		let minWeightDiff = Infinity;
-		
+
 		maxTeamIndividuals.forEach(maxPerson => {
 			minTeam.forEach(minPerson => {
 				// 그룹이 아니고, 히든 그룹이 아니고, 제약이 없는 경우만
@@ -6039,7 +6039,7 @@ function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 				const hiddenCluster = getActiveHiddenGroupCluster(minPerson.id);
 				if (hiddenCluster.size > 1) return;
 				if (isForbidden(maxPerson.id, minPerson.id)) return;
-				
+
 				const weightDiff = Math.abs((maxPerson.weight || 0) - (minPerson.weight || 0));
 				if (weightDiff < minWeightDiff) {
 					minWeightDiff = weightDiff;
@@ -6057,34 +6057,34 @@ function swapToBalanceBlocks(teams, maxTeamIdx, minTeamIdx, minorityGender) {
 			if (hiddenCluster.size > 1) return false;
 			return true;
 		});
-		
+
 		if (minTeamIndividuals.length > 0) {
 			const maxPerson = maxTeamIndividuals[Math.floor(Math.random() * maxTeamIndividuals.length)];
 			const minPerson = minTeamIndividuals[Math.floor(Math.random() * minTeamIndividuals.length)];
-			
+
 			// 제약 확인
 			if (!isForbidden(maxPerson.id, minPerson.id)) {
 				targetPerson = { from: maxPerson, to: minPerson };
 			}
 		}
 	}
-	
+
 	if (!targetPerson) {
 		return false; // 교체 가능한 쌍이 없음
 	}
-	
+
 	// 3. 교체 실행
 	const maxPersonIdx = maxTeam.indexOf(targetPerson.from);
 	const minPersonIdx = minTeam.indexOf(targetPerson.to);
-	
+
 	if (maxPersonIdx !== -1 && minPersonIdx !== -1) {
 		// 배열에서 교체
-		[teams[maxTeamIdx][maxPersonIdx], teams[minTeamIdx][minPersonIdx]] = 
+		[teams[maxTeamIdx][maxPersonIdx], teams[minTeamIdx][minPersonIdx]] =
 		[teams[minTeamIdx][minPersonIdx], teams[maxTeamIdx][maxPersonIdx]];
-		
+
 		return true;
 	}
-	
+
 	return false;
 }
 
