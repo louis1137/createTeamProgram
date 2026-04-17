@@ -482,6 +482,11 @@ function renderGenerateHistoryTableRows() {
 
 function renderGenerateHistoryTable() {
 	renderGenerateHistoryTableRows();
+	const historyTableRow = getEl('historyTableRow');
+	if (historyTableRow) {
+		historyTableRow.classList.remove('expanded');
+		closeAllHistoryDetailRows();
+	}
 	refreshHistoryExpandButton();
 	applyHistoryExpandedState();
 }
@@ -500,6 +505,24 @@ function closeAllHistoryDetailRows(container = getEl('historyTableBody')) {
 		const chevron = button.querySelector('.history-chevron');
 		if (chevron) {
 			chevron.textContent = '▸';
+		}
+	});
+}
+
+function openAllHistoryDetailRows(container = getEl('historyTableBody')) {
+	if (!(container instanceof HTMLElement)) {
+		return;
+	}
+	const detailRows = Array.from(container.querySelectorAll('tr.history-detail-row'));
+	const toggleButtons = Array.from(container.querySelectorAll('button[data-role="toggle-history"]'));
+	detailRows.forEach((row) => {
+		row.removeAttribute('hidden');
+	});
+	toggleButtons.forEach((button) => {
+		button.setAttribute('aria-expanded', 'true');
+		const chevron = button.querySelector('.history-chevron');
+		if (chevron) {
+			chevron.textContent = '▾';
 		}
 	});
 }
@@ -929,8 +952,7 @@ function shouldShowConstraintExpandButton() {
 }
 
 function shouldShowHistoryExpandButton() {
-	const tbody = getEl('historyTableBody');
-	return isOverflowingForCollapsedView(tbody);
+	return true;
 }
 
 function refreshMemberExpandButton() {
@@ -1985,7 +2007,9 @@ function bindEvents() {
 	if (historyExpandBtn instanceof HTMLButtonElement && historyTableRow) {
 		historyExpandBtn.addEventListener('click', () => {
 			historyTableRow.classList.toggle('expanded');
-			if (!historyTableRow.classList.contains('expanded')) {
+			if (historyTableRow.classList.contains('expanded')) {
+				openAllHistoryDetailRows();
+			} else {
 				closeAllHistoryDetailRows();
 			}
 			applyHistoryExpandedState();
