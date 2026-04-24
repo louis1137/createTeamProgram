@@ -22,7 +22,7 @@ section:last-child, .faq-section {border-bottom: none !important;}
 .people-list {display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; min-height: 50px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px dashed #bbb; align-items: center; position: relative;}
 .people-list:empty::before {content: '추가된 참가자가 없습니다'; color: #999; font-size: 0.9rem;}
 .add-person-container {display: flex; gap: 10px; align-items: center;}
-.name-input {flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;}
+.name-input {flex: 1; padding: 12px 16px; width: calc(100% - 53px); border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;}
 .name-input:focus {outline: none; border-color: var(--btn_main);}
 
 /* [4] Tags & Controls (Person Tag) */
