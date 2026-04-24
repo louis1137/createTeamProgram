@@ -2,7 +2,7 @@
 // let console = window.console;
 const teamDisplayDelay = isLocalView() ? 40 : 600;
 const maxTimer = isLocalView() ? 0 : 5000;
-const blindDelay = isLocalView() ? null : 5000;
+const blindDelay = isLocalView() ? null : null;
 // 검증 비교창 표시 여부 (true: 표시, false: 숨김)
 const SHOW_VALIDATION_COMPARISON = isLocalView() ? false : false;
 try { window.blindDelay = blindDelay; } catch (_) { /* no-op */ }
@@ -81,7 +81,8 @@ const elements = {
 	teamsDisplay: document.getElementById('teamsDisplay'),
 	participantCount: document.querySelector('.participantCount'),
 	captureBtn: document.getElementById('captureBtn'),
-	captureButtonContainer: document.querySelector('.capture-button-container')
+	captureButtonContainer: document.querySelector('.capture-button-container'),
+	manageSeparationBtn: document.getElementById('manageSeparationBtn')
 };
 
 let captureSuccessTimer = null;
@@ -125,6 +126,7 @@ function init() {
 	if (elements.addPersonBtn) elements.addPersonBtn.addEventListener('click', addPerson);
 	if (elements.resetBtn) elements.resetBtn.addEventListener('click', (e) => resetAll(e));
 	if (elements.shuffleOrderBtn) elements.shuffleOrderBtn.addEventListener('click', shuffleOrder);
+	if (elements.manageSeparationBtn) elements.manageSeparationBtn.addEventListener('click', openForbiddenWindow);
 	if (elements.nameInput) {
 		elements.nameInput.addEventListener('keypress', (e) => {
 			if (e.key === 'Enter') addPerson();
@@ -2984,7 +2986,7 @@ function getActiveHiddenGroupBlockIds(personId) {
 	return Array.from(blockIds);
 }
 
-// --- 제약 연결 팝업 창 관련 헬퍼 ---
+// --- 참가자 분리 팝업 창 관련 헬퍼 ---
 let forbiddenPopup = null;
 
 function openForbiddenWindow() {

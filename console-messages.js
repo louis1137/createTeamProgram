@@ -18,7 +18,7 @@ const commandConsoleMessages = {
 
 	comments: {
 		// ==================== command-console.js 메시지 ====================
-		
+
 		// --- 공통 메시지 ---
 		cancel: '❌ 취소되었습니다.',
 		help: '💡 명령어 목록을 보려면 <code data-cmd="도움">도움</code> 또는 <code data-cmd="help">help</code> 명령어를 입력하세요.',
@@ -47,7 +47,7 @@ const commandConsoleMessages = {
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="generate">generate</code> / <code data-cmd="생성">생성</code></td><td style="padding: 10px;">설정된 조건에 따라 랜덤 팀을 생성합니다.</td></tr>' +
 		'<tr><td style="padding: 10px;"><code data-cmd="help">help</code> / <code data-cmd="도움">도움</code></td><td style="padding: 10px;">이 도움말을 표시합니다.</td></tr>' +
 		'</tbody></table></div>',
-		
+
 		helpMessageAuth : '<div style="margin-bottom: 30px;">' +
 		'<h3 style="color: #f59e0b; margin: 15px 0 10px 0;">🔐 인증 필요 명령어</h3>' +
 		'<table style="width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; overflow: hidden;">' +
@@ -76,7 +76,7 @@ const commandConsoleMessages = {
 		'<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);"><td style="padding: 10px;"><code data-cmd="예약 우선 A,B,C">예약 우선 A,B,C</code></td><td style="padding: 10px;">A,B,C를 다음 예약보다 우선하여 예약 스택 맨 앞에 추가합니다.</td></tr>' +
 		'<tr><td style="padding: 10px;"><code data-cmd="예약 초기화">예약 초기화</code></td><td style="padding: 10px;">모든 예약을 제거합니다.</td></tr>' +
 		'</tbody></table></div>',
-		
+
 		// --- 비밀번호 관련 ---
 		passwordCreate: '비밀번호를 생성하시겠습니까?',
 		passwordCreatePrompt: '비밀번호를 생성하세요:',
@@ -99,7 +99,7 @@ const commandConsoleMessages = {
 		passwordDeleted: '🗑️ 비밀번호가 삭제되었습니다.<br>콘솔이 준비되었습니다.',
 		passwordDeleteConfirm: '⚠️ 비밀번호를 삭제하시겠습니까?',
 		passwordDeleteFailed: '비밀번호 삭제 실패: {error}',
-		
+
 		// --- 프로필 관련 ---
 		profileInput: '프로필 이름을 입력하세요:',
 		profileSwitch: '🔄 프로필 이름을 입력하세요:',
@@ -119,7 +119,7 @@ const commandConsoleMessages = {
 		profileLoaded: '📡 프로필 \'{profile}\' 로드됨 (참가자: {count}명)',
 		profileLoadedInitial: '📡 프로필 \'{profile}\' 로드됨 (초기 상태)',
 		profileFoundMessage: '프로필 \'{profile}\'를 발견했습니다.',
-		
+
 		// --- 프로필 삭제 관련 ---
 		deleteConfirm: '삭제하려면 프로필 이름을 정확히 입력하세요:',
 		deleteCanceled: '삭제가 취소되었습니다.',
@@ -134,7 +134,7 @@ const commandConsoleMessages = {
 		profileDeleteAttempt: '프로필을 삭제하려고 합니다.',
 		profileDeleteAttemptMessage: '🔥 프로필 \'{profile}\'를 삭제하려고 합니다.',
 		deleteReadOnlyError: '🚫 프로필 삭제는 읽기 전용 모드에서 사용할 수 없습니다.',
-		
+
 		// --- 로그인/인증 관련 ---
 		loginRequired: '인증하려면 <code data-cmd="로그인">로그인</code> 또는 <code data-cmd="login">login</code> 명령어를 사용하세요.',
 		loginSuccess: '✅ 이미 로그인되어 있습니다.',
@@ -150,7 +150,7 @@ const commandConsoleMessages = {
 		readOnlyFeatureDisabled: '🚫 이 기능은 읽기 전용 모드에서 사용할 수 없습니다',
 		readOnlyModeSwitch: '🔓 읽기 전용 모드로 전환되었습니다.',
 		writeLoginRequired: '💡 쓰기 권한이 필요하면 <code data-cmd="login">login</code> 또는 <code data-cmd="로그인">로그인</code> 명령어를 사용하세요.',
-		
+
 		// --- Firebase/저장/동기화 관련 ---
 		firebaseMissing: '⚠️ Firebase가 설정되지 않았거나 Profile Key가 없습니다.',
 		firebaseInitFailed: 'Firebase 초기화에 실패했습니다',
@@ -171,7 +171,7 @@ const commandConsoleMessages = {
 		noSavedData: '저장된 데이터가 없습니다',
 		localDataRestored: '✅ 로컬 데이터 복원: 참가자 {count}명',
 		localStorageRestoreFailed: '❌ localStorage 복원 실패: ',
-		
+
 		// --- 초기화/리셋 관련 ---
 		clearComplete: '🗑️ 데이터 초기화 완료 (비밀번호 유지)',
 		clearConfirmMessage: '⚠️ 참가자, 미참가자, 제약, 확률 그룹, 옵션 설정을 모두 초기화하시겠습니까?\n(비밀번호와 프로필은 유지됩니다)',
@@ -183,7 +183,7 @@ const commandConsoleMessages = {
 		resetAllConstraintsConfirm: '모든 제약을 초기화하시겠습니까?',
 		resetButton: '초기화',
 		resetFailed: '초기화 실패:',
-		
+
 		// --- 참가자 관련 ---
 		noParticipants: '등록된 참가자가 없습니다',
 		noInactiveParticipants: '미참가자가 없습니다',
@@ -199,11 +199,11 @@ const commandConsoleMessages = {
 		minOneName: '최소 1명 이상의 이름을 입력해주세요.',
 		genderMale: '남',
 		genderFemale: '여',
-		
+
 		// --- 제약 조건 관련 ---
 		noConstraints: '설정된 제약 조건이 없습니다.',
 		constraintManagement: '제약 관리',
-		constraintConnection: '제약 연결',
+		constraintConnection: '참가자 분리',
 		constraintInputPlaceholder: '예: A!B 또는 해지: A!!B (쉼표로 여러 항목 가능)',
 		appliedConstraints: '적용된 제약',
 		pendingConstraints: '대기중인 제약',
@@ -215,7 +215,7 @@ const commandConsoleMessages = {
 		constraintInSameGroup: '같은 그룹에 금지 제약이 있습니다.',
 		constraintPlacementImpossible: '제약 조건으로 팀 배치가 불가능합니다. 다시 시도해주세요.',
 		userNotFoundForConstraint: '제약 대상 사용자를 찾을 수 없습니다:',
-		
+
 		// --- 확률/매칭 규칙 관련 ---
 		noProbabilityRules: '설정된 확률 규칙이 없습니다.',
 		probabilityRules: '확률 규칙 목록',
@@ -239,32 +239,32 @@ const commandConsoleMessages = {
 		chainCandidateProbabilityUpdated: '🔄 체인 후보 확률 갱신',
 		chainCandidateAdded: '➕ 체인에 후보 추가',
 		newChainCreated: '✅ 새 체인 생성',
-		
+
 		// --- 히든 그룹 관련 ---
 		hiddenGroupAddFailed: '히든 그룹 추가 실패:',
 		samePersonHiddenGroupError: '동일인에 대한 히든 그룹은 불가능합니다.',
 		pendingHiddenGroupAdded: '⏳ 보류 히든 그룹 추가',
 		pendingHiddenGroupUpdated: '🔄 보류 히든 그룹 확률 갱신',
-		
+
 		// --- 팝업/윈도우 관련 ---
-		popupBlockedError: '팝업 차단: 제약 연결 창을 열 수 없습니다. 브라우저의 팝업 차단을 확인하세요.',
+		popupBlockedError: '팝업 차단: 참가자 분리 창을 열 수 없습니다. 브라우저의 팝업 차단을 확인하세요.',
 		popupAccessError: '팝업에 접근할 수 없습니다 (크로스오리진 또는 차단됨):',
 		popupOpenError: '팝업 열기 중 오류:',
 		popupDocumentAccessError: '팝업 문서에 접근할 수 없습니다 (크로스오리진):',
 		popupFunctionNotDefined: 'openForbiddenWindow 함수가 정의되지 않았습니다.',
 		parentWindowNotFound: '부모 창 참조를 찾을 수 없습니다. 팝업을 닫고 다시 열어주세요.',
 		additionFailed: '추가 실패',
-		
+
 		// --- 기타 UI 요소 ---
 		showButton: '보기',
 		showButtonWarning: ' 보기 버튼을 누르면 제약셋팅의 목록이 노출됩니다',
 		noneText: '없음',
 		nextButton: '다음',
 		confirmButton: '확인',
-		
-		
+
+
 		// ==================== script.js 메시지 ====================
-		
+
 		// --- 팀 생성/셔플 관련 ---
 		teamGenerating: '🎲 팀 생성 중...',
 		teamGenerationFailed: '팀 생성 실패: {error}',
@@ -274,7 +274,7 @@ const commandConsoleMessages = {
 		minTwoPerTeam: '팀 인원수는 최소 2명 이상이어야 합니다.',
 		notEnoughParticipants: '참가자 수가 팀 인원수보다 적습니다.',
 		delayAdjusted: '⚡ 지연 조정',
-		
+
 		// --- 팀 정보 표시 ---
 		generatedTeams: '[생성된 팀]',
 		teamFormat: '{number}팀: {members}',
@@ -285,7 +285,7 @@ const commandConsoleMessages = {
 		memberWithGroup: '{name} (그룹 {groupIndex})',
 		appliedRules: '[적용된 규칙]',
 		appliedRuleFormat: '  - {primaryName} → {partnerName} (확률 {probability}%)',
-		
+
 		// --- 검증/밸런스 관련 ---
 		teamSizeBalance: '팀 인원 균형',
 		genderBlockBalance: '성비 블록 균형',
@@ -298,7 +298,7 @@ const commandConsoleMessages = {
 		adjustedOptions: '이 조정되었습니다',
 		teamsAdjusted: '팀이 조정되었습니다',
 		spacebarHint: '스페이스바를 눌러 성비 블록 균형을 검증하세요',
-		
+
 		// --- 화면 캡처/클립보드 관련 ---
 		html2canvasNotFound: 'html2canvas 라이브러리를 찾을 수 없습니다.',
 		captureAreaNotFound: '캡처 영역을 찾을 수 없습니다.',
@@ -308,11 +308,11 @@ const commandConsoleMessages = {
 		clipboardHttpsRequired: '클립보드 기능을 사용할 수 없습니다. HTTPS 환경이 필요합니다.',
 		clipboardCopyFailed: '클립보드 복사 실패:',
 		copyComplete: '복사 완료!',
-		
+
 		// --- 사운드 관련 ---
 		soundPlaybackFailed: '사운드 재생 실패:',
 		audioContextNotSupported: 'AudioContext not supported',
-		
+
 		// --- 예약 관련 ---
 		reservationModeEnter: '📅 예약 모드로 진입했습니다. 참가자를 입력하세요 (예: A,B,C,D)',
 		reservationAdded: '✅ 예약이 등록되었습니다: {members}',
