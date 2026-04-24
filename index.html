@@ -16,11 +16,11 @@
 	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌕</text></svg>">
 	<link rel="stylesheet" href="style.css">
 	<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-	
+
 	<!-- Firebase SDK -->
 	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 	<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-	
+
 	<script type="application/ld+json">
 	{
 		"@context": "https://schema.org",
@@ -48,7 +48,7 @@
 			</div>
 			<div id="peopleList" class="people-list"></div>
 			<div class="add-person-container">
-				<input type="text" id="nameInput" placeholder="이름 입력 (,는 그룹 /는 구분. 예: 가,나,다 / 라 / 마,바)" class="name-input">
+				<input type="text" id="nameInput" placeholder="같은 팀 희망 시 쉼표로 구분 후 입력 (예: 철수,영희)" class="name-input">
 				<button id="addPersonBtn" class="btn btn-add">+</button>
 			</div>
 		</section>
@@ -167,7 +167,7 @@
 				<div id="teamsDisplay" class="teams-display"></div>
 			</div>
 		</section>
-		
+
 		<div class="capture-button-container" style="display:none;">
 			<button id="captureBtn" class="btn btn-capture btn-primary">화면 캡처 <span class="camera-emoji">📸</span></button>
 			<p class="capture-hint">캡처 버튼을 눌러 손쉽게 이미지를 복사하세요. <code>Ctrl+V</code>로 붙여넣기 하세요!</p>
@@ -195,7 +195,7 @@
 				<div class="duplicate-section">
 					<div id="duplicateModalExisting" class="duplicate-modal-list"></div>
 				</div>
-				
+
 				<div class="duplicate-arrow">
 					<svg width="70" height="70" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
 						<!-- 화살표 몸통 (직사각형) -->
@@ -204,16 +204,16 @@
 						<path d="M35 55 L15 35 L55 35 Z" fill="#06b6d4"/>
 					</svg>
 				</div>
-				
+
 				<div class="duplicate-section">
 					<div id="duplicateModalNew" class="duplicate-modal-list"></div>
 				</div>
 			</div>
-			
+
 			<p id="duplicateModalMessage">기존 참가자를 제거하고 새 그룹으로 등록하시겠습니까?</p>
-			
+
 			<div id="duplicateWarning" class="duplicate-warning" style="display: none;"></div>
-			
+
 			<div class="duplicate-modal-buttons">
 				<button id="duplicateConfirmBtn" class="btn btn-primary">확인</button>
 				<button id="duplicateCancelBtn" class="btn btn-secondary">취소</button>
