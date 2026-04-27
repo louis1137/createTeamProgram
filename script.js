@@ -2339,15 +2339,6 @@ function updateLoginUI() {
 			statusText.textContent = `${currentProfileKey}님 환영합니다.`;
 			statusText.classList.add('logged-in');
 		}
-	} else if (_readOnlyMode && _readOnlyProfileKey) {
-		if (loginBtn) { loginBtn.style.display = ''; loginBtn.textContent = `${_readOnlyProfileKey} 로그인`; loginBtn.classList.remove('logged-in'); }
-		if (signupBtn) signupBtn.style.display = 'none';
-		if (pwChangeBtn) pwChangeBtn.style.display = 'none';
-		if (logoutDirectBtn) logoutDirectBtn.style.display = 'none';
-		if (statusText) {
-			statusText.textContent = `${_readOnlyProfileKey} (읽기 전용)`;
-			statusText.classList.add('logged-in');
-		}
 	} else {
 		if (loginBtn) { loginBtn.style.display = ''; loginBtn.textContent = '로그인'; loginBtn.classList.remove('logged-in'); }
 		if (signupBtn) signupBtn.style.display = '';
@@ -2369,7 +2360,7 @@ function openLoginModal() {
 	const idInput = document.getElementById('loginIdInput');
 	const pwInput = document.getElementById('loginPwInput');
 	if (errorEl) errorEl.textContent = '';
-	if (idInput) idInput.value = (_readOnlyMode && _readOnlyProfileKey) ? _readOnlyProfileKey : '';
+	if (idInput) idInput.value = '';
 	if (pwInput) pwInput.value = '';
 
 	if (currentProfileKey) {

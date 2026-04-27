@@ -1008,18 +1008,11 @@ function writeFormData(key, type, data) {
 	getEl(fieldIds.lastAccess).value = data.lastAccess || '';
 	getEl(fieldIds.password).value = data.password || '';
 	getEl(fieldIds.timestamp).value = data.timestamp || '';
-	// 토큰 필드 (profiles만 표시)
-	const tokenRow = document.getElementById('tokenRow');
-	const tokenField = document.getElementById('fieldToken');
-	if (tokenRow && tokenField) {
-		if (type === 'profiles' && data.token) {
-			const base = window.location.origin + window.location.pathname.replace('/admin/', '/') + 'index.html';
-			tokenField.value = `${base}?token=${data.token}`;
-			tokenRow.style.display = '';
-		} else {
-			tokenField.value = '';
-			tokenRow.style.display = 'none';
-		}
+	// 토큰을 editorTitle 끝에 표시
+	const titleEl = getEl('editorTitle');
+	if (titleEl) {
+		const base = `${selected.type}/${selected.key}`;
+		titleEl.textContent = (type === 'profiles' && data.token) ? `${base} (${data.token})` : base;
 	}
 	cloneMembers(data || {});
 	cloneConstraints(data || {});
