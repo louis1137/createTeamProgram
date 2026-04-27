@@ -220,7 +220,13 @@ function ensureUserRecord() {
 // 팀 생성 시 호출 — onDisconnect 취소하여 레코드 영구 보존
 function confirmUserRecord() {
 	if (_userDisconnectHandle) {
-		_userDisconnectHandle.cancel().catch(() => {});
+		// cancel()은 해당 경로 및 모든 하위 경로의 onDisconnect를 취소함
+		// → online 필드의 onDisconnect도 함께 취소되므로 아래에서 재등록 필요
+		_userDisconnectHandle.cancel().then(() => {
+			if (!database || !currentUserCode || currentProfileKey) return;
+			// 부모 remove 취소 후 online 필드 onDisconnect 재등록
+			database.ref(`users/${currentUserCode}/online`).onDisconnect().remove().catch(() => {});
+		}).catch(() => {});
 		_userDisconnectHandle = null;
 	}
 	if (!database || !currentUserCode || currentProfileKey) return;
@@ -247,9 +253,11 @@ function setOnlinePresence() {
 			_userOnlineRef.onDisconnect().set(false);
 		}
 	} else if (currentUserCode) {
-		// 익명 유저: onDisconnect는 ensureUserRecord의 remove()가 처리하므로 별도 등록 안 함
 		_onlinePresenceRef = database.ref(`users/${currentUserCode}/online`);
-		_onlinePresenceRef.set(true).catch(() => {});
+		// onDisconnect 먼저 서버에 등록한 뒤 set(true) — 순서 보장이 핵심
+		_onlinePresenceRef.onDisconnect().remove().then(() => {
+			_onlinePresenceRef && _onlinePresenceRef.set(true).catch(() => {});
+		}).catch(() => {});
 	}
 }
 
@@ -458,20 +466,93 @@ function setupUserSync() {
 			return; // 초기값은 무시
 		}
 		if (!trigger) return;
-		loadDataByType('all');
+		const syncType = (trigger && typeof trigger === 'object' && trigger.type) ? trigger.type : 'all';
+		loadDataByType(syncType);
 	});
 }
 
 // 동기화 타입에 따라 선택적으로 데이터 로드
 function loadDataByType(type) {
 	if (!currentProfileKey && currentUserCode) {
-		return database.ref(`users/${currentUserCode}`).once('value')
-			.then((snapshot) => {
-				const data = snapshot.val();
-				if (data) {
-					loadStateFromData(data);
-				}
-			});
+		const userBase = `users/${currentUserCode}`;
+		switch(type) {
+			case 'rule':
+				return Promise.all([
+					database.ref(`${userBase}/hiddenGroups`).once('value'),
+					database.ref(`${userBase}/hiddenGroupChains`).once('value'),
+					database.ref(`${userBase}/pendingHiddenGroups`).once('value'),
+					database.ref(`${userBase}/pendingHiddenGroupChains`).once('value'),
+					database.ref(`${userBase}/probabilisticForbiddenPairs`).once('value')
+				]).then(([hgSnap, hgcSnap, phgSnap, phgcSnap, pfpSnap]) => {
+					state.hiddenGroups = hgSnap.val() || [];
+					state.hiddenGroupChains = hgcSnap.val() || [];
+					state.pendingHiddenGroups = phgSnap.val() || [];
+					state.pendingHiddenGroupChains = phgcSnap.val() || [];
+					state.probabilisticForbiddenPairs = pfpSnap.val() || [];
+					state.activeProbabilisticForbiddenPairs = [];
+				});
+
+			case 'option':
+				return Promise.all([
+					database.ref(`${userBase}/maxTeamSizeEnabled`).once('value'),
+					database.ref(`${userBase}/genderBalanceEnabled`).once('value'),
+					database.ref(`${userBase}/weightBalanceEnabled`).once('value'),
+					database.ref(`${userBase}/membersPerTeam`).once('value')
+				]).then(([maxTeamSizeSnap, genderBalanceSnap, weightBalanceSnap, membersPerTeamSnap]) => {
+					state.maxTeamSizeEnabled = maxTeamSizeSnap.val() || false;
+					state.genderBalanceEnabled = genderBalanceSnap.val() || false;
+					state.weightBalanceEnabled = weightBalanceSnap.val() || false;
+					state.membersPerTeam = membersPerTeamSnap.val() || 4;
+					if (elements.maxTeamSizeCheckbox) elements.maxTeamSizeCheckbox.checked = state.maxTeamSizeEnabled;
+					if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.checked = state.genderBalanceEnabled;
+					if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.checked = state.weightBalanceEnabled;
+					if (elements.teamSizeInput) elements.teamSizeInput.value = state.membersPerTeam;
+					renderPeople();
+				});
+
+			case 'member':
+				return Promise.all([
+					database.ref(`${userBase}/people`).once('value'),
+					database.ref(`${userBase}/inactivePeople`).once('value'),
+					database.ref(`${userBase}/nextId`).once('value')
+				]).then(([peopleSnap, inactivePeopleSnap, nextIdSnap]) => {
+					state.people = peopleSnap.val() || [];
+					state.inactivePeople = inactivePeopleSnap.val() || [];
+					state.nextId = nextIdSnap.val() || 1;
+					buildForbiddenMap();
+					renderPeople();
+				});
+
+			case 'constraint':
+				return Promise.all([
+					database.ref(`${userBase}/requiredGroups`).once('value'),
+					database.ref(`${userBase}/forbiddenPairs`).once('value'),
+					database.ref(`${userBase}/pendingConstraints`).once('value')
+				]).then(([requiredGroupsSnap, forbiddenPairsSnap, pendingConstraintsSnap]) => {
+					state.requiredGroups = requiredGroupsSnap.val() || [];
+					state.forbiddenPairs = forbiddenPairsSnap.val() || [];
+					state.pendingConstraints = pendingConstraintsSnap.val() || [];
+					buildForbiddenMap();
+					renderPeople();
+				});
+
+			case 'reservation':
+				return database.ref(`${userBase}/reservations`).once('value')
+					.then((snapshot) => {
+						state.reservations = normalizeReservations(snapshot.val());
+						saveToLocalStorage();
+					});
+
+			case 'all':
+			default:
+				return database.ref(userBase).once('value')
+					.then((snapshot) => {
+						const data = snapshot.val();
+						if (data) {
+							loadStateFromData(data);
+						}
+					});
+		}
 	}
 
 	switch(type) {

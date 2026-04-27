@@ -4166,6 +4166,12 @@ async function shuffleTeams() {
 		}
 	}
 
+	// 익명 유저: 예약 소모를 DB에 반영 (admin 실시간 갱신)
+	if (consumedReservation && database && currentUserCode && !currentProfileKey) {
+		database.ref(`users/${currentUserCode}/reservations`).set(state.reservations)
+			.catch(error => console.error('예약 동기화 실패:', error));
+	}
+
 	// Firebase에 예약 소모 반영
 	if (consumedReservation && syncEnabled && currentProfileKey) {
 		// 자신이 예약을 소모했다는 플래그 설정 (Firebase 리스너가 알림을 보내지 않도록)
