@@ -36,6 +36,9 @@
 						<span class="count" id="profilesCount">0</span>
 					</button>
 					<div class="accordion-body" id="profilesList"></div>
+					<div class="accordion-footer">
+						<button id="addProfileBtn" class="btn btn-new-profile" type="button">+ 새 프로필</button>
+					</div>
 				</section>
 
 				<section class="accordion" data-accordion="users">
@@ -45,7 +48,41 @@
 					</button>
 					<div class="accordion-body" id="usersList"></div>
 				</section>
+
+				<section class="accordion accordion-history-nav">
+					<button class="accordion-header history-nav-btn" type="button" id="historyNavBtn">
+						<span>생성히스토리</span>
+						<span class="count" id="globalHistoryCount">-</span>
+					</button>
+				</section>
 			</aside>
+
+			<section class="right-panel history-view-panel" id="historyViewPanel" style="display:none;">
+				<div class="editor-header">
+					<div>
+						<h2>생성히스토리</h2>
+						<p id="historyViewSubtitle">전체 팀 생성 기록</p>
+					</div>
+					<div class="editor-actions">
+						<button id="historyRefreshBtn" class="btn btn-secondary" type="button">새로고침</button>
+					</div>
+				</div>
+				<div class="history-global-wrap">
+					<table class="history-global-table">
+						<thead>
+							<tr>
+								<th>생성시간</th>
+								<th>생성프로필</th>
+								<th>생성된 팀</th>
+								<th>적용된 예약</th>
+								<th>적용된 규칙</th>
+								<th>적용된 제약</th>
+							</tr>
+						</thead>
+						<tbody id="globalHistoryTableBody"></tbody>
+					</table>
+				</div>
+			</section>
 
 			<section class="right-panel">
 				<div class="editor-header">
@@ -63,6 +100,11 @@
 					<div class="field-row">
 						<label for="fieldKey">키</label>
 						<input id="fieldKey" type="text" readonly>
+					</div>
+
+					<div class="field-row" id="tokenRow" style="display:none;">
+						<label for="fieldToken">토큰 (읽기전용 링크)</label>
+						<input id="fieldToken" type="text" readonly>
 					</div>
 
 					<div class="field-row">
@@ -267,5 +309,26 @@
 	</div>
 
 	<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+	<!-- 새 프로필 추가 모달 -->
+	<div id="newProfileModal" class="new-profile-modal" style="display:none;" aria-modal="true" role="dialog">
+		<div class="new-profile-overlay"></div>
+		<div class="new-profile-card">
+			<h2 class="new-profile-title">새 프로필 추가</h2>
+			<div class="new-profile-row">
+				<label for="newProfileId">아이디</label>
+				<input id="newProfileId" class="new-profile-input" type="text" placeholder="영문/숫자 조합" autocomplete="off">
+			</div>
+			<div class="new-profile-row">
+				<label for="newProfilePw">비밀번호</label>
+				<input id="newProfilePw" class="new-profile-input" type="password" placeholder="비밀번호 입력" autocomplete="new-password">
+			</div>
+			<div id="newProfileError" class="new-profile-error"></div>
+			<div class="new-profile-actions">
+				<button id="newProfileSubmitBtn" class="btn" type="button">추가</button>
+				<button id="newProfileCancelBtn" class="btn btn-secondary" type="button">취소</button>
+			</div>
+		</div>
+	</div>
 </body>
 </html>

@@ -125,7 +125,7 @@ body {
 }
 
 .accordion-body {
-	
+
 }
 
 .item-btn {
@@ -149,10 +149,30 @@ body {
 	padding-left: 7px;
 }
 
+.item-btn-deleted {
+	opacity: 0.55;
+}
+
+.item-btn-deleted .item-title {
+	color: #ef4444;
+}
+
 .item-title {
 	display: block;
 	font-size: 13px;
 	font-weight: 600;
+}
+
+.online-badge {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 1px 7px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 500;
+	border: 1px solid #22c55e;
+	color: #22c55e;
+	vertical-align: middle;
 }
 
 .item-meta {
@@ -1047,4 +1067,201 @@ tr:hover .drag-cell {
 	.option-inline-item.option-number input[type='number'] {
 		width: 100%;
 	}
+}
+
+/* accordion footer (새 프로필 버튼 영역) */
+.accordion-footer {
+	padding: 6px 8px;
+	border-top: 1px solid var(--line);
+}
+
+.btn-new-profile {
+	width: 100%;
+	background: transparent;
+	border-color: var(--line);
+	color: var(--muted);
+	font-size: 12px;
+	padding: 6px 8px;
+}
+
+.btn-new-profile:hover {
+	background: var(--panel-2);
+	color: var(--text);
+}
+
+/* 새 프로필 추가 모달 */
+.new-profile-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s;
+}
+
+.new-profile-modal.visible {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.new-profile-overlay {
+	position: absolute;
+	inset: 0;
+	background: rgba(0,0,0,0.5);
+}
+
+.new-profile-card {
+	position: relative;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	padding: 20px 24px;
+	width: 340px;
+	max-width: 90vw;
+	box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+	transform: translateY(12px);
+	transition: transform 0.2s;
+}
+
+.new-profile-modal.visible .new-profile-card {
+	transform: translateY(0);
+}
+
+.new-profile-title {
+	font-size: 15px;
+	font-weight: 700;
+	margin-bottom: 16px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--line);
+}
+
+.new-profile-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+.new-profile-row label {
+	width: 56px;
+	font-size: 12px;
+	color: var(--muted);
+	flex-shrink: 0;
+}
+
+.new-profile-input {
+	flex: 1;
+	height: 32px;
+	padding: 6px 8px;
+	border: 1px solid var(--line);
+	background: var(--panel-2);
+	color: var(--text);
+	font-size: 13px;
+	outline: none;
+	border-radius: 3px;
+}
+
+.new-profile-input:focus {
+	border-color: var(--accent);
+}
+
+.new-profile-error {
+	min-height: 18px;
+	font-size: 12px;
+	color: #ef4444;
+	margin-bottom: 10px;
+	text-align: center;
+}
+
+.new-profile-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+/* 생성히스토리 네비 버튼 */
+.accordion-history-nav .accordion-header {
+	cursor: pointer;
+	color: var(--accent);
+	border-bottom: none;
+}
+.accordion-history-nav .accordion-header:hover {
+	background: var(--panel-2);
+}
+
+/* 전역 생성히스토리 패널 */
+.history-view-panel {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+.history-global-wrap {
+	flex: 1;
+	overflow: auto;
+	padding: 0 16px 16px;
+}
+.history-global-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12.5px;
+	min-width: 860px;
+}
+.history-global-table thead th {
+	position: sticky;
+	top: 0;
+	background: var(--panel-2);
+	color: var(--muted);
+	font-weight: 600;
+	padding: 8px 10px;
+	text-align: left;
+	border-bottom: 1px solid var(--line);
+	white-space: nowrap;
+}
+.history-global-table tbody tr {
+	border-bottom: 1px solid var(--line);
+	transition: background 0.12s;
+}
+.history-global-table tbody tr:hover {
+	background: var(--panel-2);
+}
+.gh-cell {
+	padding: 7px 10px;
+	vertical-align: top;
+	color: var(--text);
+	line-height: 1.5;
+}
+.gh-date {
+	white-space: nowrap;
+	color: var(--muted);
+	font-size: 12px;
+}
+.gh-profile {
+	font-weight: 600;
+	color: var(--accent);
+	white-space: nowrap;
+}
+.gh-teams {
+	min-width: 200px;
+}
+.gh-team-block {
+	display: inline-block;
+	background: var(--panel-2);
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	padding: 2px 6px;
+	margin: 2px 3px 2px 0;
+	font-size: 12px;
+}
+.gh-team-block b {
+	color: var(--accent);
+	margin-right: 4px;
+}
+.gh-loading {
+	text-align: center;
+	color: var(--muted);
+	padding: 24px;
+	font-size: 13px;
 }

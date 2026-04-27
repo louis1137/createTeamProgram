@@ -56,17 +56,12 @@ const commandConsole = {
 		const consoleEl = document.getElementById('commandConsole');
 		const profileKeyDisplay = document.getElementById('profileKeyDisplay');
 		
-		// key 파라미터가 있을 때 profile key 설정 (콘솔은 표시하지 않음)
-		currentProfileKey = getProfileKeyFromURL();
+		// 세션에서 로그인된 프로필 키 설정
+		currentProfileKey = (typeof getSessionProfile === 'function') ? getSessionProfile() : null;
 		if (currentProfileKey) {
-			profileKeyDisplay.textContent = `Profile: ${currentProfileKey}`;
-			// 인증 상태면 초록색 배경
-			if (authenticatedPassword) {
-				profileKeyDisplay.classList.add('authenticated');
-			} else {
-				profileKeyDisplay.classList.remove('authenticated');
-			}
-			
+			profileKeyDisplay.textContent = `🔑 ${currentProfileKey}`;
+			profileKeyDisplay.classList.add('authenticated');
+
 			// Firebase 초기화 시도
 			if (initFirebase()) {
 				syncEnabled = true;

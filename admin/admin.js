@@ -18,6 +18,13 @@ let ruleDraft = [];
 let reservationDraft = [];
 let historyDraft = [];
 
+// 실시간 리스너 핸들
+let _profilesListenerRef = null;
+let _usersListenerRef = null;
+let _selectedListenerRef = null;
+let _selectedListenerCallback = null;
+let _isSaving = false;
+
 const ADMIN_ACCESS_SESSION_KEY = 'adminAccessAuthenticated';
 
 const fieldIds = {
@@ -1098,9 +1105,10 @@ function updateConditionalRows(type) {
 	if (!passwordRow) {
 		return;
 	}
-	passwordRow.style.display = 'none';
+	// profiles: 비밀번호 필드 표시 (로그인에 사용), users: 숨김
+	passwordRow.style.display = type === 'profiles' ? 'flex' : 'none';
 	if (historyRow) {
-		historyRow.style.display = type === 'users' ? 'flex' : 'none';
+		historyRow.style.display = (type === 'users' || type === 'profiles') ? 'flex' : 'none';
 	}
 }
 
@@ -1127,6 +1135,19 @@ function writeFormData(key, type, data) {
 	getEl(fieldIds.lastAccess).value = data.lastAccess || '';
 	getEl(fieldIds.password).value = data.password || '';
 	getEl(fieldIds.timestamp).value = data.timestamp || '';
+	// 토큰 필드 (profiles만 표시)
+	const tokenRow = document.getElementById('tokenRow');
+	const tokenField = document.getElementById('fieldToken');
+	if (tokenRow && tokenField) {
+		if (type === 'profiles' && data.token) {
+			const base = window.location.origin + window.location.pathname.replace('/admin/', '/') + 'index.html';
+			tokenField.value = `${base}?token=${data.token}`;
+			tokenRow.style.display = '';
+		} else {
+			tokenField.value = '';
+			tokenRow.style.display = 'none';
+		}
+	}
 	cloneMembers(data || {});
 	cloneConstraints(data || {});
 	cloneRules(data || {});
@@ -1166,16 +1187,24 @@ function buildItemButton(type, key, data) {
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.className = 'item-btn';
+	if (type === 'profiles' && data?.deleted) button.classList.add('item-btn-deleted');
 	button.dataset.type = type;
 	button.dataset.key = key;
 	const dateValue = data?.timestamp || data?.lastAccess || data?.createdAt || '';
-	button.innerHTML = `<span class="item-title">${key}</span><span class="item-meta">${dateValue || 'no timestamp'}</span>`;
+	const displayKey = (type === 'profiles' && data?.deleted) ? `${key} (deleted)` : key;
+	const isOnline = data?.online === true;
+	const onlineUser = type === 'profiles' ? (data?.onlineUser || '') : '';
+	const badgeLabel = type === 'profiles' ? (onlineUser || '로그인중') : '로그인중';
+	const onlineBadge = isOnline ? ` <span class="online-badge">${badgeLabel}</span>` : '';
+	button.innerHTML = `<span class="item-title">${displayKey}${onlineBadge}</span><span class="item-meta">${dateValue || 'no timestamp'}</span>`;
 	button.addEventListener('click', async () => {
+		showEditorView();
 		selected = { type, key };
 		setButtonsEnabled(true);
 		setEditorHeader();
 		applySelectionStyles();
 		await loadSelectedItem();
+		setupSelectedItemListener(type, key);
 	});
 	return button;
 }
@@ -1234,13 +1263,56 @@ function renderList(type, values) {
 	applySelectionStyles();
 }
 
-async function loadLists() {
-	const [profilesSnapshot, usersSnapshot] = await Promise.all([
-		database.ref('profiles').once('value'),
-		database.ref('users').once('value')
-	]);
-	renderList('profiles', profilesSnapshot.val() || {});
-	renderList('users', usersSnapshot.val() || {});
+function teardownListListeners() {
+	if (_profilesListenerRef) {
+		_profilesListenerRef.off('value');
+		_profilesListenerRef = null;
+	}
+	if (_usersListenerRef) {
+		_usersListenerRef.off('value');
+		_usersListenerRef = null;
+	}
+}
+
+function teardownSelectedListener() {
+	if (_selectedListenerRef && _selectedListenerCallback) {
+		_selectedListenerRef.off('value', _selectedListenerCallback);
+	}
+	_selectedListenerRef = null;
+	_selectedListenerCallback = null;
+}
+
+function setupRealtimeListeners() {
+	teardownListListeners();
+
+	_profilesListenerRef = database.ref('profiles');
+	_profilesListenerRef.on('value', (snapshot) => {
+		renderList('profiles', snapshot.val() || {});
+	});
+
+	_usersListenerRef = database.ref('users');
+	_usersListenerRef.on('value', (snapshot) => {
+		renderList('users', snapshot.val() || {});
+	});
+}
+
+function setupSelectedItemListener(type, key) {
+	teardownSelectedListener();
+	if (!type || !key) return;
+
+	_selectedListenerCallback = (snapshot) => {
+		if (_isSaving) return;
+		const data = snapshot.val();
+		if (!data) return;
+		writeFormData(key, type, data);
+	};
+
+	_selectedListenerRef = database.ref(`${type}/${key}`);
+	_selectedListenerRef.on('value', _selectedListenerCallback);
+}
+
+function loadLists() {
+	setupRealtimeListeners();
 }
 
 async function loadSelectedItem() {
@@ -1372,6 +1444,10 @@ function buildPayloadFromForm(type) {
 	if (type === 'profiles') {
 		payload.createdAt = form.createdAt || getDbTimestamp();
 		payload.timestamp = form.timestamp || getDbTimestamp();
+		const passwordValue = getEl(fieldIds.password) ? getEl(fieldIds.password).value : '';
+		if (passwordValue) {
+			payload.password = passwordValue;
+		}
 	}
 	if (type === 'users') {
 		payload.createdAt = form.createdAt || getDbTimestamp();
@@ -1523,9 +1599,13 @@ async function saveSelected() {
 	removeEmptyRuleRows();
 	removeEmptyReservationRows();
 	const payload = buildPayloadFromForm(selected.type);
-	await savePayloadByType(selected.type, selected.key, payload);
-	await loadSelectedItem();
-	await loadLists();
+	_isSaving = true;
+	try {
+		await savePayloadByType(selected.type, selected.key, payload);
+		await loadSelectedItem();
+	} finally {
+		_isSaving = false;
+	}
 	showToast('저장 완료');
 }
 
@@ -1538,9 +1618,14 @@ async function syncSelected() {
 	removeEmptyRuleRows();
 	removeEmptyReservationRows();
 	const payload = buildPayloadFromForm(selected.type);
-	await savePayloadByType(selected.type, selected.key, payload);
-	await broadcastSyncTrigger(selected.type, selected.key, 'all');
-	await loadSelectedItem();
+	_isSaving = true;
+	try {
+		await savePayloadByType(selected.type, selected.key, payload);
+		await broadcastSyncTrigger(selected.type, selected.key, 'all');
+		await loadSelectedItem();
+	} finally {
+		_isSaving = false;
+	}
 	showToast('동기화 완료');
 }
 
@@ -1556,17 +1641,17 @@ async function executeSectionAction(section, action) {
 	}
 	const syncType = getSectionSyncType(section);
 	const label = getSectionLabel(section);
-	await savePayloadByType(selected.type, selected.key, sectionPayload);
-	if (action === 'sync') {
-		await broadcastSyncTrigger(selected.type, selected.key, syncType);
+	_isSaving = true;
+	try {
+		await savePayloadByType(selected.type, selected.key, sectionPayload);
+		if (action === 'sync') {
+			await broadcastSyncTrigger(selected.type, selected.key, syncType);
+		}
+		await loadSelectedItem();
+	} finally {
+		_isSaving = false;
 	}
-	await loadSelectedItem();
-	if (action === 'sync') {
-		showToast(`${label} 동기화 완료`);
-		return;
-	}
-	await loadLists();
-	showToast(`${label} 저장 완료`);
+	showToast(action === 'sync' ? `${label} 동기화 완료` : `${label} 저장 완료`);
 }
 
 function initAccordion() {
@@ -1601,7 +1686,7 @@ function bindEvents() {
 		logoutAdminAccess();
 	});
 	getEl('refreshListsBtn').addEventListener('click', async () => {
-		await loadLists();
+		loadLists();
 		if (selected.type && selected.key) {
 			await loadSelectedItem();
 			applySelectionStyles();
@@ -2045,6 +2130,219 @@ function bindEvents() {
 	refreshHistoryExpandButton();
 }
 
+function openNewProfileModal() {
+	const modal = getEl('newProfileModal');
+	const idInput = getEl('newProfileId');
+	const pwInput = getEl('newProfilePw');
+	const errorEl = getEl('newProfileError');
+	if (!modal) return;
+	if (idInput) idInput.value = '';
+	if (pwInput) pwInput.value = '';
+	if (errorEl) errorEl.textContent = '';
+	modal.style.display = 'flex';
+	requestAnimationFrame(() => {
+		modal.classList.add('visible');
+		if (idInput) idInput.focus();
+	});
+}
+
+function closeNewProfileModal() {
+	const modal = getEl('newProfileModal');
+	if (!modal) return;
+	modal.classList.remove('visible');
+	setTimeout(() => { modal.style.display = 'none'; }, 200);
+}
+
+async function submitNewProfile() {
+	const idInput = getEl('newProfileId');
+	const pwInput = getEl('newProfilePw');
+	const errorEl = getEl('newProfileError');
+	const username = (idInput ? idInput.value : '').trim();
+	const password = pwInput ? pwInput.value : '';
+	if (errorEl) errorEl.textContent = '';
+
+	if (!username) {
+		if (errorEl) errorEl.textContent = '아이디를 입력하세요.';
+		if (idInput) idInput.focus();
+		return;
+	}
+	if (!password) {
+		if (errorEl) errorEl.textContent = '비밀번호를 입력하세요.';
+		if (pwInput) pwInput.focus();
+		return;
+	}
+
+	// 중복 확인
+	const existing = await database.ref(`profiles/${username}`).once('value');
+	if (existing.exists()) {
+		if (errorEl) errorEl.textContent = '이미 존재하는 아이디입니다.';
+		if (idInput) idInput.focus();
+		return;
+	}
+
+	const now = getDbTimestamp();
+	await database.ref(`profiles/${username}`).set({
+		password,
+		createdAt: now,
+		timestamp: now
+	});
+
+	showToast(`프로필 '${username}' 추가 완료`);
+	closeNewProfileModal();
+
+	// 새 항목 자동 선택 (목록은 실시간 리스너가 자동 갱신)
+	selected = { type: 'profiles', key: username };
+	setButtonsEnabled(true);
+	setEditorHeader();
+	applySelectionStyles();
+	await loadSelectedItem();
+	setupSelectedItemListener('profiles', username);
+}
+
+function bindNewProfileModal() {
+	const addBtn = getEl('addProfileBtn');
+	const submitBtn = getEl('newProfileSubmitBtn');
+	const cancelBtn = getEl('newProfileCancelBtn');
+	const overlay = document.querySelector('#newProfileModal .new-profile-overlay');
+	const idInput = getEl('newProfileId');
+	const pwInput = getEl('newProfilePw');
+
+	if (addBtn) addBtn.addEventListener('click', openNewProfileModal);
+	if (submitBtn) submitBtn.addEventListener('click', submitNewProfile);
+	if (cancelBtn) cancelBtn.addEventListener('click', closeNewProfileModal);
+	if (overlay) overlay.addEventListener('click', closeNewProfileModal);
+	if (idInput) {
+		idInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') { const pw = getEl('newProfilePw'); if (pw) pw.focus(); }
+		});
+	}
+	if (pwInput) {
+		pwInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') submitNewProfile();
+		});
+	}
+}
+
+// ==================== 전역 생성히스토리 ====================
+
+let globalHistoryData = [];
+
+function formatGlobalHistoryDate(createdAt) {
+	if (!createdAt) return '-';
+	let d;
+	if (typeof createdAt === 'number') {
+		d = new Date(createdAt);
+	} else {
+		d = new Date(String(createdAt));
+	}
+	if (isNaN(d.getTime())) return String(createdAt);
+	const pad = (n) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function formatGlobalHistoryTeams(teams) {
+	if (!Array.isArray(teams) || teams.length === 0) return '-';
+	return teams.map((team, i) => {
+		const members = Array.isArray(team) ? team.join(', ') : String(team);
+		return `<span class="gh-team-block"><b>팀${i+1}</b> ${members}</span>`;
+	}).join('');
+}
+
+function formatGlobalHistoryList(val) {
+	if (!val) return '-';
+	if (Array.isArray(val)) return val.filter(Boolean).join(', ') || '-';
+	return String(val) || '-';
+}
+
+function extractHistoryEntries(rootKey, rootData) {
+	const historyNode = rootData?.generateHistory;
+	if (!historyNode || typeof historyNode !== 'object') return [];
+	return Object.entries(historyNode).map(([entryKey, entry]) => ({
+		key: `${rootKey}/${entryKey}`,
+		createdAt: entry?.createdAt || entryKey,
+		profile: entry?.profile || rootKey,
+		teams: normalizeHistoryTeams(entry?.teams),
+		appliedReservation: normalizeHistoryStrings(entry?.appliedReservation, null),
+		appliedRules: normalizeHistoryStrings(entry?.appliedRules, '/'),
+		appliedConstraints: normalizeHistoryStrings(entry?.appliedConstraints, '/')
+	}));
+}
+
+async function loadGlobalHistory() {
+	const tbody = document.getElementById('globalHistoryTableBody');
+	const countEl = document.getElementById('globalHistoryCount');
+	if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="gh-loading">불러오는 중...</td></tr>';
+	try {
+		const snap = await database.ref('generateHistory').once('value');
+		const data = snap.val() || {};
+
+		const allEntries = Object.entries(data).map(([pushKey, entry]) => ({
+			key: pushKey,
+			createdAt: entry?.createdAt || pushKey,
+			profile: entry?.profile || '',
+			teams: normalizeHistoryTeams(entry?.teams),
+			appliedReservation: normalizeHistoryStrings(entry?.appliedReservation, null),
+			appliedRules: normalizeHistoryStrings(entry?.appliedRules, '/'),
+			appliedConstraints: normalizeHistoryStrings(entry?.appliedConstraints, '/')
+		}));
+
+		allEntries.sort((a, b) => {
+			const ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt).getTime() || 0;
+			const tb = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt).getTime() || 0;
+			return tb - ta;
+		});
+
+		globalHistoryData = allEntries;
+		if (countEl) countEl.textContent = globalHistoryData.length;
+		renderGlobalHistory();
+	} catch (e) {
+		if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="gh-loading">로드 실패: ${e.message}</td></tr>`;
+	}
+}
+
+function renderGlobalHistory() {
+	const tbody = document.getElementById('globalHistoryTableBody');
+	const subtitle = document.getElementById('historyViewSubtitle');
+	if (!tbody) return;
+	if (subtitle) subtitle.textContent = `전체 팀 생성 기록 (${globalHistoryData.length}건)`;
+	if (!globalHistoryData.length) {
+		tbody.innerHTML = '<tr><td colspan="6" class="gh-loading">생성 기록이 없습니다.</td></tr>';
+		return;
+	}
+	tbody.innerHTML = globalHistoryData.map((item) => `
+		<tr>
+			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
+			<td class="gh-cell gh-profile">${item.profile}</td>
+			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams)}</td>
+			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
+			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
+			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
+		</tr>
+	`).join('');
+}
+
+function showHistoryView() {
+	const historyPanel = document.getElementById('historyViewPanel');
+	const editorPanel = document.querySelector('.right-panel:not(.history-view-panel)');
+	if (historyPanel) historyPanel.style.display = '';
+	if (editorPanel) editorPanel.style.display = 'none';
+	loadGlobalHistory();
+}
+
+function showEditorView() {
+	const historyPanel = document.getElementById('historyViewPanel');
+	const editorPanel = document.querySelector('.right-panel:not(.history-view-panel)');
+	if (historyPanel) historyPanel.style.display = 'none';
+	if (editorPanel) editorPanel.style.display = '';
+}
+
+function bindHistoryNav() {
+	const navBtn = document.getElementById('historyNavBtn');
+	if (navBtn) navBtn.addEventListener('click', showHistoryView);
+	const refreshBtn = document.getElementById('historyRefreshBtn');
+	if (refreshBtn) refreshBtn.addEventListener('click', loadGlobalHistory);
+}
+
 async function bootstrap() {
 	if (!guardAdminAccess()) {
 		return;
@@ -2053,9 +2351,11 @@ async function bootstrap() {
 	initAccordion();
 	initTheme();
 	bindEvents();
+	bindNewProfileModal();
+	bindHistoryNav();
 	setButtonsEnabled(false);
 	setEditorHeader();
-	await loadLists();
+	loadLists();
 }
 
 bootstrap().catch((error) => {

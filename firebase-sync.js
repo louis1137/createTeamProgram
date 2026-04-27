@@ -105,14 +105,35 @@ function resolveProfileRecord(profileKey) {
 	});
 }
 
-// 6자리 영숫자 userCode 생성
-function generateUserCode() {
+// 영숫자 코드 생성 (len 자리)
+function generateCode(len) {
 	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 	let code = '';
-	for (let i = 0; i < 6; i++) {
+	for (let i = 0; i < len; i++) {
 		code += chars.charAt(Math.floor(Math.random() * chars.length));
 	}
 	return code;
+}
+
+function generateUserCode() { return generateCode(6); }
+
+// 프로필 토큰이 없으면 생성하여 저장 + 역방향 조회 테이블에도 기록
+function ensureProfileToken(profileKey) {
+	if (!database || !profileKey) return Promise.resolve(null);
+	const ref = database.ref(`profiles/${profileKey}/token`);
+	return ref.once('value').then((snap) => {
+		const existing = snap.val();
+		if (existing) {
+			// 역방향 테이블 보장
+			database.ref(`profileTokens/${existing}`).set(profileKey).catch(() => {});
+			return existing;
+		}
+		const token = generateCode(12);
+		return Promise.all([
+			ref.set(token),
+			database.ref(`profileTokens/${token}`).set(profileKey)
+		]).then(() => token);
+	});
 }
 
 // userCode 가져오기/생성 (localStorage key: userCode)
@@ -150,17 +171,36 @@ function getCurrentDbTimestamp() {
 	return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
-// users/{userCode} 레코드 보장
+// onDisconnect 핸들 (임시 user 레코드 자동 삭제용)
+let _userDisconnectHandle = null;
+
+// 비프로필 유저 임시 레코드 생성 + onDisconnect 설정
 function ensureUserRecord() {
-	if (!database || !currentUserCode) return Promise.resolve(false);
+	if (!database || !currentUserCode || currentProfileKey) return Promise.resolve(false);
 	const userRef = database.ref(`users/${currentUserCode}`);
 	const now = getCurrentDbTimestamp();
-	
+
 	return userRef.once('value')
 		.then((snapshot) => {
 			if (!snapshot.exists()) {
-				return userRef.set({ createdAt: now, lastAccess: now });
+				// 신규 접속: 임시 레코드 생성 + 연결 끊기면 서버에서 자동 삭제
+				return userRef.set({ createdAt: now, lastAccess: now, confirmed: false })
+					.then(() => {
+						_userDisconnectHandle = userRef.onDisconnect();
+						_userDisconnectHandle.remove();
+						setOnlinePresence();
+					});
 			}
+			const data = snapshot.val();
+			if (!data.confirmed) {
+				// 미확정 상태로 재접속 (예: 새로고침): onDisconnect 재등록
+				_userDisconnectHandle = userRef.onDisconnect();
+				_userDisconnectHandle.remove();
+				setOnlinePresence();
+				return userRef.update({ lastAccess: now });
+			}
+			// 팀 생성 이력이 있는 확정 유저: lastAccess만 갱신
+			setOnlinePresence();
 			return userRef.update({ lastAccess: now });
 		})
 		.catch((error) => {
@@ -168,10 +208,109 @@ function ensureUserRecord() {
 		});
 }
 
-// URL 파라미터에서 key 읽기
+// 팀 생성 시 호출 — onDisconnect 취소하여 레코드 영구 보존
+function confirmUserRecord() {
+	if (_userDisconnectHandle) {
+		_userDisconnectHandle.cancel().catch(() => {});
+		_userDisconnectHandle = null;
+	}
+	if (!database || !currentUserCode || currentProfileKey) return;
+	database.ref(`users/${currentUserCode}`).update({ confirmed: true }).catch(() => {});
+}
+
+// 현재 접속 중 표시 (online: true + onDisconnect → false)
+let _onlinePresenceRef = null;
+let _userOnlineRef = null;
+
+function setOnlinePresence() {
+	if (!database) return;
+	if (currentProfileKey) {
+		const userCode = currentUserCode || getUserCode();
+		// profiles 섹션 online 표시
+		const profileRef = database.ref(`profiles/${currentProfileKey}`);
+		profileRef.update({ online: true, onlineUser: userCode }).catch(() => {});
+		profileRef.onDisconnect().update({ online: false, onlineUser: '' });
+		_onlinePresenceRef = database.ref(`profiles/${currentProfileKey}/online`);
+		// users 섹션에도 동일 userCode로 online 표시
+		if (userCode) {
+			_userOnlineRef = database.ref(`users/${userCode}/online`);
+			_userOnlineRef.set(true).catch(() => {});
+			_userOnlineRef.onDisconnect().set(false);
+		}
+	} else if (currentUserCode) {
+		_onlinePresenceRef = database.ref(`users/${currentUserCode}/online`);
+		_onlinePresenceRef.set(true).catch(() => {});
+		_onlinePresenceRef.onDisconnect().set(false);
+	}
+}
+
+function clearOnlinePresence() {
+	// 프로필 online만 해제 (users online은 유지 — 로그아웃 후에도 사이트에 남아있음)
+	if (_onlinePresenceRef) {
+		_onlinePresenceRef.set(false).catch(() => {});
+		_onlinePresenceRef.onDisconnect().cancel().catch(() => {});
+		_onlinePresenceRef = null;
+	}
+	if (currentProfileKey && database) {
+		database.ref(`profiles/${currentProfileKey}`).update({ online: false, onlineUser: '' }).catch(() => {});
+	}
+	_userOnlineRef = null;
+}
+
+// URL 파라미터에서 key 읽기 (레거시 - 더 이상 사용하지 않음)
 function getProfileKeyFromURL() {
 	const params = new URLSearchParams(window.location.search);
 	return params.get('key');
+}
+
+// ==================== 프로필 로그인 세션 ====================
+const PROFILE_SESSION_KEY = 'profileLoginUsername';
+
+function getSessionProfile() {
+	try { return sessionStorage.getItem(PROFILE_SESSION_KEY) || null; } catch (_) { return null; }
+}
+
+function setSessionProfile(username) {
+	try { sessionStorage.setItem(PROFILE_SESSION_KEY, username); } catch (_) {}
+}
+
+function clearSessionProfile() {
+	try { sessionStorage.removeItem(PROFILE_SESSION_KEY); } catch (_) {}
+}
+
+// 프로필 로그인: Firebase에서 비밀번호 검증 후 세션 설정
+function loginProfile(username, password) {
+	if (!database || !username) return Promise.resolve({ ok: false, error: 'Firebase가 초기화되지 않았습니다.' });
+	const u = String(username).trim();
+	if (!u) return Promise.resolve({ ok: false, error: '아이디를 입력하세요.' });
+	return database.ref(`profiles/${u}/password`).once('value')
+		.then((snapshot) => {
+			const stored = snapshot.val();
+			if (stored === null || stored === undefined) {
+				return { ok: false, error: '존재하지 않는 아이디입니다.' };
+			}
+			if (String(stored) !== String(password)) {
+				return { ok: false, error: '비밀번호가 올바르지 않습니다.' };
+			}
+			setSessionProfile(u);
+			currentProfileKey = u;
+			setCurrentProfileSource('profiles');
+			authenticatedPassword = String(password);
+			return { ok: true, username: u };
+		})
+		.catch(() => ({ ok: false, error: '로그인 중 오류가 발생했습니다.' }));
+}
+
+// 프로필 로그아웃
+function logoutProfile() {
+	clearSessionProfile();
+	currentProfileKey = null;
+	authenticatedPassword = '';
+	syncEnabled = false;
+	syncListenerAttached = false;
+	realtimeSyncActive = false;
+	syncTriggerInitialized = false;
+	lastSyncSignature = '';
 }
 
 // Firebase 초기화
@@ -180,7 +319,6 @@ function initFirebase() {
 		// 이미 초기화되었는지 확인
 		if (database) {
 			if (!currentUserCode) currentUserCode = getUserCode();
-			ensureUserRecord();
 			return true;
 		}
 		
@@ -206,19 +344,13 @@ function initFirebase() {
 			console.log('✅ Firebase 초기화 완료');
 			console.log('⚙️ 참가자 입력란에 \'cmd\' 또는 \'command\'를 입력하면 다양한 기능을 사용할 수 있습니다.');
 			
-			// URL에서 프로필 키 읽기
-			currentProfileKey = getProfileKeyFromURL();
+			// 세션에서 로그인된 프로필 키 읽기
+			currentProfileKey = getSessionProfile();
 			setCurrentProfileSource('profiles');
 			currentUserCode = getUserCode();
-			ensureUserRecord();
 
-			// user 파라미터는 노출하지 않음
-			const url = new URL(window.location.href);
-			if (url.searchParams.has('user')) {
-				url.searchParams.delete('user');
-				window.history.replaceState({}, '', url);
-			}
-			
+			// 비프로필 유저: 임시 레코드 생성은 init() 쪽에서 토큰 모드 여부 확인 후 호출
+
 			return true;
 		} else {
 			console.log('⚠️ Firebase 설정이 필요합니다. firebase-sync.js의 firebaseConfig를 설정하세요.');
@@ -247,9 +379,9 @@ function getSyncSignature(syncTrigger) {
 	return String(syncTrigger ?? '');
 }
 
-// 실시간 동기화 설정
+// 실시간 동기화 설정 (프로필 로그인 상태에서만 동작)
 function setupRealtimeSync() {
-	if (!database || (!currentProfileKey && !currentUserCode)) return;
+	if (!database || !currentProfileKey) return;
 	
 	// 이미 리스너가 등록되어 있으면 중복 등록 방지
 	if (syncListenerAttached) return;
@@ -262,12 +394,10 @@ function setupRealtimeSync() {
 	realtimeSyncActive = true;
 	syncListenerAttached = true;
 	
-	const triggerPaths = currentProfileKey
-		? [
-			`profiles/${currentProfileKey}/syncTrigger`,
-			`users/${currentProfileKey}/syncTrigger`
-		]
-		: [`users/${currentUserCode}/syncTrigger`];
+	const triggerPaths = [
+		`profiles/${currentProfileKey}/syncTrigger`,
+		`users/${currentProfileKey}/syncTrigger`
+	];
 
 	const handleSyncTrigger = (syncTrigger) => {
 		const signature = getSyncSignature(syncTrigger);
@@ -460,6 +590,8 @@ function loadStateFromData(data) {
 	
 	buildForbiddenMap();
 	renderPeople();
+	if (typeof tryResolvePendingConstraints === 'function') tryResolvePendingConstraints();
+	if (typeof tryResolveHiddenGroups === 'function') tryResolveHiddenGroups();
 }
 
 // state를 완전 초기화

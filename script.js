@@ -77,7 +77,7 @@ const elements = {
 	shuffleOrderBtn: document.getElementById('shuffleOrderBtn'),
 	peopleList: document.getElementById('peopleList'),
 	shuffleBtn: document.getElementById('shuffleBtn'),
-	resultsSection: document.getElementById('resultsSection'),
+	resultsSection: document.getElementById('results'),
 	teamsDisplay: document.getElementById('teamsDisplay'),
 	participantCount: document.querySelector('.participantCount'),
 	captureBtn: document.getElementById('captureBtn'),
@@ -119,6 +119,46 @@ function logProfileConsole(message) {
 	commandConsole.log(message);
 }
 
+// ==================== 읽기 전용 모드 ====================
+let _readOnlyMode = false;
+
+function enterReadOnlyMode(profileKey, data) {
+	_readOnlyMode = true;
+	if (data && typeof loadStateFromData === 'function') loadStateFromData(data);
+}
+
+function exitReadOnlyMode() {
+	_readOnlyMode = false;
+	history.replaceState({}, '', window.location.pathname);
+}
+
+async function initTokenMode() {
+	const params = new URLSearchParams(window.location.search);
+	const token = params.get('token');
+	if (!token) return false;
+
+	if (!database && typeof initFirebase === 'function') initFirebase();
+	if (!database) return false;
+
+	try {
+		// profileTokens/${token} → profileKey 역방향 조회
+		const tokenSnap = await database.ref(`profileTokens/${token}`).once('value');
+		const profileKey = tokenSnap.val();
+		if (!profileKey) return false;
+
+		// 해당 프로필 데이터 읽기
+		const profileSnap = await database.ref(`profiles/${profileKey}`).once('value');
+		const profileData = profileSnap.val();
+		if (!profileData) return false;
+
+		enterReadOnlyMode(profileKey, profileData);
+		return true;
+	} catch (e) {
+		console.error('토큰 모드 로드 실패:', e);
+		return false;
+	}
+}
+
 function init() {
 	if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.addEventListener('change', handleGenderBalanceToggle);
 	if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.addEventListener('change', handleWeightBalanceToggle);
@@ -158,14 +198,17 @@ function init() {
 	// 팀 표시 애니메이션 시간: teamDisplayDelay의 50%로 설정
 	setTeamAnimDurationFromDelay();
 
-	// localStorage에서 데이터 복원 (프로필이 없을 경우에만)
+	// 비프로필: 빈 화면 시작. ?token= 이 있으면 읽기 전용 로드, 없으면 자동로그인 + 임시 user 레코드 생성
 	if (!currentProfileKey) {
-		loadFromLocalStorage();
-		if (database) {
-			setupRealtimeSync();
-		}
+		initTokenMode().then((isTokenMode) => {
+			if (!isTokenMode) {
+				tryAutoLogin();
+				if (typeof ensureUserRecord === 'function') ensureUserRecord();
+			}
+		});
 	} else if (database) {
 		// 프로필이 있는 경우 Firebase에서 데이터 즉시 로드 (profiles + users 동시 확인)
+		if (typeof setOnlinePresence === 'function') setOnlinePresence();
 		resolveProfileRecord(currentProfileKey)
 			.then((result) => {
 				const data = result.data;
@@ -235,6 +278,127 @@ function init() {
 			if (e.key === 'Escape') closeEditModal();
 			if (e.key === 'Enter') saveEditModal();
 		});
+	}
+
+	// 로그인 모달 이벤트 리스너
+	const loginTriggerBtn = document.getElementById('loginTriggerBtn');
+	const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+	const loginCloseBtn = document.getElementById('loginCloseBtn');
+	const logoutSubmitBtn = document.getElementById('logoutSubmitBtn');
+	const logoutCloseBtn = document.getElementById('logoutCloseBtn');
+	const profileLoginModal = document.getElementById('profileLoginModal');
+
+	if (loginTriggerBtn) loginTriggerBtn.addEventListener('click', openLoginModal);
+	if (loginSubmitBtn) loginSubmitBtn.addEventListener('click', handleLoginSubmit);
+	if (loginCloseBtn) loginCloseBtn.addEventListener('click', closeLoginModal);
+	if (logoutSubmitBtn) logoutSubmitBtn.addEventListener('click', handleLogout);
+	if (logoutCloseBtn) logoutCloseBtn.addEventListener('click', closeLoginModal);
+	if (profileLoginModal) {
+		profileLoginModal.querySelector('.login-modal-overlay').addEventListener('click', closeLoginModal);
+	}
+
+	const loginPwInput = document.getElementById('loginPwInput');
+	if (loginPwInput) {
+		loginPwInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') handleLoginSubmit();
+		});
+	}
+	const loginIdInput = document.getElementById('loginIdInput');
+	if (loginIdInput) {
+		loginIdInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				const pw = document.getElementById('loginPwInput');
+				if (pw) pw.focus();
+			}
+		});
+	}
+
+	// 프로필 생성 모달 이벤트 리스너
+	const signupTriggerBtn = document.getElementById('signupTriggerBtn');
+	const signupSubmitBtn = document.getElementById('signupSubmitBtn');
+	const signupCloseBtn = document.getElementById('signupCloseBtn');
+	const profileSignupModal = document.getElementById('profileSignupModal');
+
+	if (signupTriggerBtn) signupTriggerBtn.addEventListener('click', openSignupModal);
+	if (signupSubmitBtn) signupSubmitBtn.addEventListener('click', handleSignupSubmit);
+	if (signupCloseBtn) signupCloseBtn.addEventListener('click', closeSignupModal);
+	if (profileSignupModal) {
+		profileSignupModal.querySelector('.login-modal-overlay').addEventListener('click', closeSignupModal);
+	}
+
+	const signupIdInput = document.getElementById('signupIdInput');
+	if (signupIdInput) {
+		signupIdInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') { const pw = document.getElementById('signupPwInput'); if (pw) pw.focus(); }
+		});
+	}
+	const signupPwInput = document.getElementById('signupPwInput');
+	if (signupPwInput) {
+		signupPwInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') { const pc = document.getElementById('signupPwConfirmInput'); if (pc) pc.focus(); }
+		});
+	}
+	const signupPwConfirmInput = document.getElementById('signupPwConfirmInput');
+	if (signupPwConfirmInput) {
+		signupPwConfirmInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') handleSignupSubmit();
+		});
+	}
+
+	// 비밀번호 변경 / 직접 로그아웃 버튼
+	const passwordChangeTriggerBtn = document.getElementById('passwordChangeTriggerBtn');
+	const logoutDirectBtn = document.getElementById('logoutDirectBtn');
+	if (passwordChangeTriggerBtn) passwordChangeTriggerBtn.addEventListener('click', openPasswordChangeModal);
+	if (logoutDirectBtn) logoutDirectBtn.addEventListener('click', handleLogout);
+
+	const pwChangeSubmitBtn = document.getElementById('pwChangeSubmitBtn');
+	const pwChangeCancelBtn = document.getElementById('pwChangeCancelBtn');
+	const passwordChangeModal = document.getElementById('passwordChangeModal');
+	if (pwChangeSubmitBtn) pwChangeSubmitBtn.addEventListener('click', handlePasswordChangeSubmit);
+	if (pwChangeCancelBtn) pwChangeCancelBtn.addEventListener('click', closePasswordChangeModal);
+	if (passwordChangeModal) {
+		passwordChangeModal.querySelector('.login-modal-overlay').addEventListener('click', closePasswordChangeModal);
+	}
+
+	const profileDeleteTriggerBtn = document.getElementById('profileDeleteTriggerBtn');
+	const profileDeleteConfirmBtn = document.getElementById('profileDeleteConfirmBtn');
+	const profileDeleteCancelBtn = document.getElementById('profileDeleteCancelBtn');
+	if (profileDeleteTriggerBtn) profileDeleteTriggerBtn.addEventListener('click', showDeleteConfirmSection);
+	if (profileDeleteConfirmBtn) profileDeleteConfirmBtn.addEventListener('click', handleProfileDelete);
+	if (profileDeleteCancelBtn) profileDeleteCancelBtn.addEventListener('click', hideDeleteConfirmSection);
+
+	const deleteConfirmPwInput = document.getElementById('deleteConfirmPwInput');
+	if (deleteConfirmPwInput) {
+		deleteConfirmPwInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') handleProfileDelete();
+		});
+	}
+
+	const pwChangeCurInput = document.getElementById('pwChangeCurrentInput');
+	const pwChangeNewInput = document.getElementById('pwChangeNewInput');
+	const pwChangeConfirmInput = document.getElementById('pwChangeConfirmInput');
+	if (pwChangeCurInput) {
+		pwChangeCurInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') { if (pwChangeNewInput) pwChangeNewInput.focus(); }
+		});
+	}
+	if (pwChangeNewInput) {
+		pwChangeNewInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') { if (pwChangeConfirmInput) pwChangeConfirmInput.focus(); }
+		});
+	}
+	if (pwChangeConfirmInput) {
+		pwChangeConfirmInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') handlePasswordChangeSubmit();
+		});
+	}
+
+	// 초기 로그인 상태 UI 반영 (세션에 로그인 정보 있으면 표시)
+	updateLoginUI();
+
+	// 자동 로그인 시도 (세션이 없을 때만)
+	if (!currentProfileKey) {
+		tryAutoLogin();
 	}
 
 	// 개발자 도구가 열려있으면 cmd 콘솔 자동으로 열기
@@ -804,29 +968,25 @@ function handleDuplicateCancel() {
 	elements.nameInput.focus();
 }
 
+let _profileAutoSaveTimer = null;
+
 // localStorage에 저장
 function saveToLocalStorage() {
+	if (_readOnlyMode) return;
 	try {
-		// key 모드에서는 자동 저장하지 않음 (save 명령으로만 저장)
-		if (currentProfileKey) return;
-
-		if (!database && !initFirebase()) return;
-		if (!currentUserCode) return;
-
 		const data = {
 			people: state.people,
-			inactivePeople: state.inactivePeople, // 미참가자 목록 저장
+			inactivePeople: state.inactivePeople,
 			requiredGroups: state.requiredGroups,
 			nextId: state.nextId,
 			forbiddenPairs: state.forbiddenPairs,
 			pendingConstraints: state.pendingConstraints,
-			reservations: state.reservations, // 예약 목록 저장
+			reservations: state.reservations,
 			hiddenGroups: state.hiddenGroups,
 			hiddenGroupChains: state.hiddenGroupChains,
 			pendingHiddenGroups: state.pendingHiddenGroups,
 			pendingHiddenGroupChains: state.pendingHiddenGroupChains,
 			probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
-			// 설정 값 저장
 			maxTeamSizeEnabled: state.maxTeamSizeEnabled,
 			genderBalanceEnabled: state.genderBalanceEnabled,
 			weightBalanceEnabled: state.weightBalanceEnabled,
@@ -835,127 +995,27 @@ function saveToLocalStorage() {
 			lastAccess: getCurrentDbTimestamp()
 		};
 
-		const userRef = database.ref(`users/${currentUserCode}`);
-		userRef.once('value')
-			.then((snapshot) => {
-				const existing = snapshot.val() || {};
-				const payload = {
-					...data,
-					createdAt: existing.createdAt || getCurrentDbTimestamp()
-				};
-				return userRef.update(payload);
-			})
-			.catch((e) => {
-				console.error('자동 저장 실패:', e);
-			});
+		// 프로필 로그인 상태 — Firebase 프로필에 자동 저장 (debounce 1초)
+		if (currentProfileKey) {
+			if (!database) return;
+			clearTimeout(_profileAutoSaveTimer);
+			_profileAutoSaveTimer = setTimeout(() => {
+				database.ref(`profiles/${currentProfileKey}`).update(data)
+					.catch((e) => { console.error('프로필 자동 저장 실패:', e); });
+			}, 1000);
+			return;
+		}
+
+		// 비프로필 유저 — 저장하지 않음 (새로고침 시 빈 화면)
 	} catch (e) {
 		console.error('자동 저장 실패:', e);
 	}
 }
 
-// localStorage에서 복원
+// localStorage에서 복원 — 현재는 비프로필 저장 없으므로 사용하지 않음
 function loadFromLocalStorage() {
-
-	try {
-		// key 모드에서는 자동 복원을 사용하지 않음
-		if (currentProfileKey) return;
-
-		if (!database && !initFirebase()) return;
-		if (!currentUserCode) return;
-
-		database.ref(`users/${currentUserCode}`).once('value')
-			.then((snapshot) => {
-				const data = snapshot.val();
-				if (!data) return;
-
-				const normalizeReservations = (value) => {
-					const toRow = (item) => {
-						if (Array.isArray(item)) {
-							return item.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
-						}
-						if (typeof item === 'string') {
-							return item.split(',').map((name) => name.trim()).filter((name) => name.length > 0);
-						}
-						return [];
-					};
-					if (Array.isArray(value)) {
-						return value.map(toRow).filter((row) => row.length > 0);
-					}
-					if (value && typeof value === 'object') {
-						return Object.values(value).map(toRow).filter((row) => row.length > 0);
-					}
-					return [];
-				};
-
-				// cmd 콘솔에도 출력
-				setTimeout(() => {
-					if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-						commandConsole.log(`✅ 자동 데이터 복원: 참가자 ${data.people?.length || 0}명`);
-					}
-				}, 200);
-
-				state.people = data.people || [];
-				state.inactivePeople = data.inactivePeople || []; // 미참가자 목록 복원
-				// 참가자 목록을 이름순으로 정렬
-				state.people.sort((a, b) => a.name.localeCompare(b.name));
-				// 그룹 내부를 가나다순으로 정렬하여 복원
-				state.requiredGroups = (data.requiredGroups || []).map(group => {
-					return [...group].sort((a, b) => {
-						const pa = state.people.find(p => p.id === a);
-						const pb = state.people.find(p => p.id === b);
-						if (!pa || !pb) return 0;
-						return pa.name.localeCompare(pb.name, 'ko');
-					});
-				});
-				state.nextId = data.nextId || 1;
-				state.forbiddenPairs = data.forbiddenPairs || [];
-				state.pendingConstraints = data.pendingConstraints || [];
-				state.reservations = normalizeReservations(data.reservations); // 예약 목록 복원
-				state.hiddenGroups = data.hiddenGroups || [];
-				state.pendingHiddenGroups = data.pendingHiddenGroups || [];
-				state.hiddenGroupChains = data.hiddenGroupChains || [];
-				state.pendingHiddenGroupChains = data.pendingHiddenGroupChains || [];
-				state.probabilisticForbiddenPairs = data.probabilisticForbiddenPairs || [];
-				state.activeProbabilisticForbiddenPairs = [];
-
-				// 설정 값 복원
-				if (typeof data.maxTeamSizeEnabled !== 'undefined') {
-					state.maxTeamSizeEnabled = data.maxTeamSizeEnabled;
-					elements.maxTeamSizeCheckbox.checked = data.maxTeamSizeEnabled;
-				}
-				if (typeof data.genderBalanceEnabled !== 'undefined') {
-					state.genderBalanceEnabled = data.genderBalanceEnabled;
-					elements.genderBalanceCheckbox.checked = data.genderBalanceEnabled;
-				}
-				if (typeof data.weightBalanceEnabled !== 'undefined') {
-					state.weightBalanceEnabled = data.weightBalanceEnabled;
-					elements.weightBalanceCheckbox.checked = data.weightBalanceEnabled;
-				}
-				if (typeof data.membersPerTeam !== 'undefined') {
-					state.membersPerTeam = data.membersPerTeam;
-					elements.teamSizeInput.value = data.membersPerTeam;
-				}
-
-				// 복원된 데이터 기반으로 참가자 UI 재구성
-				buildForbiddenMap();
-				renderPeople();
-				tryResolvePendingConstraints();
-				tryResolveHiddenGroups();
-
-			})
-			.catch((e) => {
-				console.error('자동 데이터 복원 실패:', e);
-			});
-	} catch (e) {
-
-		// cmd 콘솔에도 출력
-		setTimeout(() => {
-			if (typeof commandConsole !== 'undefined' && commandConsole.error) {
-				commandConsole.error(commandConsoleMessages.comments.localStorageRestoreFailed + e.message);
-			}
-		}, 300);
-	}
-
+	// 비프로필: 새로고침 시 빈 화면 (저장 없음)
+	// 프로필: loginProfile 흐름에서 직접 로드
 }
 
 // 이름별 기본값 가져오기
@@ -2258,6 +2318,509 @@ function saveEditModal() {
 	renderPeople();
 }
 
+// ==================== 프로필 로그인 모달 ====================
+function updateLoginUI() {
+	const loginBtn = document.getElementById('loginTriggerBtn');
+	const signupBtn = document.getElementById('signupTriggerBtn');
+	const pwChangeBtn = document.getElementById('passwordChangeTriggerBtn');
+	const logoutDirectBtn = document.getElementById('logoutDirectBtn');
+	const statusText = document.getElementById('loginStatusText');
+
+	if (currentProfileKey) {
+		if (loginBtn) loginBtn.style.display = 'none';
+		if (signupBtn) signupBtn.style.display = 'none';
+		if (pwChangeBtn) pwChangeBtn.style.display = '';
+		if (logoutDirectBtn) logoutDirectBtn.style.display = '';
+		if (statusText) {
+			statusText.textContent = `${currentProfileKey}님 환영합니다.`;
+			statusText.classList.add('logged-in');
+		}
+	} else {
+		if (loginBtn) { loginBtn.style.display = ''; loginBtn.textContent = '로그인'; loginBtn.classList.remove('logged-in'); }
+		if (signupBtn) signupBtn.style.display = '';
+		if (pwChangeBtn) pwChangeBtn.style.display = 'none';
+		if (logoutDirectBtn) logoutDirectBtn.style.display = 'none';
+		if (statusText) {
+			statusText.textContent = '';
+			statusText.classList.remove('logged-in');
+		}
+	}
+}
+
+function openLoginModal() {
+	const modal = document.getElementById('profileLoginModal');
+	if (!modal) return;
+	const loginSection = document.getElementById('loginFormSection');
+	const logoutSection = document.getElementById('logoutFormSection');
+	const errorEl = document.getElementById('loginErrorText');
+	const idInput = document.getElementById('loginIdInput');
+	const pwInput = document.getElementById('loginPwInput');
+	if (errorEl) errorEl.textContent = '';
+	if (idInput) idInput.value = '';
+	if (pwInput) pwInput.value = '';
+
+	if (currentProfileKey) {
+		const nameEl = document.getElementById('loggedInUsernameText');
+		if (nameEl) nameEl.textContent = currentProfileKey;
+		if (loginSection) loginSection.style.display = 'none';
+		if (logoutSection) logoutSection.style.display = '';
+	} else {
+		if (loginSection) loginSection.style.display = '';
+		if (logoutSection) logoutSection.style.display = 'none';
+	}
+
+	modal.style.display = 'flex';
+	requestAnimationFrame(() => {
+		modal.classList.add('visible');
+		if (!currentProfileKey && idInput) idInput.focus();
+	});
+}
+
+function closeLoginModal() {
+	const modal = document.getElementById('profileLoginModal');
+	if (!modal) return;
+	modal.classList.remove('visible');
+	setTimeout(() => { modal.style.display = 'none'; }, 250);
+}
+
+// ==================== 프로필 생성 모달 ====================
+function openSignupModal() {
+	const modal = document.getElementById('profileSignupModal');
+	if (!modal) return;
+	const idInput = document.getElementById('signupIdInput');
+	const pwInput = document.getElementById('signupPwInput');
+	const pwConfirmInput = document.getElementById('signupPwConfirmInput');
+	const errorEl = document.getElementById('signupErrorText');
+	if (idInput) idInput.value = '';
+	if (pwInput) pwInput.value = '';
+	if (pwConfirmInput) pwConfirmInput.value = '';
+	if (errorEl) errorEl.textContent = '';
+	modal.style.display = 'flex';
+	requestAnimationFrame(() => {
+		modal.classList.add('visible');
+		if (idInput) idInput.focus();
+	});
+}
+
+function closeSignupModal() {
+	const modal = document.getElementById('profileSignupModal');
+	if (!modal) return;
+	modal.classList.remove('visible');
+	setTimeout(() => { modal.style.display = 'none'; }, 250);
+}
+
+// ==================== 정보 변경 모달 ====================
+function openPasswordChangeModal() {
+	const modal = document.getElementById('passwordChangeModal');
+	if (!modal) return;
+	hideDeleteConfirmSection();
+	['pwChangeCurrentInput', 'pwChangeNewInput', 'pwChangeConfirmInput'].forEach((id) => {
+		const el = document.getElementById(id);
+		if (el) el.value = '';
+	});
+	const errorEl = document.getElementById('pwChangeErrorText');
+	if (errorEl) errorEl.textContent = '';
+	modal.style.display = 'flex';
+	requestAnimationFrame(() => {
+		modal.classList.add('visible');
+		const cur = document.getElementById('pwChangeCurrentInput');
+		if (cur) cur.focus();
+	});
+}
+
+function closePasswordChangeModal() {
+	const modal = document.getElementById('passwordChangeModal');
+	if (!modal) return;
+	modal.classList.remove('visible');
+	setTimeout(() => { modal.style.display = 'none'; }, 250);
+}
+
+function showDeleteConfirmSection() {
+	const normalSection = document.getElementById('pwChangeSectionNormal');
+	const deleteSection = document.getElementById('pwChangeDeleteConfirmSection');
+	if (normalSection) normalSection.style.display = 'none';
+	if (deleteSection) deleteSection.style.display = '';
+	const errEl = document.getElementById('pwChangeDeleteErrorText');
+	if (errEl) errEl.textContent = '';
+	const pwInput = document.getElementById('deleteConfirmPwInput');
+	if (pwInput) { pwInput.value = ''; pwInput.focus(); }
+}
+
+function hideDeleteConfirmSection() {
+	const normalSection = document.getElementById('pwChangeSectionNormal');
+	const deleteSection = document.getElementById('pwChangeDeleteConfirmSection');
+	if (normalSection) normalSection.style.display = '';
+	if (deleteSection) deleteSection.style.display = 'none';
+	const pwInput = document.getElementById('deleteConfirmPwInput');
+	if (pwInput) pwInput.value = '';
+	const errEl = document.getElementById('pwChangeDeleteErrorText');
+	if (errEl) errEl.textContent = '';
+}
+
+async function handleProfileDelete() {
+	if (!currentProfileKey || !database) return;
+	const errorEl = document.getElementById('pwChangeDeleteErrorText');
+	const deleteBtn = document.getElementById('profileDeleteConfirmBtn');
+	const pwInput = document.getElementById('deleteConfirmPwInput');
+
+	const enteredPw = pwInput ? pwInput.value : '';
+	if (!enteredPw) {
+		if (errorEl) errorEl.textContent = '현재 비밀번호를 입력하세요.';
+		if (pwInput) pwInput.focus();
+		return;
+	}
+
+	// 현재 비밀번호 검증
+	let storedPw = '';
+	try {
+		const snap = await database.ref(`profiles/${currentProfileKey}/password`).once('value');
+		storedPw = String(snap.val() || '');
+	} catch (_) {}
+	if (storedPw !== enteredPw) {
+		if (errorEl) errorEl.textContent = '비밀번호가 올바르지 않습니다.';
+		if (pwInput) { pwInput.value = ''; pwInput.focus(); }
+		return;
+	}
+
+	if (deleteBtn) { deleteBtn.disabled = true; deleteBtn.textContent = '삭제 중...'; }
+	try {
+		const username = currentProfileKey;
+		await database.ref(`profiles/${username}`).update({
+			password: null,
+			deleted: true,
+			deletedAt: new Date().toISOString(),
+			_label: `${username} (deleted)`
+		});
+		logoutProfile();
+		updateLoginUI();
+		closePasswordChangeModal();
+	} catch (_) {
+		if (errorEl) errorEl.textContent = '삭제에 실패했습니다.';
+		if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.textContent = '삭제'; }
+	}
+}
+
+async function handlePasswordChangeSubmit() {
+	const currentPw = document.getElementById('pwChangeCurrentInput');
+	const newPw = document.getElementById('pwChangeNewInput');
+	const confirmPw = document.getElementById('pwChangeConfirmInput');
+	const errorEl = document.getElementById('pwChangeErrorText');
+	if (errorEl) errorEl.textContent = '';
+
+	const current = currentPw ? currentPw.value : '';
+	const next = newPw ? newPw.value : '';
+	const confirm = confirmPw ? confirmPw.value : '';
+
+	if (!current) { if (errorEl) errorEl.textContent = '현재 비밀번호를 입력하세요.'; if (currentPw) currentPw.focus(); return; }
+	if (!next) { if (errorEl) errorEl.textContent = '새 비밀번호를 입력하세요.'; if (newPw) newPw.focus(); return; }
+	if (next !== confirm) { if (errorEl) errorEl.textContent = '새 비밀번호가 일치하지 않습니다.'; if (confirmPw) { confirmPw.value = ''; confirmPw.focus(); } return; }
+	if (!currentProfileKey || !database) { if (errorEl) errorEl.textContent = '로그인 상태가 아닙니다.'; return; }
+
+	// 현재 비밀번호 검증
+	let storedPw = '';
+	try {
+		const snap = await database.ref(`profiles/${currentProfileKey}/password`).once('value');
+		storedPw = String(snap.val() || '');
+	} catch (_) {}
+	if (storedPw !== current) {
+		if (errorEl) errorEl.textContent = '현재 비밀번호가 올바르지 않습니다.';
+		if (currentPw) { currentPw.value = ''; currentPw.focus(); }
+		return;
+	}
+
+	const submitBtn = document.getElementById('pwChangeSubmitBtn');
+	if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '변경 중...'; }
+	try {
+		await database.ref(`profiles/${currentProfileKey}/password`).set(next);
+		authenticatedPassword = next;
+		if (commandConsole) commandConsole.storedPassword = next;
+	} catch (_) {
+		if (errorEl) errorEl.textContent = '비밀번호 변경에 실패했습니다.';
+		if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '변경'; }
+		return;
+	}
+	if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '변경'; }
+	closePasswordChangeModal();
+}
+
+function buildProfileStatePayload() {
+	return {
+		people: state.people,
+		inactivePeople: state.inactivePeople,
+		requiredGroups: state.requiredGroups,
+		nextId: state.nextId,
+		forbiddenPairs: state.forbiddenPairs,
+		pendingConstraints: state.pendingConstraints,
+		reservations: state.reservations,
+		hiddenGroups: state.hiddenGroups,
+		hiddenGroupChains: state.hiddenGroupChains,
+		pendingHiddenGroups: state.pendingHiddenGroups,
+		pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+		probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
+		maxTeamSizeEnabled: state.maxTeamSizeEnabled,
+		genderBalanceEnabled: state.genderBalanceEnabled,
+		weightBalanceEnabled: state.weightBalanceEnabled,
+		membersPerTeam: state.membersPerTeam
+	};
+}
+
+async function handleSignupSubmit() {
+	const idInput = document.getElementById('signupIdInput');
+	const pwInput = document.getElementById('signupPwInput');
+	const pwConfirmInput = document.getElementById('signupPwConfirmInput');
+	const errorEl = document.getElementById('signupErrorText');
+	const username = (idInput ? idInput.value : '').trim();
+	const password = pwInput ? pwInput.value : '';
+	const passwordConfirm = pwConfirmInput ? pwConfirmInput.value : '';
+	if (errorEl) errorEl.textContent = '';
+
+	if (!username) {
+		if (errorEl) errorEl.textContent = '아이디를 입력하세요.';
+		if (idInput) idInput.focus();
+		return;
+	}
+	if (!password) {
+		if (errorEl) errorEl.textContent = '비밀번호를 입력하세요.';
+		if (pwInput) pwInput.focus();
+		return;
+	}
+	if (password !== passwordConfirm) {
+		if (errorEl) errorEl.textContent = '비밀번호가 일치하지 않습니다.';
+		if (pwConfirmInput) { pwConfirmInput.value = ''; pwConfirmInput.focus(); }
+		return;
+	}
+
+	if (!database) {
+		if (typeof initFirebase === 'function') initFirebase();
+	}
+	if (!database) {
+		if (errorEl) errorEl.textContent = 'Firebase에 연결할 수 없습니다.';
+		return;
+	}
+
+	const submitBtn = document.getElementById('signupSubmitBtn');
+	if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '처리 중...'; }
+
+	// 중복 아이디 확인
+	let alreadyExists = false;
+	try {
+		const snap = await database.ref(`profiles/${username}`).once('value');
+		alreadyExists = snap.exists();
+	} catch (_) {}
+
+	if (alreadyExists) {
+		if (errorEl) errorEl.textContent = '이미 사용 중인 아이디입니다.';
+		if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '확인'; }
+		if (idInput) idInput.focus();
+		return;
+	}
+
+	// 프로필 생성 — 빈 상태로만 저장 (현재 화면 상태 포함 안 함)
+	const now = (typeof getCurrentDbTimestamp === 'function') ? getCurrentDbTimestamp() : new Date().toISOString();
+	const token = (typeof generateCode === 'function') ? generateCode(12) : Math.random().toString(36).slice(2, 14).toUpperCase();
+	const profileData = {
+		password,
+		token,
+		createdAt: now,
+		timestamp: now
+	};
+
+	try {
+		await database.ref(`profiles/${username}`).set(profileData);
+		await database.ref(`profileTokens/${token}`).set(username);
+	} catch (e) {
+		if (errorEl) errorEl.textContent = '프로필 생성에 실패했습니다.';
+		if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '확인'; }
+		return;
+	}
+
+	if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '확인'; }
+
+	// 자동 로그인
+	setSessionProfile(username);
+	currentProfileKey = username;
+	setCurrentProfileSource('profiles');
+	authenticatedPassword = password;
+	commandConsole.authenticated = true;
+	commandConsole.storedPassword = password;
+	syncEnabled = true;
+
+	// 화면을 빈 상태로 초기화 (auto-save 타이머 취소 후)
+	clearTimeout(_profileAutoSaveTimer);
+	clearState();
+
+	initFirebase();
+	syncListenerAttached = false;
+	setupRealtimeSync();
+
+	const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+	if (profileKeyDisplay) {
+		profileKeyDisplay.textContent = `🔑 ${currentProfileKey}`;
+		profileKeyDisplay.classList.add('authenticated');
+	}
+
+	updateLoginUI();
+	closeSignupModal();
+}
+
+async function handleLoginSubmit() {
+	const idInput = document.getElementById('loginIdInput');
+	const pwInput = document.getElementById('loginPwInput');
+	const errorEl = document.getElementById('loginErrorText');
+	const username = (idInput ? idInput.value : '').trim();
+	const password = pwInput ? pwInput.value : '';
+	if (errorEl) errorEl.textContent = '';
+
+	if (!username) {
+		if (errorEl) errorEl.textContent = '아이디를 입력하세요.';
+		if (idInput) idInput.focus();
+		return;
+	}
+	if (!password) {
+		if (errorEl) errorEl.textContent = '비밀번호를 입력하세요.';
+		if (pwInput) pwInput.focus();
+		return;
+	}
+
+	if (!database) {
+		if (typeof initFirebase === 'function') initFirebase();
+	}
+	if (!database) {
+		if (errorEl) errorEl.textContent = 'Firebase에 연결할 수 없습니다.';
+		return;
+	}
+
+	const submitBtn = document.getElementById('loginSubmitBtn');
+	if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '확인 중...'; }
+
+	const result = await loginProfile(username, password);
+
+	if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '로그인'; }
+
+	if (!result.ok) {
+		if (errorEl) errorEl.textContent = result.error || '로그인에 실패했습니다.';
+		if (pwInput) { pwInput.value = ''; pwInput.focus(); }
+		return;
+	}
+
+	// 자동 로그인 설정 저장/해제
+	const autoLoginCheckbox = document.getElementById('autoLoginCheckbox');
+	if (autoLoginCheckbox && autoLoginCheckbox.checked) {
+		try { localStorage.setItem('profileAutoLogin', JSON.stringify({ username, password })); } catch (_) {}
+	} else {
+		try { localStorage.removeItem('profileAutoLogin'); } catch (_) {}
+	}
+
+	// 로그인 성공
+	exitReadOnlyMode();
+	commandConsole.authenticated = true;
+	commandConsole.storedPassword = password;
+	syncEnabled = true;
+
+	// 프로필 토큰 자동 생성 (없을 경우)
+	if (typeof ensureProfileToken === 'function') ensureProfileToken(currentProfileKey);
+	if (typeof setOnlinePresence === 'function') setOnlinePresence();
+
+	// Firebase 초기화 후 데이터 로드
+	initFirebase();
+	resolveProfileRecord(currentProfileKey)
+		.then((res) => {
+			clearTimeout(_profileAutoSaveTimer);
+			if (res.data) {
+				loadStateFromData(res.data);
+			} else {
+				clearState();
+			}
+			syncListenerAttached = false;
+			setupRealtimeSync();
+		})
+		.catch(() => {
+			clearTimeout(_profileAutoSaveTimer);
+			clearState();
+		});
+
+	// profileKeyDisplay 업데이트
+	const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+	if (profileKeyDisplay) {
+		profileKeyDisplay.textContent = `🔑 ${currentProfileKey}`;
+		profileKeyDisplay.classList.add('authenticated');
+	}
+
+	updateLoginUI();
+	closeLoginModal();
+}
+
+function handleLogout() {
+	try { localStorage.removeItem('profileAutoLogin'); } catch (_) {}
+	if (typeof clearOnlinePresence === 'function') clearOnlinePresence();
+	if (typeof logoutProfile === 'function') logoutProfile();
+	// 로그아웃 후 익명 유저로 users online 유지
+	if (typeof setOnlinePresence === 'function') setOnlinePresence();
+	commandConsole.authenticated = false;
+	commandConsole.storedPassword = null;
+
+	const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+	if (profileKeyDisplay) {
+		profileKeyDisplay.textContent = '';
+		profileKeyDisplay.classList.remove('authenticated');
+	}
+
+	clearState();
+	exitReadOnlyMode();
+	renderPeople();
+	updateLoginUI();
+	closeLoginModal();
+}
+
+async function tryAutoLogin() {
+	let saved = null;
+	try { saved = JSON.parse(localStorage.getItem('profileAutoLogin') || 'null'); } catch (_) {}
+	if (!saved || !saved.username || !saved.password) return;
+
+	if (!database && typeof initFirebase === 'function') initFirebase();
+	if (!database) return;
+
+	const result = await loginProfile(saved.username, saved.password);
+	if (!result.ok) {
+		// 저장된 자격증명이 유효하지 않으면 삭제
+		try { localStorage.removeItem('profileAutoLogin'); } catch (_) {}
+		return;
+	}
+
+	exitReadOnlyMode();
+	commandConsole.authenticated = true;
+	commandConsole.storedPassword = saved.password;
+	syncEnabled = true;
+
+	if (typeof ensureProfileToken === 'function') ensureProfileToken(currentProfileKey);
+	if (typeof setOnlinePresence === 'function') setOnlinePresence();
+
+	initFirebase();
+	resolveProfileRecord(currentProfileKey)
+		.then((res) => {
+			clearTimeout(_profileAutoSaveTimer);
+			if (res.data) {
+				loadStateFromData(res.data);
+			} else {
+				clearState();
+			}
+			syncListenerAttached = false;
+			setupRealtimeSync();
+		})
+		.catch(() => {
+			clearTimeout(_profileAutoSaveTimer);
+			clearState();
+		});
+
+	const profileKeyDisplay = document.getElementById('profileKeyDisplay');
+	if (profileKeyDisplay) {
+		profileKeyDisplay.textContent = `🔑 ${currentProfileKey}`;
+		profileKeyDisplay.classList.add('authenticated');
+	}
+
+	updateLoginUI();
+}
+
 // --- 제약 및 이름 정규화 관련 헬퍼 함수들 ---
 function normalizeName(name) {
 	// 괄호 패턴 제거: 이름(남100) -> 이름
@@ -3116,7 +3679,7 @@ function openForbiddenWindow() {
 					<div id="showWarn" class="warn">${commandConsoleMessages.comments.showButtonWarning}</div>
 				</div>
 			</div>
-			<section class="add-form"><input id="addConstraintInput" placeholder="${commandConsoleMessages.comments.constraintInputPlaceholder}"><button id="addConstraintBtn">+</button></section>
+			<section class="add-form"><input id="addConstraintInputA" placeholder="참가자 A"><input id="addConstraintInputB" placeholder="참가자 B"><button id="addConstraintBtn">분리하기</button></section>
 			<section id="appliedSection" style="display:none"><h2>${commandConsoleMessages.comments.appliedConstraints}</h2><div id="appliedList"></div></section>
 			<section id="pendingSection" style="display:none"><h2>${commandConsoleMessages.comments.pendingConstraints}</h2><div id="pendingList"></div></section>
 			<script>
@@ -3127,7 +3690,8 @@ function openForbiddenWindow() {
 						return;
 					}
 					const addBtn = document.getElementById('addConstraintBtn');
-					const input = document.getElementById('addConstraintInput');
+					const inputA = document.getElementById('addConstraintInputA');
+					const inputB = document.getElementById('addConstraintInputB');
 					const showBtn = document.getElementById('showBtn');
 					const modal = document.getElementById('initialModal');
 					const showWarn = document.getElementById('showWarn');
@@ -3143,35 +3707,21 @@ function openForbiddenWindow() {
 							}
 						}
 					} catch (_) { /* fallback to defaults */ }
-					// 로컬 구분 없이 부모의 blindDelay만 사용
 					function refresh(){ try { if (parentWindow && parentWindow.renderForbiddenWindowContent) parentWindow.renderForbiddenWindowContent(); } catch(e){ console.log(e); } }
 					addBtn.addEventListener('click', ()=>{
-						const v = input.value.trim(); if (!v) return; input.value='';
+						const ln = inputA.value.trim();
+						const rn = inputB.value.trim();
+						if (!ln || !rn) return;
+						inputA.value = '';
+						inputB.value = '';
 						try {
-							const parts = v.split(',').map(s=>s.trim()).filter(Boolean);
-							parts.forEach(part=>{
-								if (part.includes('!!')) {
-									const [L,R] = part.split('!!').map(s=>s.trim());
-									if (L && R) { try { parentWindow.removeForbiddenPairByNames(L,R); } catch(e){ console.log(e);} }
-								} else if (part.includes('!')) {
-									const names = part.split('!').map(s=>s.trim()).filter(Boolean);
-									for (let i=0;i<names.length;i++) {
-										for (let j=i+1;j<names.length;j++) {
-											const ln = names[i];
-											const rn = names[j];
-											if (!ln || !rn) continue;
-											try {
-												const res = parentWindow.addForbiddenPairByNames(ln,rn);
-												if (!res.ok) parentWindow.addPendingConstraint(ln,rn);
-											} catch(e){ console.log(e); }
-										}
-									}
-								}
-							});
+							const res = parentWindow.addForbiddenPairByNames(ln, rn);
+							if (!res.ok) parentWindow.addPendingConstraint(ln, rn);
 							refresh();
 						} catch(e){ console.log(commandConsoleMessages.comments.additionFailed, e); }
 					});
-					input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') addBtn.click(); });
+					inputA.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') inputB.focus(); });
+					inputB.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') addBtn.click(); });
 
 					// 초기화 버튼 이벤트
 					if (resetAllBtn) {
@@ -4820,7 +5370,9 @@ function logTeamResultsToConsole(teams) {
 // 팀 생성 이력 저장
 function saveGenerateHistory(teams) {
 	try {
-		if (!database || !currentUserCode) return;
+		if (_readOnlyMode) return;
+		if (!database) return;
+		if (!currentUserCode && !currentProfileKey) return;
 		if (!Array.isArray(teams) || teams.length === 0) return;
 
 		const buildAppliedReservationSnapshot = () => {
@@ -5023,7 +5575,7 @@ function saveGenerateHistory(teams) {
 		const timestamp = getCurrentDbTimestamp();
 		const historyData = {
 			createdAt: timestamp,
-			profile: currentProfileKey || '',
+			profile: currentProfileKey || `users/${currentUserCode}` || '',
 			teams: teams.map(team => team.map(person => {
 				const details = [];
 				if (state.genderBalanceEnabled && person.gender) {
@@ -5048,39 +5600,23 @@ function saveGenerateHistory(teams) {
 			historyData.appliedConstraints = constraintItems;
 		}
 
-		const toHistoryKeyTimestamp = () => {
-			const now = new Date();
-			const year = now.getFullYear();
-			const month = String(now.getMonth() + 1).padStart(2, '0');
-			const day = String(now.getDate()).padStart(2, '0');
-			const hour = String(now.getHours()).padStart(2, '0');
-			const minute = String(now.getMinutes()).padStart(2, '0');
-			const second = String(now.getSeconds()).padStart(2, '0');
-			return `${year}${month}${day}${hour}${minute}${second}`;
-		};
+		// 루트 레벨 generateHistory에 저장 (전체 기록)
+		database.ref('generateHistory').push(historyData)
+			.then(() => { console.log('generateHistory(global) 저장 완료'); })
+			.catch((error) => { console.error('generateHistory(global) 저장 실패:', error); });
 
-		const historyRootRef = database.ref(`users/${currentUserCode}/generateHistory`);
-		const baseHistoryKey = toHistoryKeyTimestamp();
+		// 프로필 로그인 상태면 profiles 히스토리에도 저장 (per-profile 기록)
+		if (currentProfileKey) {
+			database.ref(`profiles/${currentProfileKey}/generateHistory`).push(historyData)
+				.then(() => { console.log('generateHistory(profiles) 저장 완료'); })
+				.catch((error) => { console.error('generateHistory(profiles) 저장 실패:', error); });
+		}
 
-		const writeWithTimestampKey = (sequence = 0) => {
-			const entryKey = sequence === 0 ? baseHistoryKey : `${baseHistoryKey}_${sequence}`;
-			const entryRef = historyRootRef.child(entryKey);
-			return entryRef.once('value').then((snapshot) => {
-				if (snapshot.exists()) {
-					return writeWithTimestampKey(sequence + 1);
-				}
-				return entryRef.set(historyData);
-			});
-		};
+		// 비프로필 상태: 팀 생성 = 레코드 확정 (onDisconnect 취소 → 영구 보존)
+		if (!currentProfileKey && typeof confirmUserRecord === 'function') {
+			confirmUserRecord();
+		}
 
-		writeWithTimestampKey()
-			.then(() => null)
-			.catch((error) => {
-				console.error('generateHistory 저장 실패:', error);
-				if (typeof commandConsole !== 'undefined' && commandConsole.log) {
-					commandConsole.log(`❌ generateHistory 저장 실패: ${error.message || error}`);
-				}
-			});
 	} catch (error) {
 		console.error('generateHistory 저장 실패:', error);
 	}

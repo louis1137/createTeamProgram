@@ -33,149 +33,164 @@
 	</script>
 </head>
 <body>
+
 	<div class="container">
 		<header>
-			<h1>🎯 팀 생성 프로그램</h1>
+			<div class="header-login-area">
+				<span id="loginStatusText" class="login-status-text"></span>
+				<button id="loginTriggerBtn" class="style_btn login-trigger-btn">로그인</button>
+				<button id="signupTriggerBtn" class="style_btn signup-trigger-btn">프로필 생성</button>
+				<button id="passwordChangeTriggerBtn" class="style_btn pw-change-btn" style="display:none;">정보 변경</button>
+				<button id="logoutDirectBtn" class="style_btn logout-direct-btn" style="display:none;">로그아웃</button>
+			</div>
 		</header>
 
-		<section id="people" class="people-section">
-			<div class="section-header">
-				<h2>참가자 관리</h2>
-				<div class="tool">
-					<em><span class="participantCount">0</span>명 참여중</em>
-					<button id="shuffleOrderBtn" class="style_btn">순서섞기</button>
-					<button id="resetBtn" class="style_btn">초기화</button>
+		<main class="container">
+
+			<section class="top">
+				<h1>🎯 팀 생성 프로그램</h1>
+			</section>
+
+			<section id="people" class="people-section">
+				<div class="section-header">
+					<h2>참가자 관리</h2>
+					<div class="tool">
+						<em><span class="participantCount">0</span>명 참여중</em>
+						<button id="shuffleOrderBtn" class="style_btn">순서섞기</button>
+						<button id="resetBtn" class="style_btn">초기화</button>
+					</div>
 				</div>
-			</div>
-			<div id="peopleList" class="people-list"></div>
-			<div class="add-person-container">
-				<input type="text" id="nameInput" placeholder="같은 팀 희망 시 쉼표로 구분 후 입력 (예: 철수,영희)" class="name-input">
-				<button id="addPersonBtn" class="style_btn">+</button>
-			</div>
-			<div class="manage-separation-container">
-				<button id="manageSeparationBtn" class="style_btn">분리할 참가자 관리</button>
-			</div>
-		</section>
+				<div id="peopleList" class="people-list"></div>
+				<div class="add-person-container">
+					<input type="text" id="nameInput" placeholder="같은 팀 희망 시 쉼표로 구분 후 입력 (예: 철수,영희)" class="name-input">
+					<button id="addPersonBtn" class="style_btn">+</button>
+				</div>
+				<div class="manage-separation-container">
+					<button id="manageSeparationBtn" class="style_btn">분리할 참가자 관리</button>
+				</div>
+			</section>
 
-		<section id="options" class="options-section">
-			<div class="option">
-				<label>
-					<input type="checkbox" id="maxTeamSizeCheckbox">
-					최대인원으로 팀 생성
-				</label>
-			</div>
-			<div class="option">
-				<label>
-					<input type="checkbox" id="genderBalanceCheckbox">
-					성비 균등
-				</label>
-			</div>
-			<div class="option">
-				<label>
-					<input type="checkbox" id="weightBalanceCheckbox">
-					가중치 균등
-				</label>
-			</div>
-			<div class="option">
-				<label>
-					팀 인원수:
-					<input type="number" id="teamSizeInput" min="2" value="4">
-				</label>
-			</div>
-		</section>
+			<section id="options" class="options-section">
+				<div class="option">
+					<label>
+						<input type="checkbox" id="maxTeamSizeCheckbox">
+						최대인원으로 팀 생성
+					</label>
+				</div>
+				<div class="option">
+					<label>
+						<input type="checkbox" id="genderBalanceCheckbox">
+						성비 균등
+					</label>
+				</div>
+				<div class="option">
+					<label>
+						<input type="checkbox" id="weightBalanceCheckbox">
+						가중치 균등
+					</label>
+				</div>
+				<div class="option">
+					<label>
+						팀 인원수:
+						<input type="number" id="teamSizeInput" min="2" value="4">
+					</label>
+				</div>
+			</section>
 
-		<section id="action" class="action-section">
-			<button id="shuffleBtn" class="style_btn">팀 생성</button>
-		</section>
+			<section id="action" class="action-section">
+				<button id="shuffleBtn" class="style_btn">팀 생성</button>
+			</section>
 
-		<section id="faq" class="faq-section" aria-label="FAQ">
-			<h2>자주 묻는 질문 (FAQ)</h2>
-			<div class="faq">
-				<details>
-					<summary>팀섞기란 무엇인가요?</summary>
-					<p>팀섞기는 참가자들을 지정된 규칙(팀크기, 성비, 가중치 등)에 맞춰 무작위로 또는 균형 있게 나누는 도구입니다.</p>
-				</details>
-				<details>
-					<summary>성비 균등은 어떻게 동작하나요?</summary>
-					<p>성비 균등 체크 시 가능한 한 남/여 비율이 균형을 이루도록 팀을 배정합니다.<br>(참가자에 마우스 오버시 나오는 수정버튼을 사용해 수정 가능합니다.)</p>
-				</details>
-				<details>
-					<summary>가중치 균등은 무엇인가요?</summary>
-					<p>가중치 균등을 사용하면 각 참가자에게 부여한 점수를 고려해 팀의 총 가중치가 균형이 되도록 배정합니다.<br>(참가자에 마우스 오버시 나오는 수정버튼을 사용해 수정 가능합니다.)</p>
-				</details>
-				<details>
-					<summary>같은 팀을 하고 싶지 않은 사람은 어떻게 지정하나요?</summary>
-						<p>입력창에 <code>A!B</code> 또는 <code>A!B,C,D</code> 형식으로 입력해 제약을 추가합니다. <mark>제약을 추가하면 제약관리창이 자동으로 열려 현재 제약 목록을 보여줍니다. 팝업이 열리지 않으면 브라우저의 팝업 차단을 해제해야 합니다.</mark> A와 B 등 양쪽 모두 등록되어 있으면 즉시 적용(적용된 제약)되고, 등록되지 않은 인원이 포함되어 있으면 대기(보류 제약) 상태로 저장됩니다. 팝업 창에서 적용/대기 제약을 확인하고 직접 추가/제거할 수 있습니다. 제약 변경 내용은 개발자 도구(F12) 콘솔에 기록되며, 메인 UI에는 별도로 표시되지 않습니다.</p>
-				</details>
-				<details>
-					<summary>제약(금지 제약)을 해지하려면 어떻게 하나요?</summary>
-					<p>입력창에 <code>A!!B</code> 또는 <code>A!!B,C</code> 형식으로 입력하면 적용된 제약이나 보류 중인 제약을 해지합니다. 팝업 창에서도 각 제약 옆의 × 버튼으로 해지할 수 있습니다. 해지 결과는 개발자 도구(F12) 콘솔에 기록됩니다.</p>
-				</details>
-				<details>
-					<summary>사람을 등록하기 전, 제약을 먼저 추가할 수 있나요?</summary>
-						<p>네, 가능합니다. 등록되지 않은 이름에 대한 제약은 '대기중'으로 저장되며 해당 참가자가 등록되면 자동으로 적용됩니다.</p>
-				</details>
-				<details>
-					<summary>초기화하면 기피 설정은 어떻게 되나요?</summary>
-						<p>초기화 시 참가자는 삭제되지만 기존의 적용된 제약은 이름 기반의 '대기' 제약으로 변환되어 유지됩니다. 따라서 다시 동일한 사람들이 등록되면 제약이 복원됩니다.</p>
-				</details>
+			<section id="faq" class="faq-section" aria-label="FAQ">
+				<h2>자주 묻는 질문 (FAQ)</h2>
+				<div class="faq">
+					<details>
+						<summary>팀섞기란 무엇인가요?</summary>
+						<p>팀섞기는 참가자들을 지정된 규칙(팀크기, 성비, 가중치 등)에 맞춰 무작위로 또는 균형 있게 나누는 도구입니다.</p>
+					</details>
+					<details>
+						<summary>성비 균등은 어떻게 동작하나요?</summary>
+						<p>성비 균등 체크 시 가능한 한 남/여 비율이 균형을 이루도록 팀을 배정합니다.<br>(참가자에 마우스 오버시 나오는 수정버튼을 사용해 수정 가능합니다.)</p>
+					</details>
+					<details>
+						<summary>가중치 균등은 무엇인가요?</summary>
+						<p>가중치 균등을 사용하면 각 참가자에게 부여한 점수를 고려해 팀의 총 가중치가 균형이 되도록 배정합니다.<br>(참가자에 마우스 오버시 나오는 수정버튼을 사용해 수정 가능합니다.)</p>
+					</details>
+					<details>
+						<summary>같은 팀을 하고 싶지 않은 사람은 어떻게 지정하나요?</summary>
+							<p>입력창에 <code>A!B</code> 또는 <code>A!B,C,D</code> 형식으로 입력해 제약을 추가합니다. <mark>제약을 추가하면 제약관리창이 자동으로 열려 현재 제약 목록을 보여줍니다. 팝업이 열리지 않으면 브라우저의 팝업 차단을 해제해야 합니다.</mark> A와 B 등 양쪽 모두 등록되어 있으면 즉시 적용(적용된 제약)되고, 등록되지 않은 인원이 포함되어 있으면 대기(보류 제약) 상태로 저장됩니다. 팝업 창에서 적용/대기 제약을 확인하고 직접 추가/제거할 수 있습니다. 제약 변경 내용은 개발자 도구(F12) 콘솔에 기록되며, 메인 UI에는 별도로 표시되지 않습니다.</p>
+					</details>
+					<details>
+						<summary>제약(금지 제약)을 해지하려면 어떻게 하나요?</summary>
+						<p>입력창에 <code>A!!B</code> 또는 <code>A!!B,C</code> 형식으로 입력하면 적용된 제약이나 보류 중인 제약을 해지합니다. 팝업 창에서도 각 제약 옆의 × 버튼으로 해지할 수 있습니다. 해지 결과는 개발자 도구(F12) 콘솔에 기록됩니다.</p>
+					</details>
+					<details>
+						<summary>사람을 등록하기 전, 제약을 먼저 추가할 수 있나요?</summary>
+							<p>네, 가능합니다. 등록되지 않은 이름에 대한 제약은 '대기중'으로 저장되며 해당 참가자가 등록되면 자동으로 적용됩니다.</p>
+					</details>
+					<details>
+						<summary>초기화하면 기피 설정은 어떻게 되나요?</summary>
+							<p>초기화 시 참가자는 삭제되지만 기존의 적용된 제약은 이름 기반의 '대기' 제약으로 변환되어 유지됩니다. 따라서 다시 동일한 사람들이 등록되면 제약이 복원됩니다.</p>
+					</details>
+				</div>
+				<script type="application/ld+json">
+				{
+					"@context": "https://schema.org",
+					"@type": "FAQPage",
+					"mainEntity": [
+						{
+							"@type": "Question",
+							"name": "팀섞기란 무엇인가요?",
+							"acceptedAnswer": { "@type": "Answer", "text": "팀섞기는 참가자들을 지정된 규칙(팀크기, 성비, 가중치 등)에 맞춰 무작위로 또는 균형 있게 나누는 도구입니다." }
+						},
+						{
+							"@type": "Question",
+							"name": "성비 균등은 어떻게 동작하나요?",
+							"acceptedAnswer": { "@type": "Answer", "text": "성비 균등 체크 시 가능한 한 남/여 비율이 균형을 이루도록 팀을 배정합니다. 성별은 참가자의 성별 아이콘을 클릭해 변경할 수 있습니다." }
+						},
+						{
+							"@type": "Question",
+							"name": "가중치 균등은 무엇인가요?",
+							"acceptedAnswer": { "@type": "Answer", "text": "가중치 균등을 사용하면 각 참가자에게 부여한 점수를 고려해 팀의 총 가중치가 균형이 되도록 배정합니다." }
+						},
+						{
+							"@type": "Question",
+							"name": "같은 팀을 하고 싶지 않은 사람은 어떻게 지정하나요?",
+							"acceptedAnswer": { "@type": "Answer", "text": "입력창에 'A!B' 또는 'A!B,C,D' 형식으로 입력합니다. '!'로 제약을 추가하면 별도 팝업 창(600×700)이 자동으로 열려 현재 제약 목록을 보여줍니다. 팝업이 열리지 않으면 브라우저의 팝업 차단을 해제해 주세요. 등록된 참가자 간에는 즉시 적용되며, 미등록 참가자가 포함된 경우에는 '대기' 상태로 저장되어 해당 참가자가 등록되면 자동으로 적용됩니다. 팝업에서 제약을 관리할 수 있으며, 제약 변경은 개발자 도구 콘솔에 기록됩니다." }
+						},
+						{
+							"@type": "Question",
+							"name": "제약(금지 제약)을 해지하려면 어떻게 하나요?",
+							"acceptedAnswer": { "@type": "Answer", "text": "입력창에 'A!!B' 또는 'A!!B,C' 형식으로 입력하면 적용된 제약이나 보류 중인 제약을 해지합니다. 팝업에서도 제약 옆의 × 버튼으로 해지할 수 있습니다." }
+						},
+						{
+							"@type": "Question",
+							"name": "사람을 등록하기 전, 제약을 먼저 추가할 수 있나요?",
+							"acceptedAnswer": { "@type": "Answer", "text": "네. 미등록 이름에 대한 제약은 '대기'로 저장되며 해당 참가자가 추가되면 자동으로 적용됩니다." }
+						},
+						{
+							"@type": "Question",
+							"name": "초기화하면 기피 설정은 어떻게 되나요?",
+							"acceptedAnswer": { "@type": "Answer", "text": "초기화 시 참가자는 삭제되지만 기존의 적용된 제약은 이름 기반의 '대기' 제약으로 보존됩니다. 이후 동일한 이름이 등록되면 제약이 다시 적용됩니다." }
+						}
+					]
+				}
+				</script>
+			</section>
+
+			<section id="results" class="results-section">
+				<div class="results-capture-area">
+					<h2>생성된 팀</h2>
+					<div id="teamsDisplay" class="teams-display"></div>
+				</div>
+			</section>
+
+			<div id="capture" class="capture-button-container" style="display:none;">
+				<button id="captureBtn" class="style_btn"><span>화면 캡처</span> <span class="camera-emoji">📸</span></button>
+				<p class="capture-hint">캡처 버튼을 눌러 손쉽게 이미지를 복사하세요. <code>Ctrl+V</code>로 붙여넣기 하세요!</p>
 			</div>
-			<script type="application/ld+json">
-			{
-				"@context": "https://schema.org",
-				"@type": "FAQPage",
-				"mainEntity": [
-					{
-						"@type": "Question",
-						"name": "팀섞기란 무엇인가요?",
-						"acceptedAnswer": { "@type": "Answer", "text": "팀섞기는 참가자들을 지정된 규칙(팀크기, 성비, 가중치 등)에 맞춰 무작위로 또는 균형 있게 나누는 도구입니다." }
-					},
-					{
-						"@type": "Question",
-						"name": "성비 균등은 어떻게 동작하나요?",
-						"acceptedAnswer": { "@type": "Answer", "text": "성비 균등 체크 시 가능한 한 남/여 비율이 균형을 이루도록 팀을 배정합니다. 성별은 참가자의 성별 아이콘을 클릭해 변경할 수 있습니다." }
-					},
-					{
-						"@type": "Question",
-						"name": "가중치 균등은 무엇인가요?",
-						"acceptedAnswer": { "@type": "Answer", "text": "가중치 균등을 사용하면 각 참가자에게 부여한 점수를 고려해 팀의 총 가중치가 균형이 되도록 배정합니다." }
-					},
-					{
-						"@type": "Question",
-						"name": "같은 팀을 하고 싶지 않은 사람은 어떻게 지정하나요?",
-						"acceptedAnswer": { "@type": "Answer", "text": "입력창에 'A!B' 또는 'A!B,C,D' 형식으로 입력합니다. '!'로 제약을 추가하면 별도 팝업 창(600×700)이 자동으로 열려 현재 제약 목록을 보여줍니다. 팝업이 열리지 않으면 브라우저의 팝업 차단을 해제해 주세요. 등록된 참가자 간에는 즉시 적용되며, 미등록 참가자가 포함된 경우에는 '대기' 상태로 저장되어 해당 참가자가 등록되면 자동으로 적용됩니다. 팝업에서 제약을 관리할 수 있으며, 제약 변경은 개발자 도구 콘솔에 기록됩니다." }
-					},
-					{
-						"@type": "Question",
-						"name": "제약(금지 제약)을 해지하려면 어떻게 하나요?",
-						"acceptedAnswer": { "@type": "Answer", "text": "입력창에 'A!!B' 또는 'A!!B,C' 형식으로 입력하면 적용된 제약이나 보류 중인 제약을 해지합니다. 팝업에서도 제약 옆의 × 버튼으로 해지할 수 있습니다." }
-					},
-					{
-						"@type": "Question",
-						"name": "사람을 등록하기 전, 제약을 먼저 추가할 수 있나요?",
-						"acceptedAnswer": { "@type": "Answer", "text": "네. 미등록 이름에 대한 제약은 '대기'로 저장되며 해당 참가자가 추가되면 자동으로 적용됩니다." }
-					},
-					{
-						"@type": "Question",
-						"name": "초기화하면 기피 설정은 어떻게 되나요?",
-						"acceptedAnswer": { "@type": "Answer", "text": "초기화 시 참가자는 삭제되지만 기존의 적용된 제약은 이름 기반의 '대기' 제약으로 보존됩니다. 이후 동일한 이름이 등록되면 제약이 다시 적용됩니다." }
-					}
-				]
-			}
-			</script>
-		</section>
 
-		<section id="results" class="results-section">
-			<div class="results-capture-area">
-				<h2>생성된 팀</h2>
-				<div id="teamsDisplay" class="teams-display"></div>
-			</div>
-		</section>
-
-		<div id="capture" class="capture-button-container" style="display:none;">
-			<button id="captureBtn" class="style_btn"><span>화면 캡처</span> <span class="camera-emoji">📸</span></button>
-			<p class="capture-hint">캡처 버튼을 눌러 손쉽게 이미지를 복사하세요. <code>Ctrl+V</code>로 붙여넣기 하세요!</p>
-		</div>
+		</main>
 	</div>
 
 	<!-- 제약 목록 확인 레이어 -->
@@ -248,6 +263,118 @@
 			<div class="edit-modal-actions">
 				<button id="editPersonSaveBtn" class="style_btn">저장</button>
 				<button id="editPersonCloseBtn" class="style_btn">닫기</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- 프로필 로그인 모달 -->
+	<div id="profileLoginModal" style="display:none;">
+		<div class="login-modal-overlay"></div>
+		<div class="login-modal-card">
+			<h3 class="login-modal-title">프로필 로그인</h3>
+
+			<!-- 로그인 폼 -->
+			<div id="loginFormSection">
+				<div class="login-modal-row">
+					<label for="loginIdInput">아이디</label>
+					<input type="text" id="loginIdInput" class="login-modal-input" placeholder="아이디 입력" autocomplete="username">
+				</div>
+				<div class="login-modal-row">
+					<label for="loginPwInput">비밀번호</label>
+					<input type="password" id="loginPwInput" class="login-modal-input" placeholder="비밀번호 입력" autocomplete="current-password">
+				</div>
+				<div class="login-modal-autologin-row">
+					<label class="autologin-label">
+						<input type="checkbox" id="autoLoginCheckbox">
+						자동 로그인
+					</label>
+				</div>
+				<div id="loginErrorText" class="login-modal-error"></div>
+				<div class="login-modal-actions">
+					<button id="loginSubmitBtn" class="style_btn">로그인</button>
+					<button id="loginCloseBtn" class="style_btn login-modal-close-btn">닫기</button>
+				</div>
+			</div>
+
+			<!-- 로그아웃 폼 (로그인 후 표시) -->
+			<div id="logoutFormSection" style="display:none;">
+				<p class="login-modal-info">현재 <strong id="loggedInUsernameText"></strong>으로 로그인되어 있습니다.</p>
+				<div class="login-modal-actions">
+					<button id="logoutSubmitBtn" class="style_btn login-modal-logout-btn">로그아웃</button>
+					<button id="logoutCloseBtn" class="style_btn login-modal-close-btn">닫기</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 정보 변경 모달 -->
+	<div id="passwordChangeModal" style="display:none;">
+		<div class="login-modal-overlay"></div>
+		<div class="login-modal-card">
+			<h3 class="login-modal-title">정보 변경</h3>
+
+			<!-- 비밀번호 변경 + 정보 삭제 섹션 -->
+			<div id="pwChangeSectionNormal">
+				<div class="login-modal-row">
+					<label for="pwChangeCurrentInput">현재 비번</label>
+					<input type="password" id="pwChangeCurrentInput" class="login-modal-input" placeholder="현재 비밀번호" autocomplete="current-password">
+				</div>
+				<div class="login-modal-row">
+					<label for="pwChangeNewInput">새 비번</label>
+					<input type="password" id="pwChangeNewInput" class="login-modal-input" placeholder="새 비밀번호" autocomplete="new-password">
+				</div>
+				<div class="login-modal-row">
+					<label for="pwChangeConfirmInput">비번 확인</label>
+					<input type="password" id="pwChangeConfirmInput" class="login-modal-input" placeholder="새 비밀번호 재입력" autocomplete="new-password">
+				</div>
+				<div id="pwChangeErrorText" class="login-modal-error"></div>
+				<div class="login-modal-actions">
+					<button id="pwChangeSubmitBtn" class="style_btn">변경</button>
+					<button id="pwChangeCancelBtn" class="style_btn login-modal-close-btn">취소</button>
+				</div>
+				<div class="login-modal-divider"></div>
+				<div class="login-modal-actions login-modal-actions-delete">
+					<button id="profileDeleteTriggerBtn" class="style_btn profile-delete-trigger-btn">정보 삭제</button>
+				</div>
+			</div>
+
+			<!-- 삭제 확인 섹션 -->
+			<div id="pwChangeDeleteConfirmSection" style="display:none;">
+				<p class="profile-delete-confirm-text">모든 저장된 정보가 삭제 됩니다.</p>
+				<div class="login-modal-row">
+					<label for="deleteConfirmPwInput">현재 비번</label>
+					<input type="password" id="deleteConfirmPwInput" class="login-modal-input" placeholder="현재 비밀번호 입력" autocomplete="current-password">
+				</div>
+				<div id="pwChangeDeleteErrorText" class="login-modal-error"></div>
+				<div class="login-modal-actions">
+					<button id="profileDeleteConfirmBtn" class="style_btn profile-delete-confirm-btn">삭제</button>
+					<button id="profileDeleteCancelBtn" class="style_btn login-modal-close-btn">취소</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 프로필 생성 모달 -->
+	<div id="profileSignupModal" style="display:none;">
+		<div class="login-modal-overlay"></div>
+		<div class="login-modal-card">
+			<h3 class="login-modal-title">프로필 생성</h3>
+			<div class="login-modal-row">
+				<label for="signupIdInput">아이디</label>
+				<input type="text" id="signupIdInput" class="login-modal-input" placeholder="아이디 입력" autocomplete="off">
+			</div>
+			<div class="login-modal-row">
+				<label for="signupPwInput">비밀번호</label>
+				<input type="password" id="signupPwInput" class="login-modal-input" placeholder="비밀번호 입력" autocomplete="new-password">
+			</div>
+			<div class="login-modal-row">
+				<label for="signupPwConfirmInput">비번 확인</label>
+				<input type="password" id="signupPwConfirmInput" class="login-modal-input" placeholder="비밀번호 재입력" autocomplete="new-password">
+			</div>
+			<div id="signupErrorText" class="login-modal-error"></div>
+			<div class="login-modal-actions">
+				<button id="signupSubmitBtn" class="style_btn">확인</button>
+				<button id="signupCloseBtn" class="style_btn login-modal-close-btn">취소</button>
 			</div>
 		</div>
 	</div>
