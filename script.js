@@ -3241,17 +3241,23 @@ function openForbiddenWindow() {
 				const pendingSection = doc.getElementById('pendingSection');
 
 				if (modal) {
-					// 항상 모달을 visible 상태로 강제 설정 (blindDelay는 나중에 체크)
-					modal.style.display = '';
-					modal.classList.remove('visible');
-					// 강제로 reflow 발생
-					void modal.offsetWidth;
-					modal.classList.add('visible');
-
-					if (appliedSection) appliedSection.style.display = 'none';
-					if (pendingSection) pendingSection.style.display = 'none';
-					if (showBtn) showBtn.style.display = '';
-					if (showWarn) showWarn.style.display = '';
+					if (blindDelay === null) {
+						modal.style.display = 'none';
+						modal.classList.remove('visible');
+						if (showBtn) showBtn.style.display = 'none';
+						if (showWarn) showWarn.style.display = 'none';
+						if (appliedSection) appliedSection.style.display = '';
+						if (pendingSection) pendingSection.style.display = '';
+					} else {
+						modal.style.display = '';
+						modal.classList.remove('visible');
+						void modal.offsetWidth;
+						modal.classList.add('visible');
+						if (appliedSection) appliedSection.style.display = 'none';
+						if (pendingSection) pendingSection.style.display = 'none';
+						if (showBtn) showBtn.style.display = '';
+						if (showWarn) showWarn.style.display = '';
+					}
 				}
 			} catch(e) {
 				console.warn('모달 초기화 실패:', e);
