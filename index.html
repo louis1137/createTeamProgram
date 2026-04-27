@@ -38,26 +38,26 @@
 			<h1>🎯 팀 생성 프로그램</h1>
 		</header>
 
-		<section class="people-section">
+		<section id="people" class="people-section">
 			<div class="section-header">
 				<h2>참가자 관리</h2>
 				<div class="tool">
 					<em><span class="participantCount">0</span>명 참여중</em>
-					<button id="shuffleOrderBtn" class="btn btn-secondary">순서섞기</button>
-					<button id="resetBtn" class="btn btn-reset">초기화</button>
+					<button id="shuffleOrderBtn" class="style_btn">순서섞기</button>
+					<button id="resetBtn" class="style_btn">초기화</button>
 				</div>
 			</div>
 			<div id="peopleList" class="people-list"></div>
 			<div class="add-person-container">
 				<input type="text" id="nameInput" placeholder="같은 팀 희망 시 쉼표로 구분 후 입력 (예: 철수,영희)" class="name-input">
-				<button id="addPersonBtn" class="btn btn-secondary">+</button>
+				<button id="addPersonBtn" class="style_btn">+</button>
 			</div>
 			<div class="manage-separation-container">
-				<button id="manageSeparationBtn" class="btn btn-secondary">분리할 참가자 관리</button>
+				<button id="manageSeparationBtn" class="style_btn">분리할 참가자 관리</button>
 			</div>
 		</section>
 
-		<section class="options-section">
+		<section id="options" class="options-section">
 			<div class="option">
 				<label>
 					<input type="checkbox" id="maxTeamSizeCheckbox">
@@ -84,11 +84,11 @@
 			</div>
 		</section>
 
-		<section class="action-section">
-			<button id="shuffleBtn" class="btn btn-primary">팀 생성</button>
+		<section id="action" class="action-section">
+			<button id="shuffleBtn" class="style_btn">팀 생성</button>
 		</section>
 
-		<section class="faq-section" aria-label="FAQ">
+		<section id="faq" class="faq-section" aria-label="FAQ">
 			<h2>자주 묻는 질문 (FAQ)</h2>
 			<div class="faq">
 				<details>
@@ -165,34 +165,34 @@
 			</script>
 		</section>
 
-		<section class="results-section" id="resultsSection">
+		<section id="results" class="results-section">
 			<div class="results-capture-area">
 				<h2>생성된 팀</h2>
 				<div id="teamsDisplay" class="teams-display"></div>
 			</div>
 		</section>
 
-		<div class="capture-button-container" style="display:none;">
-			<button id="captureBtn" class="btn btn-capture btn-primary"><span>화면 캡처</span> <span class="camera-emoji">📸</span></button>
+		<div id="capture" class="capture-button-container" style="display:none;">
+			<button id="captureBtn" class="style_btn"><span>화면 캡처</span> <span class="camera-emoji">📸</span></button>
 			<p class="capture-hint">캡처 버튼을 눌러 손쉽게 이미지를 복사하세요. <code>Ctrl+V</code>로 붙여넣기 하세요!</p>
 		</div>
 	</div>
 
 	<!-- 제약 목록 확인 레이어 -->
-	<div id="constraintNotificationLayer" class="constraint-notification-layer" style="display: none;">
+	<section id="constraintNotificationLayer" class="constraint-notification-layer" style="display: none;">
 		<div class="constraint-notification-card">
 			<div class="constraint-notification-icon">⚠️</div>
 			<h3>저장된 제약 목록이 존재합니다</h3>
 			<p>제약을 유지하거나 초기화할 수 있습니다</p>
 			<div class="constraint-notification-buttons">
-				<button id="constraintNotificationConfirm" class="btn btn-primary">제약유지(관리창 열기)</button>
-				<button id="constraintNotificationCancel" class="btn btn-secondary">제약 초기화</button>
+				<button id="constraintNotificationConfirm" class="style_btn">제약유지(관리창 열기)</button>
+				<button id="constraintNotificationCancel" class="style_btn">제약 초기화</button>
 			</div>
 		</div>
-	</div>
+	</section>
 
 	<!-- 중복 이름 확인 모달 -->
-	<div id="duplicateConfirmModal" class="duplicate-modal" style="display: none;">
+	<section id="duplicateConfirmModal" class="duplicate-modal" style="display: none;">
 		<div class="duplicate-modal-overlay"></div>
 		<div class="duplicate-modal-card">
 			<div class="duplicate-comparison">
@@ -219,14 +219,41 @@
 			<div id="duplicateWarning" class="duplicate-warning" style="display: none;"></div>
 
 			<div class="duplicate-modal-buttons">
-				<button id="duplicateConfirmBtn" class="btn btn-secondary">확인</button>
-				<button id="duplicateCancelBtn" class="btn btn-secondary">취소</button>
+				<button id="duplicateConfirmBtn" class="style_btn">확인</button>
+				<button id="duplicateCancelBtn" class="style_btn">취소</button>
+			</div>
+		</div>
+	</section>
+
+	<!-- 참가자 수정 모달 -->
+	<div id="editPersonModal" style="display:none;">
+		<div class="edit-modal-overlay"></div>
+		<div class="edit-modal-card">
+			<h3 class="edit-modal-title">참가자 정보 수정</h3>
+			<div class="edit-modal-row">
+				<label>이&nbsp;&nbsp;&nbsp;름</label>
+				<input type="text" id="editPersonName" class="edit-modal-input">
+			</div>
+			<div class="edit-modal-row" id="editGenderRow">
+				<label>성&nbsp;&nbsp;&nbsp;별</label>
+				<div class="edit-modal-gender">
+					<button id="editGenderMale" class="edit-gender-btn">남</button>
+					<button id="editGenderFemale" class="edit-gender-btn">여</button>
+				</div>
+			</div>
+			<div class="edit-modal-row" id="editWeightRow">
+				<label>가중치</label>
+				<input type="number" id="editPersonWeight" class="edit-modal-input" min="0">
+			</div>
+			<div class="edit-modal-actions">
+				<button id="editPersonSaveBtn" class="style_btn">저장</button>
+				<button id="editPersonCloseBtn" class="style_btn">닫기</button>
 			</div>
 		</div>
 	</div>
 
 	<!-- 명령어 콘솔 -->
-	<div id="commandConsole" class="command-console">
+	<section id="commandConsole" class="command-console">
 		<div class="command-header">
 			<span>🔧 Command Console</span>
 			<span id="profileKeyDisplay" class="profile-key-display"></span>
@@ -251,7 +278,7 @@
 		<div class="resize-handle resize-nw"></div>
 		<div class="resize-handle resize-se"></div>
 		<div class="resize-handle resize-sw"></div>
-	</div>
+	</section>
 
 	<!-- Firebase 동기화 시스템 -->
 	<script src="firebase-sync.js"></script>

@@ -86,6 +86,7 @@ const elements = {
 };
 
 let captureSuccessTimer = null;
+let editingPersonId = null;
 let lastProfileConsoleMessage = '';
 let lastProfileConsoleMessageAt = 0;
 let isTeamGenerationInProgress = false;
@@ -211,6 +212,30 @@ function init() {
 	const duplicateCancelBtn = document.getElementById('duplicateCancelBtn');
 	if (duplicateConfirmBtn) duplicateConfirmBtn.addEventListener('click', handleDuplicateConfirm);
 	if (duplicateCancelBtn) duplicateCancelBtn.addEventListener('click', handleDuplicateCancel);
+
+	// 참가자 수정 모달 이벤트 리스너
+	const editSaveBtn = document.getElementById('editPersonSaveBtn');
+	const editCloseBtn = document.getElementById('editPersonCloseBtn');
+	const editMaleBtn = document.getElementById('editGenderMale');
+	const editFemaleBtn = document.getElementById('editGenderFemale');
+	if (editSaveBtn) editSaveBtn.addEventListener('click', saveEditModal);
+	if (editCloseBtn) editCloseBtn.addEventListener('click', closeEditModal);
+	if (editMaleBtn) editMaleBtn.addEventListener('click', () => {
+		editMaleBtn.classList.add('active');
+		editFemaleBtn.classList.remove('active');
+	});
+	if (editFemaleBtn) editFemaleBtn.addEventListener('click', () => {
+		editFemaleBtn.classList.add('active');
+		editMaleBtn.classList.remove('active');
+	});
+	const editModal = document.getElementById('editPersonModal');
+	if (editModal) {
+		editModal.querySelector('.edit-modal-overlay').addEventListener('click', closeEditModal);
+		editModal.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') closeEditModal();
+			if (e.key === 'Enter') saveEditModal();
+		});
+	}
 
 	// 개발자 도구가 열려있으면 cmd 콘솔 자동으로 열기
 	checkDevToolsAndOpenConsole();
@@ -421,6 +446,8 @@ function showDuplicateConfirmModal(duplicateNames) {
 		});
 	});
 
+	const { weightHighIds, weightLowIds } = computeWeightHighLow();
+
 	// 이미 처리된 그룹 추적
 	const processedGroups = new Set();
 
@@ -434,7 +461,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			const group = state.requiredGroups[groupIndex];
 
 			const groupContainer = document.createElement('div');
-			groupContainer.className = 'group-container';
+			groupContainer.className = 'style_group';
 			const color = getGroupColor(groupIndex);
 			groupContainer.style.border = `2px solid ${color}`;
 
@@ -442,7 +469,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			group.forEach(personId => {
 				const groupPerson = state.people.find(p => p.id === personId);
 				if (groupPerson) {
-					const personTag = createDuplicatePersonTag(groupPerson);
+					const personTag = createDuplicatePersonTag(groupPerson, weightHighIds, weightLowIds);
 					const isDuplicate = duplicateNormalized.includes(normalizeName(groupPerson.name));
 					if (isDuplicate) {
 						// 중복된 사람 (바뀔 요소) - 진하게, 두꺼운 글씨
@@ -460,7 +487,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			existingListEl.appendChild(groupContainer);
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 참가자
-			const personTag = createDuplicatePersonTag(person);
+			const personTag = createDuplicatePersonTag(person, weightHighIds, weightLowIds);
 			personTag.style.opacity = '1';
 			const nameSpan = personTag.querySelector('.name');
 			if (nameSpan) nameSpan.style.fontWeight = 'bold';
@@ -490,14 +517,14 @@ function showDuplicateConfirmModal(duplicateNames) {
 				// 1명만 남으면 개별 참가자로 표시
 				const person = state.people.find(p => p.id === remainingMembers[0]);
 				if (person) {
-					const personTag = createDuplicatePersonTag(person);
+					const personTag = createDuplicatePersonTag(person, weightHighIds, weightLowIds);
 					personTag.style.opacity = '0.5';
 					newListEl.appendChild(personTag);
 				}
 			} else if (remainingMembers.length > 1) {
 				// 2명 이상 남으면 그룹으로 표시
 				const groupContainer = document.createElement('div');
-				groupContainer.className = 'group-container';
+				groupContainer.className = 'style_group';
 				const color = getGroupColor(groupIndex);
 				groupContainer.style.border = `2px solid ${color}`;
 				groupContainer.style.opacity = '0.5';
@@ -505,7 +532,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 				remainingMembers.forEach(personId => {
 					const person = state.people.find(p => p.id === personId);
 					if (person) {
-						const personTag = createDuplicatePersonTag(person);
+						const personTag = createDuplicatePersonTag(person, weightHighIds, weightLowIds);
 						groupContainer.appendChild(personTag);
 					}
 				});
@@ -528,7 +555,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			if (names.length > 1 && colorIndex >= 0) {
 				// 그룹으로 등록될 경우 - 새로 추가되는 그룹은 진하게
 				const groupContainer = document.createElement('div');
-				groupContainer.className = 'group-container';
+				groupContainer.className = 'style_group';
 				const color = getGroupColor(colorIndex);
 				groupContainer.style.border = `2px solid ${color}`; // border 전체를 설정
 				previewColors.push(color);
@@ -563,7 +590,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 				}
 
 				const personTag = document.createElement('div');
-				personTag.className = 'person-tag';
+				personTag.className = 'style_person';
 
 				// 성별 배경색 (기본값 포함)
 				if (state.genderBalanceEnabled) {
@@ -576,19 +603,15 @@ function showDuplicateConfirmModal(duplicateNames) {
 				nameSpan.style.fontWeight = 'bold';
 				personTag.appendChild(nameSpan);
 
-				// 성별 아이콘 (기본값 포함)
-				if (state.genderBalanceEnabled) {
-					const genderDisplay = document.createElement('span');
-					genderDisplay.className = 'gender-display';
-					genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
-					personTag.appendChild(genderDisplay);
-				}
-
 				// 가중치 표시 (기본값 포함)
 				if (state.weightBalanceEnabled) {
 					const weightDisplay = document.createElement('span');
 					weightDisplay.className = 'weight-display';
-					weightDisplay.textContent = `${parsedWeight}`;
+					weightDisplay.textContent = `(${parsedWeight})`;
+					const matchedPerson = state.people.find(p => normalizeName(p.name) === normalizeName(actualName));
+					if (matchedPerson && weightHighIds.has(matchedPerson.id)) weightDisplay.style.color = '#ef4444';
+					else if (matchedPerson && weightLowIds.has(matchedPerson.id)) weightDisplay.style.color = '#3b82f6';
+					else weightDisplay.style.color = '#999';
 					personTag.appendChild(weightDisplay);
 				}
 
@@ -633,7 +656,7 @@ function showDuplicateConfirmModal(duplicateNames) {
 			}
 
 			const personTag = document.createElement('div');
-			personTag.className = 'person-tag';
+			personTag.className = 'style_person';
 
 			// 성별 배경색 (기본값 포함)
 			if (state.genderBalanceEnabled) {
@@ -646,19 +669,15 @@ function showDuplicateConfirmModal(duplicateNames) {
 			nameSpan.style.fontWeight = 'bold';
 			personTag.appendChild(nameSpan);
 
-		// 성별 아이콘 (기본값 포함)
-		if (state.genderBalanceEnabled) {
-			const genderDisplay = document.createElement('span');
-			genderDisplay.className = 'gender-display';
-			genderDisplay.textContent = parsedGender === 'male' ? '♂️' : '♀️';
-			personTag.appendChild(genderDisplay);
-		}
-
 		// 가중치 표시 (기본값 포함)
 		if (state.weightBalanceEnabled) {
 			const weightDisplay = document.createElement('span');
 			weightDisplay.className = 'weight-display';
-			weightDisplay.textContent = `${parsedWeight}`;
+			weightDisplay.textContent = `(${parsedWeight})`;
+			const matchedPerson = state.people.find(p => normalizeName(p.name) === normalizeName(actualName));
+			if (matchedPerson && weightHighIds.has(matchedPerson.id)) weightDisplay.style.color = '#ef4444';
+			else if (matchedPerson && weightLowIds.has(matchedPerson.id)) weightDisplay.style.color = '#3b82f6';
+			else weightDisplay.style.color = '#999';
 			personTag.appendChild(weightDisplay);
 		}
 
@@ -705,9 +724,9 @@ pendingAddData.previewColors = previewColors;
 }
 
 // 중복 모달용 person-tag 생성 (제거 버튼 없는 버전)
-function createDuplicatePersonTag(person) {
+function createDuplicatePersonTag(person, weightHighIds = new Set(), weightLowIds = new Set()) {
 	const personTag = document.createElement('div');
-	personTag.className = 'person-tag';
+	personTag.className = 'style_person';
 
 	if (state.genderBalanceEnabled) personTag.style.backgroundColor = person.gender === 'male' ? '#e0f2fe' : '#fce7f3';
 
@@ -715,18 +734,13 @@ function createDuplicatePersonTag(person) {
 	nameSpan.className = 'name';
 	nameSpan.textContent = person.name;
 	personTag.appendChild(nameSpan);
-
-	if (state.genderBalanceEnabled) {
-		const genderDisplay = document.createElement('span');
-		genderDisplay.className = 'gender-display';
-		genderDisplay.textContent = person.gender === 'male' ? '♂️' : '♀️';
-		personTag.appendChild(genderDisplay);
-	}
-
 	if (state.weightBalanceEnabled) {
 		const weightDisplay = document.createElement('span');
 		weightDisplay.className = 'weight-display';
-		weightDisplay.textContent = `${person.weight ?? 0}`;
+		weightDisplay.textContent = `(${person.weight ?? 0})`;
+		if (weightHighIds.has(person.id)) weightDisplay.style.color = '#ef4444';
+		else if (weightLowIds.has(person.id)) weightDisplay.style.color = '#3b82f6';
+		else weightDisplay.style.color = '#999';
 		personTag.appendChild(weightDisplay);
 	}
 
@@ -2191,6 +2205,59 @@ function updatePersonWeight(id, weight) {
 	}
 }
 
+function updatePersonName(id, name) {
+	const person = state.people.find(p => p.id === id);
+	if (person) {
+		person.name = name;
+		saveToLocalStorage();
+	}
+}
+
+function openEditModal(person) {
+	editingPersonId = person.id;
+
+	document.getElementById('editPersonName').value = person.name;
+
+	document.getElementById('editGenderMale').classList.toggle('active', person.gender === 'male');
+	document.getElementById('editGenderFemale').classList.toggle('active', person.gender !== 'male');
+
+	document.getElementById('editPersonWeight').value = person.weight;
+
+	const modal = document.getElementById('editPersonModal');
+	modal.style.display = 'flex';
+	requestAnimationFrame(() => modal.classList.add('visible'));
+	document.getElementById('editPersonName').focus();
+}
+
+function closeEditModal() {
+	const modal = document.getElementById('editPersonModal');
+	modal.classList.remove('visible');
+	setTimeout(() => { modal.style.display = 'none'; }, 250);
+	editingPersonId = null;
+}
+
+function saveEditModal() {
+	if (!editingPersonId) return;
+	const person = state.people.find(p => p.id === editingPersonId);
+	if (!person) return;
+
+	const newName = document.getElementById('editPersonName').value.trim();
+	if (newName) person.name = newName;
+
+	if (state.genderBalanceEnabled) {
+		person.gender = document.getElementById('editGenderMale').classList.contains('active') ? 'male' : 'female';
+	}
+
+	if (state.weightBalanceEnabled) {
+		const w = parseInt(document.getElementById('editPersonWeight').value);
+		person.weight = isNaN(w) ? 0 : w;
+	}
+
+	saveToLocalStorage();
+	closeEditModal();
+	renderPeople();
+}
+
 // --- 제약 및 이름 정규화 관련 헬퍼 함수들 ---
 function normalizeName(name) {
 	// 괄호 패턴 제거: 이름(남100) -> 이름
@@ -3305,9 +3372,9 @@ function getGroupColor(groupIndex) {
 	return state.groupColors[groupIndex % state.groupColors.length];
 }
 
-function createPersonTag(person, potentialDuplicates = []) {
+function createPersonTag(person, potentialDuplicates = [], weightHighIds = new Set(), weightLowIds = new Set()) {
 	const personTag = document.createElement('div');
-	personTag.className = 'person-tag';
+	personTag.className = 'style_person';
 
 	// 중복 체크: potentialDuplicates 배열에 이 사람의 normalized 이름이 있으면 강조
 	const normalized = normalizeName(person.name);
@@ -3336,19 +3403,25 @@ function createPersonTag(person, potentialDuplicates = []) {
 	}
 
 	if (state.weightBalanceEnabled) {
-		const weightInput = document.createElement('input');
-		weightInput.type = 'number';
-		weightInput.className = 'weight-input';
-		weightInput.value = person.weight;
-		weightInput.min = '0';
-		weightInput.addEventListener('input', (e) => {
-			updatePersonWeight(person.id, e.target.value);
-		});
-		personTag.appendChild(weightInput);
+		const weightSpan = document.createElement('span');
+		weightSpan.className = 'person-data';
+		weightSpan.textContent = '(' + person.weight + ')';
+		if (weightHighIds.has(person.id)) weightSpan.style.color = '#ef4444';
+		else if (weightLowIds.has(person.id)) weightSpan.style.color = '#3b82f6';
+		personTag.appendChild(weightSpan);
 	}
 
+	const editBtn = document.createElement('button');
+	editBtn.textContent = '수정';
+	editBtn.className = 'edit-btn';
+	editBtn.addEventListener('click', (e) => {
+		e.stopPropagation();
+		openEditModal(person);
+	});
+	personTag.appendChild(editBtn);
+
 	const removeBtn = document.createElement('button');
-	removeBtn.textContent = '×';
+	removeBtn.textContent = '삭제';
 	removeBtn.className = 'remove-btn';
 	removeBtn.addEventListener('click', (e) => {
 		// Shift 키를 누른 상태로 클릭한 경우 완전 삭제
@@ -3361,7 +3434,6 @@ function createPersonTag(person, potentialDuplicates = []) {
 			removePerson(person.id, false);
 		}
 	});
-
 	personTag.appendChild(removeBtn);
 
 	return personTag;
@@ -3380,6 +3452,20 @@ function updateParticipantCount() {
 	}
 }
 
+function computeWeightHighLow() {
+	const weightHighIds = new Set();
+	const weightLowIds = new Set();
+	if (state.weightBalanceEnabled && state.people.length >= 4) {
+		const maxW = Math.max(...state.people.map(p => p.weight));
+		const minW = Math.min(...state.people.map(p => p.weight));
+		const maxPeople = state.people.filter(p => p.weight === maxW);
+		const minPeople = state.people.filter(p => p.weight === minW);
+		if (maxPeople.length <= 2) maxPeople.forEach(p => weightHighIds.add(p.id));
+		if (minPeople.length <= 2) minPeople.forEach(p => weightLowIds.add(p.id));
+	}
+	return { weightHighIds, weightLowIds };
+}
+
 function renderPeople() {
 	updateParticipantCount();
 	elements.peopleList.innerHTML = '';
@@ -3387,6 +3473,8 @@ function renderPeople() {
 
 	// 입력창에서 중복 체크를 위한 이름 목록 가져오기
 	const potentialDuplicates = getPotentialDuplicatesFromInput();
+
+	const { weightHighIds, weightLowIds } = computeWeightHighLow();
 
 	const grouped = new Set();
 	const groupMap = new Map(); // personId -> groupIndex(그룹 인덱스)
@@ -3413,19 +3501,19 @@ function renderPeople() {
 			const group = state.requiredGroups[groupIndex];
 			// 그룹 내부는 실제 배열 순서대로(셔플 반영)
 			const groupContainer = document.createElement('div');
-			groupContainer.className = 'group-container';
+			groupContainer.className = 'style_group';
 			groupContainer.style.borderColor = getGroupColor(groupIndex);
 			group.forEach(personId => {
 				const groupPerson = state.people.find(p => p.id === personId);
 				if (groupPerson) {
-					const personTag = createPersonTag(groupPerson, potentialDuplicates);
+					const personTag = createPersonTag(groupPerson, potentialDuplicates, weightHighIds, weightLowIds);
 					groupContainer.appendChild(personTag);
 				}
 			});
 			elements.peopleList.appendChild(groupContainer);
 		} else if (groupIndex === undefined) {
 			// 그룹에 속하지 않은 개별 항목
-			const personTag = createPersonTag(person, potentialDuplicates);
+			const personTag = createPersonTag(person, potentialDuplicates, weightHighIds, weightLowIds);
 			elements.peopleList.appendChild(personTag);
 		}
 		// 이미 처리된 그룹의 멤버는 스킵
