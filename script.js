@@ -5575,7 +5575,8 @@ function saveGenerateHistory(teams) {
 		const timestamp = getCurrentDbTimestamp();
 		const historyData = {
 			createdAt: timestamp,
-			profile: currentProfileKey || `users/${currentUserCode}` || '',
+			profile: currentProfileKey || '',
+			userCode: currentUserCode || '',
 			teams: teams.map(team => team.map(person => {
 				const details = [];
 				if (state.genderBalanceEnabled && person.gender) {
@@ -5605,14 +5606,21 @@ function saveGenerateHistory(teams) {
 			.then(() => { console.log('generateHistory(global) 저장 완료'); })
 			.catch((error) => { console.error('generateHistory(global) 저장 실패:', error); });
 
-		// 프로필 로그인 상태면 profiles 히스토리에도 저장 (per-profile 기록)
+		// users 히스토리 항상 저장 (로그인 여부 무관)
+		if (currentUserCode) {
+			database.ref(`users/${currentUserCode}/generateHistory`).push(historyData)
+				.then(() => { console.log('generateHistory(users) 저장 완료'); })
+				.catch((error) => { console.error('generateHistory(users) 저장 실패:', error); });
+		}
+
+		// 프로필 로그인 상태면 profiles 히스토리에도 저장
 		if (currentProfileKey) {
 			database.ref(`profiles/${currentProfileKey}/generateHistory`).push(historyData)
 				.then(() => { console.log('generateHistory(profiles) 저장 완료'); })
 				.catch((error) => { console.error('generateHistory(profiles) 저장 실패:', error); });
 		}
 
-		// 비프로필 상태: 팀 생성 = 레코드 확정 (onDisconnect 취소 → 영구 보존)
+		// 비프로필 상태: 레코드 확정
 		if (!currentProfileKey && typeof confirmUserRecord === 'function') {
 			confirmUserRecord();
 		}

@@ -99,6 +99,7 @@ main section:last-child {border-bottom: none !important;}
 #results .results-capture-area .teams-display .team-card h3 {color: var(--btn_main); margin-bottom: 12px; font-size: 16px;}
 #results .results-capture-area .teams-display .team-card ul {list-style: none;}
 #results .results-capture-area .teams-display .team-card li {padding: 8px 12px; margin: 5px 0; background: #f8f9fa; border-radius: 4px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between; gap: 10px;}
+.result-group-dot {width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block;}
 
 /* [9] #capture */
 #capture {position: sticky; bottom: 0; left: 0; right: 0; text-align: center; padding: 20px 30px; background: white; border-top: 1px solid #e0e0e0; z-index: 100;}

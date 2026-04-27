@@ -69,10 +69,20 @@
 				</div>
 				<div class="history-global-wrap">
 					<table class="history-global-table">
+						<colgroup>
+							<col class="hcol-date">
+							<col class="hcol-profile">
+							<col class="hcol-user">
+							<col class="hcol-teams">
+							<col class="hcol-rsv">
+							<col class="hcol-rule">
+							<col class="hcol-constraint">
+						</colgroup>
 						<thead>
 							<tr>
 								<th>생성시간</th>
-								<th>생성프로필</th>
+								<th>프로필</th>
+								<th>사용자</th>
 								<th>생성된 팀</th>
 								<th>적용된 예약</th>
 								<th>적용된 규칙</th>
@@ -292,9 +302,24 @@
 							<div class="member-table-panel" id="historyPanel">
 								<div class="member-table-title"><span>생성기록</span></div>
 								<table class="member-table history-table">
+									<colgroup>
+										<col class="hcol-date">
+										<col class="hcol-profile">
+										<col class="hcol-user">
+										<col class="hcol-teams">
+										<col class="hcol-rsv">
+										<col class="hcol-rule">
+										<col class="hcol-constraint">
+									</colgroup>
 									<thead>
 										<tr>
-											<th>생성일</th>
+											<th>생성시간</th>
+											<th>프로필</th>
+											<th>사용자</th>
+											<th>생성된 팀</th>
+											<th>적용된 예약</th>
+											<th>적용된 규칙</th>
+											<th>적용된 제약</th>
 										</tr>
 									</thead>
 									<tbody id="historyTableBody"></tbody>

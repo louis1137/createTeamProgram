@@ -189,18 +189,27 @@ function ensureUserRecord() {
 						_userDisconnectHandle = userRef.onDisconnect();
 						_userDisconnectHandle.remove();
 						setOnlinePresence();
+						setupUserSync();
 					});
 			}
 			const data = snapshot.val();
+			// admin이 저장한 게임 데이터가 있으면 로드
+			const hasGameData = data.people || data.inactivePeople || data.hiddenGroupChains ||
+				data.hiddenGroups || data.forbiddenPairs || data.requiredGroups || data.reservations;
+			if (hasGameData && typeof loadStateFromData === 'function') {
+				loadStateFromData(data);
+			}
 			if (!data.confirmed) {
 				// 미확정 상태로 재접속 (예: 새로고침): onDisconnect 재등록
 				_userDisconnectHandle = userRef.onDisconnect();
 				_userDisconnectHandle.remove();
 				setOnlinePresence();
+				setupUserSync();
 				return userRef.update({ lastAccess: now });
 			}
 			// 팀 생성 이력이 있는 확정 유저: lastAccess만 갱신
 			setOnlinePresence();
+			setupUserSync();
 			return userRef.update({ lastAccess: now });
 		})
 		.catch((error) => {
@@ -238,9 +247,9 @@ function setOnlinePresence() {
 			_userOnlineRef.onDisconnect().set(false);
 		}
 	} else if (currentUserCode) {
+		// 익명 유저: onDisconnect는 ensureUserRecord의 remove()가 처리하므로 별도 등록 안 함
 		_onlinePresenceRef = database.ref(`users/${currentUserCode}/online`);
 		_onlinePresenceRef.set(true).catch(() => {});
-		_onlinePresenceRef.onDisconnect().set(false);
 	}
 }
 
@@ -433,6 +442,23 @@ function setupRealtimeSync() {
 		const syncTrigger = snapshot.val();
 			handleSyncTrigger(syncTrigger);
 		});
+	});
+}
+
+// 익명 유저 syncTrigger 감시 (admin이 users/${userCode}/syncTrigger 를 쓰면 데이터 재로드)
+let _userSyncListenerAttached = false;
+function setupUserSync() {
+	if (!database || !currentUserCode || currentProfileKey || _userSyncListenerAttached) return;
+	_userSyncListenerAttached = true;
+	let initialized = false;
+	database.ref(`users/${currentUserCode}/syncTrigger`).on('value', (snapshot) => {
+		const trigger = snapshot.val();
+		if (!initialized) {
+			initialized = true;
+			return; // 초기값은 무시
+		}
+		if (!trigger) return;
+		loadDataByType('all');
 	});
 }
 

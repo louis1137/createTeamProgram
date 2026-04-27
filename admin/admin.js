@@ -434,21 +434,28 @@ function cloneGenerateHistory(data) {
 
 	historyDraft = Object.entries(source).map(([entryKey, entry]) => {
 		const createdAt = getHistoryCreatedAt(entryKey, entry || {});
+		const rawProfile = entry?.profile || '';
+		const rawUserCode = entry?.userCode || '';
+		let profile = rawProfile;
+		let userCode = rawUserCode;
+		if (!userCode && rawProfile.startsWith('users/')) {
+			profile = '';
+			userCode = rawProfile.slice(6);
+		}
 		const teams = normalizeHistoryTeams(entry?.teams);
 		const appliedReservation = normalizeHistoryStrings(entry?.appliedReservation, null);
 		const appliedRules = normalizeHistoryStrings(entry?.appliedRules, '/');
 		const appliedConstraints = normalizeHistoryStrings(entry?.appliedConstraints, '/');
-		const detailText = buildHistoryDetailLines({
-			teams,
-			appliedReservation,
-			appliedRules,
-			appliedConstraints
-		});
 		const sortTime = Date.parse(createdAt.includes('T') ? createdAt : createdAt.replace(' ', 'T'));
 		return {
 			entryKey,
 			createdAt,
-			detailText,
+			profile,
+			userCode,
+			teams,
+			appliedReservation,
+			appliedRules,
+			appliedConstraints,
 			sortTime: Number.isFinite(sortTime) ? sortTime : Number.NEGATIVE_INFINITY
 		};
 	});
@@ -467,24 +474,21 @@ function renderGenerateHistoryTableRows() {
 		return;
 	}
 	if (!historyDraft.length) {
-		container.innerHTML = `<tr><td class="member-empty" colspan="1">데이터가 없습니다.</td></tr>`;
+		container.innerHTML = `<tr><td class="member-empty" colspan="7">데이터가 없습니다.</td></tr>`;
 		return;
 	}
 
-	container.innerHTML = historyDraft.map((item, index) => {
-		const detailHtml = escapeHtml(item.detailText).replace(/\n/g, '<br>');
-		return `<tr class="history-summary-row" data-index="${index}">
-			<td>
-				<button class="history-toggle-btn" type="button" data-role="toggle-history" data-index="${index}" aria-expanded="false">
-					<span class="history-chevron">▸</span>
-					<span>${escapeHtml(item.createdAt)}</span>
-				</button>
-			</td>
+	container.innerHTML = historyDraft.map((item) => `
+		<tr>
+			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
+			<td class="gh-cell gh-profile">${item.profile || '-'}</td>
+			<td class="gh-cell gh-user">${item.userCode || '-'}</td>
+			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams)}</td>
+			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
+			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
+			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
 		</tr>
-		<tr class="history-detail-row" data-index="${index}" hidden>
-			<td><div class="history-detail-content">${detailHtml}</div></td>
-		</tr>`;
-	}).join('');
+	`).join('');
 }
 
 function renderGenerateHistoryTable() {
@@ -810,15 +814,6 @@ function bindReorderDnD(tbody, handlers) {
 	});
 }
 
-function scrollReservationTableToBottom() {
-	const tbody = getEl('reservationTableBody');
-	if (!(tbody instanceof HTMLElement)) {
-		return;
-	}
-	requestAnimationFrame(() => {
-		tbody.scrollTop = tbody.scrollHeight;
-	});
-}
 
 function focusLastReservationInput() {
 	const tbody = getEl('reservationTableBody');
@@ -839,15 +834,6 @@ function createEmptyConstraint() {
 	return { member1: '', member2: '' };
 }
 
-function scrollConstraintTableToBottom() {
-	const tbody = getEl('constraintTableBody');
-	if (!(tbody instanceof HTMLElement)) {
-		return;
-	}
-	requestAnimationFrame(() => {
-		tbody.scrollTop = tbody.scrollHeight;
-	});
-}
 
 function focusLastConstraintInput() {
 	const tbody = getEl('constraintTableBody');
@@ -864,15 +850,6 @@ function focusLastConstraintInput() {
 	});
 }
 
-function scrollRuleTableToBottom() {
-	const tbody = getEl('ruleTableBody');
-	if (!(tbody instanceof HTMLElement)) {
-		return;
-	}
-	requestAnimationFrame(() => {
-		tbody.scrollTop = tbody.scrollHeight;
-	});
-}
 
 function focusLastRuleMember1Input() {
 	const tbody = getEl('ruleTableBody');
@@ -903,16 +880,6 @@ function createEmptyMember() {
 	};
 }
 
-function scrollMemberTableToBottom(listKey) {
-	const tbodyId = listKey === 'people' ? 'participantsTableBody' : 'inactiveTableBody';
-	const tbody = getEl(tbodyId);
-	if (!(tbody instanceof HTMLElement)) {
-		return;
-	}
-	requestAnimationFrame(() => {
-		tbody.scrollTop = tbody.scrollHeight;
-	});
-}
 
 function focusLastMemberNameInput(listKey) {
 	const tbodyId = listKey === 'people' ? 'participantsTableBody' : 'inactiveTableBody';
@@ -930,37 +897,9 @@ function focusLastMemberNameInput(listKey) {
 	});
 }
 
-function getMemberTbodyMaxHeightPx() {
-	const rootStyles = getComputedStyle(document.documentElement);
-	const value = rootStyles.getPropertyValue('--member-tbody-max-h').trim();
-	const parsed = Number.parseFloat(value.replace('px', ''));
-	return Number.isFinite(parsed) ? parsed : 400;
-}
-
-function isOverflowingForCollapsedView(tbody) {
-	if (!(tbody instanceof HTMLElement)) {
-		return false;
-	}
-	const maxHeightPx = getMemberTbodyMaxHeightPx();
-	return tbody.scrollHeight > maxHeightPx + 1;
-}
-
-function shouldShowMemberExpandButton(row) {
-	if (!(row instanceof HTMLElement)) {
-		return false;
-	}
-	const tbodies = Array.from(row.querySelectorAll('.member-table tbody'));
-	return tbodies.some((tbody) => isOverflowingForCollapsedView(tbody));
-}
-
-function shouldShowConstraintExpandButton() {
-	const tbody = getEl('constraintTableBody');
-	return isOverflowingForCollapsedView(tbody);
-}
-
-function shouldShowHistoryExpandButton() {
-	return true;
-}
+function shouldShowMemberExpandButton() { return false; }
+function shouldShowConstraintExpandButton() { return false; }
+function shouldShowHistoryExpandButton() { return true; }
 
 function refreshMemberExpandButton() {
 	const button = getEl('memberExpandBtn');
@@ -1011,75 +950,9 @@ function refreshHistoryExpandButton() {
 	button.textContent = row.classList.contains('expanded') ? '숨기기' : '모두 보기';
 }
 
-function applyMemberExpandedState() {
-	const row = getEl('memberTableRow');
-	if (!row) {
-		return;
-	}
-	const isExpanded = row.classList.contains('expanded');
-	row.querySelectorAll('.member-table tbody').forEach((tbody) => {
-		if (!(tbody instanceof HTMLElement)) {
-			return;
-		}
-		if (isExpanded) {
-			tbody.style.maxHeight = 'none';
-			tbody.style.overflowY = 'visible';
-			tbody.style.overflowX = 'visible';
-			tbody.style.height = 'auto';
-		} else {
-			tbody.style.maxHeight = 'var(--member-tbody-max-h)';
-			tbody.style.overflowY = 'auto';
-			tbody.style.overflowX = 'hidden';
-			tbody.style.height = '';
-		}
-	});
-}
-
-function applyConstraintExpandedState() {
-	const row = getEl('constraintTableRow');
-	if (!row) {
-		return;
-	}
-	const tbody = getEl('constraintTableBody');
-	if (!(tbody instanceof HTMLElement)) {
-		return;
-	}
-	const isExpanded = row.classList.contains('expanded');
-	if (isExpanded) {
-		tbody.style.maxHeight = 'none';
-		tbody.style.overflowY = 'visible';
-		tbody.style.overflowX = 'visible';
-		tbody.style.height = 'auto';
-	} else {
-		tbody.style.maxHeight = 'var(--member-tbody-max-h)';
-		tbody.style.overflowY = 'auto';
-		tbody.style.overflowX = 'hidden';
-		tbody.style.height = '';
-	}
-}
-
-function applyHistoryExpandedState() {
-	const row = getEl('historyTableRow');
-	if (!row) {
-		return;
-	}
-	const tbody = getEl('historyTableBody');
-	if (!(tbody instanceof HTMLElement)) {
-		return;
-	}
-	const isExpanded = row.classList.contains('expanded');
-	if (isExpanded) {
-		tbody.style.maxHeight = 'none';
-		tbody.style.overflowY = 'visible';
-		tbody.style.overflowX = 'visible';
-		tbody.style.height = 'auto';
-	} else {
-		tbody.style.maxHeight = 'var(--member-tbody-max-h)';
-		tbody.style.overflowY = 'auto';
-		tbody.style.overflowX = 'hidden';
-		tbody.style.height = '';
-	}
-}
+function applyMemberExpandedState() {}
+function applyConstraintExpandedState() {}
+function applyHistoryExpandedState() {}
 
 function setFieldAvailability(type) {
 	const disabledMap = fieldEnabledByType[type] || {};
@@ -1827,7 +1700,6 @@ function bindEvents() {
 			}
 			memberDraft[listKey].push(createEmptyMember());
 			renderMemberTables();
-			scrollMemberTableToBottom(listKey);
 			focusLastMemberNameInput(listKey);
 		});
 	});
@@ -1885,7 +1757,6 @@ function bindEvents() {
 		constraintAddBtn.addEventListener('click', () => {
 			constraintDraft.push(createEmptyConstraint());
 			renderConstraintTable();
-			scrollConstraintTableToBottom();
 			focusLastConstraintInput();
 		});
 	}
@@ -1983,7 +1854,6 @@ function bindEvents() {
 		ruleAddBtn.addEventListener('click', () => {
 			ruleDraft.push({ member1: '', member2: '', probability: 100 });
 			renderRuleTable();
-			scrollRuleTableToBottom();
 			focusLastRuleMember1Input();
 		});
 	}
@@ -2036,7 +1906,6 @@ function bindEvents() {
 		reservationAddBtn.addEventListener('click', () => {
 			reservationDraft.push([]);
 			renderReservationTable();
-			scrollReservationTableToBottom();
 			focusLastReservationInput();
 		});
 	}
@@ -2276,15 +2145,27 @@ async function loadGlobalHistory() {
 		const snap = await database.ref('generateHistory').once('value');
 		const data = snap.val() || {};
 
-		const allEntries = Object.entries(data).map(([pushKey, entry]) => ({
-			key: pushKey,
-			createdAt: entry?.createdAt || pushKey,
-			profile: entry?.profile || '',
-			teams: normalizeHistoryTeams(entry?.teams),
-			appliedReservation: normalizeHistoryStrings(entry?.appliedReservation, null),
-			appliedRules: normalizeHistoryStrings(entry?.appliedRules, '/'),
-			appliedConstraints: normalizeHistoryStrings(entry?.appliedConstraints, '/')
-		}));
+		const allEntries = Object.entries(data).map(([pushKey, entry]) => {
+			const rawProfile = entry?.profile || '';
+			const rawUserCode = entry?.userCode || '';
+			// 구버전 호환: profile = "users/ABCDEF" 형태면 분리
+			let profile = rawProfile;
+			let userCode = rawUserCode;
+			if (!userCode && rawProfile.startsWith('users/')) {
+				profile = '';
+				userCode = rawProfile.slice(6);
+			}
+			return {
+				key: pushKey,
+				createdAt: entry?.createdAt || pushKey,
+				profile,
+				userCode,
+				teams: normalizeHistoryTeams(entry?.teams),
+				appliedReservation: normalizeHistoryStrings(entry?.appliedReservation, null),
+				appliedRules: normalizeHistoryStrings(entry?.appliedRules, '/'),
+				appliedConstraints: normalizeHistoryStrings(entry?.appliedConstraints, '/')
+			};
+		});
 
 		allEntries.sort((a, b) => {
 			const ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt).getTime() || 0;
@@ -2312,7 +2193,8 @@ function renderGlobalHistory() {
 	tbody.innerHTML = globalHistoryData.map((item) => `
 		<tr>
 			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
-			<td class="gh-cell gh-profile">${item.profile}</td>
+			<td class="gh-cell gh-profile">${item.profile || '-'}</td>
+			<td class="gh-cell gh-user">${item.userCode || '-'}</td>
 			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>

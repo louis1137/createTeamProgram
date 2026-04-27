@@ -10,7 +10,7 @@
 	--success: #3c8b68;
 	--row-h: 42px;
 	--input-h: 36px;
-	--member-tbody-max-h: 400px;
+
 }
 
 html[data-theme='light'] {
@@ -436,38 +436,9 @@ body {
 }
 
 .member-table {
-	display: block;
 	width: 100%;
 	border-collapse: collapse;
-}
-
-.member-table thead {
-	display: table;
-	width: calc(100% - 10px);
 	table-layout: fixed;
-}
-
-.member-table tbody {
-	display: block;
-	max-height: var(--member-tbody-max-h);
-	overflow-y: auto;
-	overflow-x: hidden;
-	padding-right: 10px;
-}
-
-.member-table tbody tr {
-	display: table;
-	width: 100%;
-	table-layout: fixed;
-}
-
-.member-table-panel.expanded .member-table tbody {
-	max-height: none;
-	overflow: visible;
-}
-
-.member-table-row.expanded .member-table-panel {
-	overflow: visible;
 }
 
 .constraint-table-row {
@@ -642,55 +613,34 @@ body {
 	max-width: 20px;
 }
 
-.history-table td:nth-child(1),
-.history-table th:nth-child(1) {
-	width: 100% !important;
-	text-align: left;
-}
-
-.history-toggle-btn {
+/* 편집기 내 생성기록 — 전역 히스토리 테이블과 동일 스타일 */
+.history-table {
 	width: 100%;
-	padding: 8px 10px;
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	border: 1px solid transparent;
-	background: transparent;
-	color: var(--text);
-	cursor: pointer;
-	font-size: 12px;
-	font-weight: 600;
-	text-align: left;
+	border-collapse: collapse;
+	table-layout: fixed;
+	font-size: 12.5px;
+	min-width: 600px;
 }
 
-.history-toggle-btn:hover {
-	border-color: var(--line);
-	background: var(--panel);
-}
-
-.history-chevron {
-	width: 12px;
+.history-table thead th {
+	position: sticky;
+	top: 0;
+	background: var(--panel-2);
 	color: var(--muted);
-	flex: 0 0 12px;
-}
-
-.history-detail-row td {
-	padding: 0;
+	font-weight: 600;
+	padding: 8px 10px;
+	text-align: left;
 	border-bottom: 1px solid var(--line);
+	white-space: nowrap;
 }
 
-.history-detail-row[hidden] {
-	display: none;
+.history-table tbody tr {
+	border-bottom: 1px solid var(--line);
+	transition: background 0.12s;
 }
 
-.history-detail-content {
-	padding: 10px;
-	background: var(--panel);
-	font-size: 12px;
-	line-height: 1.5;
-	color: var(--text);
-	white-space: pre-wrap;
-	word-break: break-word;
+.history-table tbody tr:hover {
+	background: var(--panel-2);
 }
 
 .reservation-text {
@@ -719,40 +669,6 @@ body {
 	color: var(--muted);
 	font-weight: 600;
 	background: rgba(0, 0, 0, 0.08);
-}
-
-.member-table td:nth-child(2) {
-	width: 44%;
-}
-
-.member-table td:nth-child(3) {
-	width: 20%;
-}
-
-.member-table td:nth-child(4) {
-	width: 26%;
-}
-
-.member-table td:nth-child(5),
-.member-table th:nth-child(5) {
-	width: 10%;
-	text-align: center;
-}
-
-.member-table .drag-col,
-.member-table .drag-cell {
-	width: 20px !important;
-	min-width: 20px;
-	max-width: 20px;
-	text-align: center;
-	padding: 0;
-}
-
-.member-table th:nth-child(1),
-.member-table td:nth-child(1) {
-	width: 20px !important;
-	min-width: 20px;
-	max-width: 20px;
 }
 
 .drag-cell {
@@ -1206,6 +1122,7 @@ tr:hover .drag-cell {
 .history-global-table {
 	width: 100%;
 	border-collapse: collapse;
+	table-layout: fixed;
 	font-size: 12.5px;
 	min-width: 860px;
 }
@@ -1243,6 +1160,11 @@ tr:hover .drag-cell {
 	color: var(--accent);
 	white-space: nowrap;
 }
+.gh-user {
+	font-weight: 600;
+	color: var(--muted);
+	white-space: nowrap;
+}
 .gh-teams {
 	min-width: 200px;
 }
@@ -1265,3 +1187,12 @@ tr:hover .drag-cell {
 	padding: 24px;
 	font-size: 13px;
 }
+
+/* 히스토리 테이블 컬럼 너비 고정 (colgroup col 기준) */
+col.hcol-date     { width: 140px; }
+col.hcol-profile  { width: 80px; }
+col.hcol-user     { width: 90px; }
+
+col.hcol-rsv      { width: 90px; }
+col.hcol-rule     { width: 90px; }
+col.hcol-constraint { width: 90px; }
