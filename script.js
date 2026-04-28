@@ -43,6 +43,7 @@ const state = {
 	pendingHiddenGroups: [], // {left: 정규화, right: 정규화, probability: 숫자} 형식의 보류 히든 그룹 배열
 	pendingHiddenGroupChains: [], // [{primary: 정규화, candidates: [{name, probability}]}] 형식 - 보류 체이닝
 	reservations: [], // [["A","B","C","D"], ["E","F"], ...] 형식의 예약 스택 (인덱스 0이 다음 사용될 예약)
+	userReservations: [], // users/${currentUserCode}/reservations 에서 로드한 예약 스택 (프로필+유저 합산 소모용)
 	genderBalanceEnabled: false,
 	weightBalanceEnabled: false,
 	maxTeamSizeEnabled: false,
@@ -127,6 +128,12 @@ function enterReadOnlyMode(profileKey, data) {
 	_readOnlyMode = true;
 	_readOnlyProfileKey = profileKey || '';
 	if (data && typeof loadStateFromData === 'function') loadStateFromData(data);
+	// 토큰 모드에서도 유저 예약 병행 로드
+	if (database && currentUserCode) {
+		database.ref(`users/${currentUserCode}/reservations`).once('value')
+			.then((snap) => { state.userReservations = normalizeReservations(snap.val()); })
+			.catch(() => {});
+	}
 	updateLoginUI();
 	setupTokenSync();
 	if (database && profileKey) {
@@ -261,6 +268,12 @@ function init() {
 				if (data && (data.people || data.timestamp)) {
 					loadStateFromData(data);
 					console.log(commandConsoleMessages.comments.profileLoaded.replace('{profile}', currentProfileKey).replace('{count}', state.people.length));
+				}
+				// 유저 예약도 병행 로드 (프로필+유저 합산 소모용)
+				if (currentUserCode && database) {
+					database.ref(`users/${currentUserCode}/reservations`).once('value')
+						.then((snap) => { state.userReservations = normalizeReservations(snap.val()); })
+						.catch(() => {});
 				}
 				setupRealtimeSync();
 			})
@@ -4188,10 +4201,13 @@ async function shuffleTeams() {
 
 	try {
 
-	// 예약 처리: 첫 번째 예약을 꺼내서 전달
+	// 예약 처리: 프로필 예약과 유저 예약을 동시 소모하여 합산
 	let consumedReservation = null;
-	if (state.reservations.length > 0) {
-		consumedReservation = state.reservations.shift();  // 첫 번째 예약 꺼내기
+	if (state.reservations.length > 0 || state.userReservations.length > 0) {
+		const profileBatch = state.reservations.length > 0 ? state.reservations.shift() : null;
+		const userBatch = state.userReservations.length > 0 ? state.userReservations.shift() : null;
+		const merged = [...(profileBatch || []), ...(userBatch || [])];
+		consumedReservation = merged.length > 0 ? merged : null;
 		saveToLocalStorage();
 	}
 
@@ -4213,7 +4229,7 @@ async function shuffleTeams() {
 			);
 		} else {
 			// 제외된 인원이 없는 경우 (기존 동작)
-			commandConsole.log(commandConsoleMessages.comments.reservationConsumed.replace('{members}', consumedReservation.join(', ')));
+			commandConsole.log(commandConsoleMessages.comments.reservationConsumed.replace('{members}', consumedReservation.map((g) => g.join(', ')).join(' / ')));
 		}
 	}
 
@@ -4224,9 +4240,14 @@ async function shuffleTeams() {
 				timestamp: getCurrentDbTimestamp(), type: 'reservation'
 			}))
 			.catch(error => console.error('토큰 모드 예약 동기화 실패:', error));
+		// 유저 예약도 동기화
+		if (currentUserCode) {
+			database.ref(`users/${currentUserCode}/reservations`).set(state.userReservations)
+				.catch(error => console.error('토큰 모드 유저 예약 동기화 실패:', error));
+		}
 	}
 
-	// 익명 유저: 예약 소모를 DB에 반영 (admin 실시간 갱신)
+	// 익명 유저: 예약 소모를 DB에 반영 (admin 실시간 갱신) — 프로필 없이 유저만 있는 경우
 	if (consumedReservation && database && currentUserCode && !currentProfileKey && !_readOnlyMode) {
 		database.ref(`users/${currentUserCode}/reservations`).set(state.reservations)
 			.catch(error => console.error('예약 동기화 실패:', error));
@@ -4237,6 +4258,11 @@ async function shuffleTeams() {
 		// 자신이 예약을 소모했다는 플래그 설정 (Firebase 리스너가 알림을 보내지 않도록)
 		if (typeof window !== 'undefined') {
 			window.lastReservationChangeByMe = true;
+		}
+		// 유저 예약도 동기화 (currentUserCode 있을 경우)
+		if (currentUserCode && database) {
+			database.ref(`users/${currentUserCode}/reservations`).set(state.userReservations)
+				.catch(error => console.error('유저 예약 동기화 실패:', error));
 		}
 		database.ref(`profiles/${currentProfileKey}/reservations`).set(state.reservations)
 			.then(() => {
@@ -4314,13 +4340,15 @@ function preShufflePeopleForGeneration(people) {
 
 function generateTeams(people, reservation = null) {
 	buildForbiddenMap();
+	// reservation은 배치(batch) 구조: [[group1Names], [group2Names], ...]
 	const reservationBaseIdSet = new Set();
 	if (Array.isArray(reservation)) {
-		reservation.forEach((name) => {
-			const person = people.find((item) => item.name === name);
-			if (person && Number.isInteger(person.id)) {
-				reservationBaseIdSet.add(person.id);
-			}
+		reservation.forEach((group) => {
+			if (!Array.isArray(group)) return;
+			group.forEach((name) => {
+				const person = people.find((item) => item.name === name);
+				if (person && Number.isInteger(person.id)) reservationBaseIdSet.add(person.id);
+			});
 		});
 	}
 	const isReservationOverridePair = (aId, bId, activeReservationIdSet) => {
@@ -4454,13 +4482,26 @@ function generateTeams(people, reservation = null) {
 		activateProbabilisticForbiddenPairsForTeamGeneration();
 		activateHiddenGroupsForTeamGeneration();
 		const activeReservationIdSet = new Set(reservationBaseIdSet);
-		if (reservation) {
-			const appliedReservationIds = applyReservationAsHiddenGroup(reservation) || [];
-			appliedReservationIds.forEach((id) => {
-				if (Number.isInteger(id)) {
-					activeReservationIdSet.add(id);
-				}
+		if (Array.isArray(reservation) && reservation.length > 0) {
+			window.appliedReservationRules = [];
+			const groupsApplied = [];
+			reservation.forEach((group) => {
+				if (!Array.isArray(group) || group.length === 0) return;
+				const appliedIds = applyReservationAsHiddenGroup(group) || [];
+				appliedIds.forEach((id) => { if (Number.isInteger(id)) activeReservationIdSet.add(id); });
+				if (window.appliedReservation) groupsApplied.push({ ...window.appliedReservation });
 			});
+			window.appliedReservation = {
+				names: groupsApplied.flatMap((g) => g.names || []),
+				foundNames: groupsApplied.flatMap((g) => g.foundNames || []),
+				additionalNames: groupsApplied.flatMap((g) => g.additionalNames || []),
+				notFoundNames: groupsApplied.flatMap((g) => g.notFoundNames || []),
+				excludedNames: groupsApplied.flatMap((g) => g.excludedNames || []),
+				groups: groupsApplied.map((g) => [
+					...(g.foundNames || []),
+					...(g.additionalNames || [])
+				])
+			};
 		}
 		const minorityForcedTogether = isMinorityForcedTogether();
 
@@ -4477,6 +4518,8 @@ function generateTeams(people, reservation = null) {
 		const processedHiddenClusters = new Set();
 		const hiddenGroupAffectedGroupIndices = new Set(); // 히든 그룹에 영향받은 requiredGroups 추적
 		let hiddenGroupFailed = false;
+		// 멀티 예약 그룹: 각 예약 클러스터가 배정된 팀 인덱스 추적 (서로 다른 팀에 배치)
+		const reservedTeamIndices = new Set();
 
 		for (const person of shuffledPeople) {
 			if (assigned.has(person.id)) continue;
@@ -4501,6 +4544,9 @@ function generateTeams(people, reservation = null) {
 					if (gi !== -1) hiddenGroupAffectedGroupIndices.add(gi);
 				});
 
+				// 이 클러스터가 예약 멤버를 포함하는지 확인 (멀티 예약 분리용)
+				const isReservationCluster = blockIds.some(id => activeReservationIdSet.has(id));
+
 				// 가중치 균등이 활성화된 경우 가중치 낮은 팀부터
 				let teamOrder;
 				if (state.weightBalanceEnabled) {
@@ -4515,6 +4561,12 @@ function generateTeams(people, reservation = null) {
 					pushLastTeamToEndIfNeeded(teamOrder, teams);
 				} else {
 					teamOrder = teams.map((_, idx) => idx).sort(() => Math.random() - 0.5);
+				}
+
+				// 예약 클러스터는 이미 다른 예약 그룹이 배정된 팀을 우선 제외
+				if (isReservationCluster && reservedTeamIndices.size > 0) {
+					const filtered = teamOrder.filter(i => !reservedTeamIndices.has(i));
+					if (filtered.length > 0) teamOrder = filtered;
 				}
 
 				let selectedTeam = -1;
@@ -4556,6 +4608,8 @@ function generateTeams(people, reservation = null) {
 				// 블록 멤버들을 팀에 추가
 				teams[selectedTeam].push(...blockMembers);
 				blockMembers.forEach(m => assigned.add(m.id));
+				// 예약 클러스터가 배정된 팀 기록 (다음 예약 그룹은 다른 팀으로)
+				if (isReservationCluster) reservedTeamIndices.add(selectedTeam);
 			}
 		}
 
@@ -5288,7 +5342,8 @@ function logTeamResultsToConsole(teams) {
 		appliedReservationSnapshot = {
 			applied: [...(reservation.foundNames || []), ...(reservation.additionalNames || [])],
 			notFound: reservation.notFoundNames || [],
-			excluded: reservation.excludedNames || []
+			excluded: reservation.excludedNames || [],
+			groups: (reservation.groups || []).map((g) => [...g])
 		};
 		let reservationInfo = `<br><br>${commandConsoleMessages.comments.reservationApplied}<br>`;
 
@@ -5388,9 +5443,20 @@ function logTeamResultsToConsole(teams) {
 	});
 
 	const appliedConstraintText = Array.from(appliedConstraintSet).join(' / ') || '-';
-	const appliedReservationText = appliedReservationSnapshot && Array.isArray(appliedReservationSnapshot.applied)
-		? appliedReservationSnapshot.applied.map((name) => String(name || '').trim()).filter((name) => name.length > 0).join(',')
-		: '';
+	const appliedReservationText = (() => {
+		if (!appliedReservationSnapshot) return '';
+		const groups = appliedReservationSnapshot.groups;
+		if (Array.isArray(groups) && groups.length > 0) {
+			return groups
+				.map((g) => g.map((n) => String(n || '').trim()).filter((n) => n.length > 0).join(','))
+				.filter((g) => g.length > 0)
+				.join('/');
+		}
+		if (Array.isArray(appliedReservationSnapshot.applied)) {
+			return appliedReservationSnapshot.applied.map((name) => String(name || '').trim()).filter((name) => name.length > 0).join(',');
+		}
+		return '';
+	})();
 
 	const appliedRuleSet = new Set();
 	appliedRulesSnapshot.forEach((rule) => {
@@ -5426,9 +5492,10 @@ function logTeamResultsToConsole(teams) {
 			? {
 				applied: [...(appliedReservationSnapshot.applied || [])],
 				notFound: [...(appliedReservationSnapshot.notFound || [])],
-				excluded: [...(appliedReservationSnapshot.excluded || [])]
+				excluded: [...(appliedReservationSnapshot.excluded || [])],
+				groups: (appliedReservationSnapshot.groups || []).map((g) => [...g])
 			}
-			: { applied: [], notFound: [], excluded: [] };
+			: { applied: [], notFound: [], excluded: [], groups: [] };
 		window.lastAppliedRulesForHistory = appliedRulesSnapshot.map((rule) => ({ ...rule }));
 	}
 
@@ -5449,10 +5516,12 @@ function saveGenerateHistory(teams) {
 				const applied = [...(window.lastAppliedReservationForHistory.applied || [])];
 				const notFound = [...(window.lastAppliedReservationForHistory.notFound || [])];
 				const excluded = [...(window.lastAppliedReservationForHistory.excluded || [])];
+				const groups = (window.lastAppliedReservationForHistory.groups || []).map((g) => [...g]);
 				return {
 					applied,
 					notFound,
 					excluded,
+					groups,
 					counts: {
 						applied: applied.length,
 						notFound: notFound.length,
@@ -5468,6 +5537,7 @@ function saveGenerateHistory(teams) {
 					applied: [],
 					notFound: [],
 					excluded: [],
+					groups: [],
 					counts: {
 						applied: 0,
 						notFound: 0,
@@ -5483,11 +5553,13 @@ function saveGenerateHistory(teams) {
 			];
 			const notFound = [...(reservation.notFoundNames || [])];
 			const excluded = [...(reservation.excludedNames || [])];
+			const groups = (reservation.groups || []).map((g) => [...g]);
 
 			return {
 				applied,
 				notFound,
 				excluded,
+				groups,
 				counts: {
 					applied: applied.length,
 					notFound: notFound.length,
@@ -5591,10 +5663,19 @@ function saveGenerateHistory(teams) {
 		});
 		const appliedConstraints = Array.from(appliedConstraintMap.values());
 
-		const appliedReservation = (appliedReservationSnapshot.applied || [])
-			.map((name) => String(name || '').trim())
-			.filter((name) => name.length > 0)
-			.join(',');
+		const appliedReservation = (() => {
+			const groups = appliedReservationSnapshot.groups;
+			if (Array.isArray(groups) && groups.length > 0) {
+				return groups
+					.map((g) => g.map((n) => String(n || '').trim()).filter((n) => n.length > 0).join(','))
+					.filter((g) => g.length > 0)
+					.join('/');
+			}
+			return (appliedReservationSnapshot.applied || [])
+				.map((name) => String(name || '').trim())
+				.filter((name) => name.length > 0)
+				.join(',');
+		})();
 
 		const appliedRuleSet = new Set();
 		appliedRuleItems.forEach((rule) => {

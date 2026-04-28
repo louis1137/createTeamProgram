@@ -24,20 +24,40 @@ const GLOBAL_APP_PASSWORD_PATH = 'admin/password';
 const DEFAULT_GLOBAL_APP_PASSWORD = 'admin1234';
 
 function normalizeReservations(value) {
-	const toRow = (item) => {
+	// group: 이름 배열 ["a","b"]
+	const toGroup = (item) => {
 		if (Array.isArray(item)) {
-			return item.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
+			return item.map((n) => String(n ?? '').trim()).filter((n) => n.length > 0);
 		}
 		if (typeof item === 'string') {
-			return item.split(',').map((name) => name.trim()).filter((name) => name.length > 0);
+			return item.split(',').map((n) => n.trim()).filter((n) => n.length > 0);
+		}
+		return [];
+	};
+	// batch: 그룹 배열. 반환값은 항상 [group1, group2, ...]
+	const toBatch = (item) => {
+		if (Array.isArray(item)) {
+			if (item.length > 0 && Array.isArray(item[0])) {
+				// 이미 다중 그룹 배치: [["a","b"],["c","d"]]
+				return item.map(toGroup).filter((g) => g.length > 0);
+			}
+			// 하위 호환: 단일 그룹 평면 배열 ["a","b"]
+			const group = toGroup(item);
+			return group.length > 0 ? [group] : [];
+		}
+		if (typeof item === 'string') {
+			// "/" 구분자로 다중 그룹 지원: "a,b / c,d"
+			return item.split('/').map((part) =>
+				part.split(',').map((n) => n.trim()).filter((n) => n.length > 0)
+			).filter((g) => g.length > 0);
 		}
 		return [];
 	};
 	if (Array.isArray(value)) {
-		return value.map(toRow).filter((row) => row.length > 0);
+		return value.map(toBatch).filter((batch) => batch.length > 0);
 	}
 	if (value && typeof value === 'object') {
-		return Object.values(value).map(toRow).filter((row) => row.length > 0);
+		return Object.values(value).map(toBatch).filter((batch) => batch.length > 0);
 	}
 	return [];
 }
@@ -636,11 +656,13 @@ function loadDataByType(type) {
 		case 'reservation':
 		// 예약만 로드 (동기화 예약 명령어로 실행된 경우)
 		const oldReservationCount = state.reservations ? state.reservations.length : 0;
-		return database.ref(`profiles/${currentProfileKey}/reservations`).once('value')
-			.then((snapshot) => {
-				const newReservations = normalizeReservations(snapshot.val());
+		return Promise.all([
+			database.ref(`profiles/${currentProfileKey}/reservations`).once('value'),
+			currentUserCode ? database.ref(`users/${currentUserCode}/reservations`).once('value') : Promise.resolve(null)
+		]).then(([profileSnap, userSnap]) => {
+				const newReservations = normalizeReservations(profileSnap.val());
 				const newCount = newReservations.length;
-				
+
 				// 예약 개수가 변경된 경우 알림 표시
 				if (oldReservationCount !== newCount) {
 					if (newCount > oldReservationCount) {
@@ -651,20 +673,24 @@ function loadDataByType(type) {
 						}
 					}
 				}
-				
+
 				state.reservations = newReservations;
+				state.userReservations = userSnap ? normalizeReservations(userSnap.val()) : [];
 				saveToLocalStorage();
 			});
-		
+
 		case 'all':
 		default:
 			// 전체 데이터 로드
-			return database.ref(`profiles/${currentProfileKey}`).once('value')
-				.then((snapshot) => {
-					const data = snapshot.val();
+			return Promise.all([
+				database.ref(`profiles/${currentProfileKey}`).once('value'),
+				currentUserCode ? database.ref(`users/${currentUserCode}/reservations`).once('value') : Promise.resolve(null)
+			]).then(([profileSnap, userResSnap]) => {
+					const data = profileSnap.val();
 					if (data) {
 						loadStateFromData(data);
 					}
+					state.userReservations = userResSnap ? normalizeReservations(userResSnap.val()) : [];
 				});
 	}
 }
@@ -684,6 +710,7 @@ function loadStateFromData(data) {
 	state.probabilisticForbiddenPairs = data.probabilisticForbiddenPairs || [];
 	state.activeProbabilisticForbiddenPairs = [];
 	state.reservations = normalizeReservations(data.reservations);
+	state.userReservations = [];
 	state.maxTeamSizeEnabled = data.maxTeamSizeEnabled || false;
 	state.genderBalanceEnabled = data.genderBalanceEnabled || false;
 	state.weightBalanceEnabled = data.weightBalanceEnabled || false;

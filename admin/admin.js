@@ -306,16 +306,30 @@ function cloneRules(data) {
 	ruleDraft = rows;
 }
 
+// 예약 배치(batch): [group1, group2, ...] 형태로 정규화
+// group은 이름 배열 ["a","b"]
 function normalizeReservation(item) {
+	const toGroup = (g) => {
+		if (Array.isArray(g)) return g.map((n) => String(n ?? '').trim()).filter((n) => n);
+		if (typeof g === 'string') return g.split(',').map((n) => n.trim()).filter((n) => n);
+		return [];
+	};
 	if (Array.isArray(item)) {
-		return item.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0);
+		if (item.length > 0 && Array.isArray(item[0])) {
+			// 이미 다중 그룹 배치: [["a","b"],["c","d"]]
+			return item.map(toGroup).filter((g) => g.length > 0);
+		}
+		// 하위 호환: 단일 그룹 ["a","b"]
+		const group = toGroup(item);
+		return group.length > 0 ? [group] : [];
 	}
 	if (typeof item === 'string') {
 		const text = item.trim();
-		if (!text) {
-			return [];
-		}
-		return text.split(',').map((name) => name.trim()).filter((name) => name.length > 0);
+		if (!text) return [];
+		// "/" 구분자로 다중 그룹 지원: "a,b / c,d"
+		return text.split('/').map((part) =>
+			part.split(',').map((n) => n.trim()).filter((n) => n)
+		).filter((g) => g.length > 0);
 	}
 	if (item && typeof item === 'object') {
 		const names = toList(item.names ?? item.members ?? item.people);
@@ -331,11 +345,11 @@ function cloneReservations(data) {
 		.filter((row) => row.length > 0);
 }
 
+// 텍스트 → 배치(batch): "a,b / c,d" → [["a","b"],["c","d"]]
 function parseReservationText(text) {
-	return String(text ?? '')
-		.split(',')
-		.map((name) => name.trim())
-		.filter((name) => name.length > 0);
+	return String(text ?? '').split('/').map((part) =>
+		part.split(',').map((n) => n.trim()).filter((n) => n.length > 0)
+	).filter((g) => g.length > 0);
 }
 
 function escapeHtml(value) {
@@ -686,11 +700,12 @@ function renderReservationTableRows() {
 		return;
 	}
 
-	container.innerHTML = reservationDraft.map((names, index) => {
-		const text = names.join(', ');
+	container.innerHTML = reservationDraft.map((batch, index) => {
+		// batch = [group1, group2, ...], 표시: "a, b / c, d"
+		const text = batch.map((g) => g.join(', ')).join(' / ');
 		return `<tr data-index="${index}">
 			<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>
-			<td><input class="member-input" type="text" data-role="reservationText" value="${escapeAttr(text)}"></td>
+			<td><input class="member-input" type="text" data-role="reservationText" value="${escapeAttr(text)}" placeholder="a,b,c / d,e,f"></td>
 			<td><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
 		</tr>`;
 	}).join('');
@@ -1298,9 +1313,10 @@ function buildPayloadFromForm(type) {
 		};
 	});
 
+	// reservationDraft = [[group1, group2], ...] 구조 그대로 저장 (normalizeReservations에서 복원)
 	const reservations = reservationDraft
-		.map((row) => row.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0))
-		.filter((row) => row.length > 0);
+		.map((batch) => batch.filter((g) => g.some((n) => String(n ?? '').trim())))
+		.filter((batch) => batch.length > 0);
 
 	const payload = {
 		membersPerTeam: form.membersPerTeam,
@@ -1458,8 +1474,8 @@ function removeEmptyRuleRows() {
 function removeEmptyReservationRows() {
 	const before = reservationDraft.length;
 	reservationDraft = reservationDraft
-		.map((row) => row.map((name) => String(name ?? '').trim()).filter((name) => name.length > 0))
-		.filter((row) => row.length > 0);
+		.map((batch) => batch.filter((g) => g.some((n) => String(n ?? '').trim())))
+		.filter((batch) => batch.length > 0);
 	if (before !== reservationDraft.length) {
 		renderReservationTable();
 	}
@@ -1906,7 +1922,7 @@ function bindEvents() {
 	const reservationAddBtn = getEl('reservationAddBtn');
 	if (reservationAddBtn instanceof HTMLButtonElement) {
 		reservationAddBtn.addEventListener('click', () => {
-			reservationDraft.push([]);
+			reservationDraft.push([[]]);
 			renderReservationTable();
 			focusLastReservationInput();
 		});
