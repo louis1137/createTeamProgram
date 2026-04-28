@@ -175,6 +175,11 @@ body {
 	vertical-align: middle;
 }
 
+.online-badge.token-badge {
+	border-color: #f59e0b;
+	color: #f59e0b;
+}
+
 .item-meta {
 	display: block;
 	margin-top: 3px;

@@ -128,11 +128,53 @@ function enterReadOnlyMode(profileKey, data) {
 	_readOnlyProfileKey = profileKey || '';
 	if (data && typeof loadStateFromData === 'function') loadStateFromData(data);
 	updateLoginUI();
+	setupTokenSync();
+	if (database && profileKey) {
+		const userCode = currentUserCode || '';
+		database.ref(`profiles/${profileKey}`).update({ tokenOnline: true, tokenOnlineUser: userCode }).catch(() => {});
+		database.ref(`profiles/${profileKey}/tokenOnline`).onDisconnect().remove().catch(() => {});
+		database.ref(`profiles/${profileKey}/tokenOnlineUser`).onDisconnect().remove().catch(() => {});
+		if (userCode) {
+			const userOnlineRef = database.ref(`users/${userCode}/online`);
+			userOnlineRef.onDisconnect().remove().then(() => {
+				userOnlineRef.set(true).catch(() => {});
+			}).catch(() => {});
+		}
+	}
+}
+
+let _tokenSyncAttached = false;
+function setupTokenSync() {
+	if (!database || !_readOnlyProfileKey || _tokenSyncAttached) return;
+	_tokenSyncAttached = true;
+	let initialized = false;
+	database.ref(`profiles/${_readOnlyProfileKey}/syncTrigger`).on('value', (snapshot) => {
+		const trigger = snapshot.val();
+		if (!initialized) { initialized = true; return; }
+		if (!trigger) return;
+		const syncType = (trigger && typeof trigger === 'object' && trigger.type) ? trigger.type : 'all';
+		// loadDataByType은 currentProfileKey 기반으로 동작하므로 임시로 설정 후 복원
+		// 토큰 모드는 읽기 전용이므로 이 사이에 쓰기가 발생하지 않아 안전
+		const prev = currentProfileKey;
+		currentProfileKey = _readOnlyProfileKey;
+		loadDataByType(syncType).finally(() => {
+			currentProfileKey = prev;
+		});
+	});
 }
 
 function exitReadOnlyMode() {
+	if (database && _readOnlyProfileKey) {
+		const tokenOnlineRef = database.ref(`profiles/${_readOnlyProfileKey}/tokenOnline`);
+		const tokenOnlineUserRef = database.ref(`profiles/${_readOnlyProfileKey}/tokenOnlineUser`);
+		tokenOnlineRef.onDisconnect().cancel().catch(() => {});
+		tokenOnlineUserRef.onDisconnect().cancel().catch(() => {});
+		tokenOnlineRef.remove().catch(() => {});
+		tokenOnlineUserRef.remove().catch(() => {});
+	}
 	_readOnlyMode = false;
 	_readOnlyProfileKey = '';
+	_tokenSyncAttached = false;
 	history.replaceState({}, '', window.location.pathname);
 }
 
@@ -2339,6 +2381,15 @@ function updateLoginUI() {
 			statusText.textContent = `${currentProfileKey}님 환영합니다.`;
 			statusText.classList.add('logged-in');
 		}
+	} else if (_readOnlyMode && _readOnlyProfileKey) {
+		if (loginBtn) loginBtn.style.display = '';
+		if (signupBtn) signupBtn.style.display = '';
+		if (pwChangeBtn) pwChangeBtn.style.display = 'none';
+		if (logoutDirectBtn) logoutDirectBtn.style.display = 'none';
+		if (statusText) {
+			statusText.textContent = '';
+			statusText.classList.remove('logged-in');
+		}
 	} else {
 		if (loginBtn) { loginBtn.style.display = ''; loginBtn.textContent = '로그인'; loginBtn.classList.remove('logged-in'); }
 		if (signupBtn) signupBtn.style.display = '';
@@ -4166,8 +4217,17 @@ async function shuffleTeams() {
 		}
 	}
 
+	// 토큰 모드: 예약 소모를 해당 프로필 DB에 반영
+	if (consumedReservation && database && _readOnlyMode && _readOnlyProfileKey) {
+		database.ref(`profiles/${_readOnlyProfileKey}/reservations`).set(state.reservations)
+			.then(() => database.ref(`profiles/${_readOnlyProfileKey}/syncTrigger`).set({
+				timestamp: getCurrentDbTimestamp(), type: 'reservation'
+			}))
+			.catch(error => console.error('토큰 모드 예약 동기화 실패:', error));
+	}
+
 	// 익명 유저: 예약 소모를 DB에 반영 (admin 실시간 갱신)
-	if (consumedReservation && database && currentUserCode && !currentProfileKey) {
+	if (consumedReservation && database && currentUserCode && !currentProfileKey && !_readOnlyMode) {
 		database.ref(`users/${currentUserCode}/reservations`).set(state.reservations)
 			.catch(error => console.error('예약 동기화 실패:', error));
 	}
@@ -5380,9 +5440,8 @@ function logTeamResultsToConsole(teams) {
 // 팀 생성 이력 저장
 function saveGenerateHistory(teams) {
 	try {
-		if (_readOnlyMode) return;
 		if (!database) return;
-		if (!currentUserCode && !currentProfileKey) return;
+		if (!currentUserCode && !currentProfileKey && !_readOnlyProfileKey) return;
 		if (!Array.isArray(teams) || teams.length === 0) return;
 
 		const buildAppliedReservationSnapshot = () => {
@@ -5585,7 +5644,7 @@ function saveGenerateHistory(teams) {
 		const timestamp = getCurrentDbTimestamp();
 		const historyData = {
 			createdAt: timestamp,
-			profile: currentProfileKey || '',
+			profile: currentProfileKey || _readOnlyProfileKey || '',
 			userCode: currentUserCode || '',
 			teams: teams.map(team => team.map(person => {
 				const details = [];
@@ -5630,8 +5689,15 @@ function saveGenerateHistory(teams) {
 				.catch((error) => { console.error('generateHistory(profiles) 저장 실패:', error); });
 		}
 
-		// 비프로필 상태: 레코드 확정
-		if (!currentProfileKey && typeof confirmUserRecord === 'function') {
+		// 토큰 모드: 해당 프로필 히스토리에 저장
+		if (_readOnlyMode && _readOnlyProfileKey) {
+			database.ref(`profiles/${_readOnlyProfileKey}/generateHistory`).push(historyData)
+				.then(() => { console.log('generateHistory(token-profile) 저장 완료'); })
+				.catch((error) => { console.error('generateHistory(token-profile) 저장 실패:', error); });
+		}
+
+		// 비프로필 상태: 레코드 확정 (토큰 모드 제외)
+		if (!currentProfileKey && !_readOnlyMode && typeof confirmUserRecord === 'function') {
 			confirmUserRecord();
 		}
 

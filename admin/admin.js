@@ -462,9 +462,9 @@ function cloneGenerateHistory(data) {
 
 	historyDraft.sort((a, b) => {
 		if (a.sortTime !== b.sortTime) {
-			return a.sortTime - b.sortTime;
+			return b.sortTime - a.sortTime;
 		}
-		return String(a.entryKey).localeCompare(String(b.entryKey), 'ko');
+		return String(b.entryKey).localeCompare(String(a.entryKey), 'ko');
 	});
 }
 
@@ -1059,9 +1059,18 @@ function buildItemButton(type, key, data) {
 	const dateValue = data?.timestamp || data?.lastAccess || data?.createdAt || '';
 	const displayKey = (type === 'profiles' && data?.deleted) ? `${key} (deleted)` : key;
 	const isOnline = data?.online === true;
+	const isTokenOnline = type === 'profiles' && data?.tokenOnline === true;
 	const onlineUser = type === 'profiles' ? (data?.onlineUser || '') : '';
-	const badgeLabel = type === 'profiles' ? (onlineUser || '로그인중') : '로그인중';
-	const onlineBadge = isOnline ? ` <span class="online-badge">${badgeLabel}</span>` : '';
+	const tokenOnlineUser = type === 'profiles' ? (data?.tokenOnlineUser || '') : '';
+	let onlineBadge = '';
+	if (isOnline) {
+		const label = type === 'profiles' ? (onlineUser ? `${onlineUser}로그인중` : '로그인중') : '접속중';
+		onlineBadge += ` <span class="online-badge">${label}</span>`;
+	}
+	if (isTokenOnline) {
+		const label = tokenOnlineUser ? `${tokenOnlineUser} 토큰사용중` : '토큰사용중';
+		onlineBadge += ` <span class="online-badge token-badge">${label}</span>`;
+	}
 	button.innerHTML = `<span class="item-title">${displayKey}${onlineBadge}</span><span class="item-meta">${dateValue || 'no timestamp'}</span>`;
 	button.addEventListener('click', async () => {
 		showEditorView();
