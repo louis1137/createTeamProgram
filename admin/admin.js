@@ -1079,7 +1079,7 @@ function buildItemButton(type, key, data) {
 	const tokenOnlineUser = type === 'profiles' ? (data?.tokenOnlineUser || '') : '';
 	let onlineBadge = '';
 	if (isOnline) {
-		const label = type === 'profiles' ? (onlineUser ? `${onlineUser}로그인중` : '로그인중') : '접속중';
+		const label = type === 'profiles' ? (onlineUser ? `${onlineUser} 로그인중` : '접속중') : '접속중';
 		onlineBadge += ` <span class="online-badge">${label}</span>`;
 	}
 	if (isTokenOnline) {

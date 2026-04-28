@@ -1071,6 +1071,35 @@ function saveToLocalStorage() {
 	}
 }
 
+// 대기 중인 debounce 저장을 즉시 실행 (로그아웃 직전 호출)
+function flushProfileAutoSave() {
+	if (!_profileAutoSaveTimer || !currentProfileKey || !database) return;
+	clearTimeout(_profileAutoSaveTimer);
+	_profileAutoSaveTimer = null;
+	const data = {
+		people: state.people,
+		inactivePeople: state.inactivePeople,
+		requiredGroups: state.requiredGroups,
+		nextId: state.nextId,
+		forbiddenPairs: state.forbiddenPairs,
+		pendingConstraints: state.pendingConstraints,
+		reservations: state.reservations,
+		hiddenGroups: state.hiddenGroups,
+		hiddenGroupChains: state.hiddenGroupChains,
+		pendingHiddenGroups: state.pendingHiddenGroups,
+		pendingHiddenGroupChains: state.pendingHiddenGroupChains,
+		probabilisticForbiddenPairs: state.probabilisticForbiddenPairs,
+		maxTeamSizeEnabled: state.maxTeamSizeEnabled,
+		genderBalanceEnabled: state.genderBalanceEnabled,
+		weightBalanceEnabled: state.weightBalanceEnabled,
+		membersPerTeam: state.membersPerTeam,
+		timestamp: getCurrentDbTimestamp(),
+		lastAccess: getCurrentDbTimestamp()
+	};
+	database.ref(`profiles/${currentProfileKey}`).update(data)
+		.catch((e) => { console.error('프로필 즉시 저장 실패:', e); });
+}
+
 // localStorage에서 복원 — 현재는 비프로필 저장 없으므로 사용하지 않음
 function loadFromLocalStorage() {
 	// 비프로필: 새로고침 시 빈 화면 (저장 없음)
@@ -1400,7 +1429,6 @@ function resetAll(e) {
 	});
 	if (converted > 0) {
 		console.log(commandConsoleMessages.comments.resetConstraintsConverted.replace('{count}', converted));
-		safeOpenForbiddenWindow();
 	}
 
 	// Shift 키를 누른 경우: 미참가자도 모두 삭제
@@ -1440,6 +1468,12 @@ function resetAll(e) {
 	if (faqSection) faqSection.style.display = '';
 	saveToLocalStorage();
 	renderPeople();
+	// 상태가 모두 정리된 후 팝업 갱신 (forbiddenPairs 클리어 이후여야 적용/대기 구분이 정확함)
+	if (converted > 0) {
+		safeOpenForbiddenWindow();
+	} else if (forbiddenPopup && !forbiddenPopup.closed) {
+		renderForbiddenWindowContent();
+	}
 }
 
 function handleGenderBalanceToggle(e) {
@@ -2306,6 +2340,7 @@ function removePerson(id, isCompleteDelete = false) {
 
 	saveToLocalStorage();
 	renderPeople();
+	if (forbiddenPopup && !forbiddenPopup.closed) renderForbiddenWindowContent();
 }
 
 function updatePersonGender(id, gender) {
@@ -2705,6 +2740,7 @@ async function handleSignupSubmit() {
 	if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '확인'; }
 
 	// 자동 로그인
+	closeForbiddenPopup();
 	setSessionProfile(username);
 	currentProfileKey = username;
 	setCurrentProfileSource('profiles');
@@ -2780,6 +2816,7 @@ async function handleLoginSubmit() {
 	}
 
 	// 로그인 성공
+	closeForbiddenPopup();
 	exitReadOnlyMode();
 	commandConsole.authenticated = true;
 	commandConsole.storedPassword = password;
@@ -2819,7 +2856,10 @@ async function handleLoginSubmit() {
 }
 
 function handleLogout() {
+	closeForbiddenPopup();
 	try { localStorage.removeItem('profileAutoLogin'); } catch (_) {}
+	// debounce 대기 중인 저장이 있으면 로그아웃 전에 즉시 flush (currentProfileKey가 유효한 동안)
+	flushProfileAutoSave();
 	if (typeof clearOnlinePresence === 'function') clearOnlinePresence();
 	if (typeof logoutProfile === 'function') logoutProfile();
 	// 로그아웃 후 익명 유저로 users online 유지
@@ -3082,7 +3122,7 @@ function tryResolvePendingConstraints() {
 	if (changed) {
 		buildForbiddenMap();
 		saveToLocalStorage();
-		// 제약 관리창 자동 열기 제거 - 참가자 입력 시 !가 없으면 창이 열리지 않아야 함
+		if (forbiddenPopup && !forbiddenPopup.closed) renderForbiddenWindowContent();
 	}
 }
 
@@ -3686,6 +3726,13 @@ function getActiveHiddenGroupBlockIds(personId) {
 
 // --- 참가자 분리 팝업 창 관련 헬퍼 ---
 let forbiddenPopup = null;
+
+function closeForbiddenPopup() {
+	if (forbiddenPopup && !forbiddenPopup.closed) {
+		try { forbiddenPopup.close(); } catch (_) {}
+	}
+	forbiddenPopup = null;
+}
 
 function openForbiddenWindow() {
 	const features = 'width=600,height=700,toolbar=0,location=0,status=0,menubar=0,scrollbars=1,resizable=1';

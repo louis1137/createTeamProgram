@@ -423,11 +423,17 @@ function setupRealtimeSync() {
 	// 이미 리스너가 등록되어 있으면 중복 등록 방지
 	if (syncListenerAttached) return;
 	
-	// 실시간 동기화 시작 전에 현재 UI 초기화 (이미 로드된 데이터가 있으면 초기화하지 않음)
-	if (!state.people || state.people.length === 0) {
+	// 이미 데이터가 로드된 경우에는 초기화하지 않음 (people이 없어도 제약/예약 등이 있을 수 있음)
+	const _hasAnyData = (state.people && state.people.length > 0)
+		|| (state.pendingConstraints && state.pendingConstraints.length > 0)
+		|| (state.forbiddenPairs && state.forbiddenPairs.length > 0)
+		|| (state.reservations && state.reservations.length > 0)
+		|| (state.hiddenGroups && state.hiddenGroups.length > 0)
+		|| (state.hiddenGroupChains && state.hiddenGroupChains.length > 0);
+	if (!_hasAnyData) {
 		clearState();
 	}
-	
+
 	realtimeSyncActive = true;
 	syncListenerAttached = true;
 	
