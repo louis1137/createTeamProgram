@@ -1170,6 +1170,14 @@ tr:hover .drag-cell {
 	color: var(--muted);
 	white-space: nowrap;
 }
+.gh-link {
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+.gh-link:hover {
+	opacity: 0.75;
+}
 .gh-teams {
 	min-width: 200px;
 }

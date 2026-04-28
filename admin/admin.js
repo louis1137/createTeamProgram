@@ -492,17 +492,24 @@ function renderGenerateHistoryTableRows() {
 		return;
 	}
 
-	container.innerHTML = historyDraft.map((item) => `
+	container.innerHTML = historyDraft.map((item) => {
+		const profileCell = item.profile
+			? `<span class="gh-link" onclick="openItemFromHistory('profiles','${item.profile}')">${item.profile}</span>`
+			: '-';
+		const userCell = item.userCode
+			? `<span class="gh-link" onclick="openItemFromHistory('users','${item.userCode}')">${item.userCode}</span>`
+			: '-';
+		return `
 		<tr>
 			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
-			<td class="gh-cell gh-profile">${item.profile || '-'}</td>
-			<td class="gh-cell gh-user">${item.userCode || '-'}</td>
+			<td class="gh-cell gh-profile">${profileCell}</td>
+			<td class="gh-cell gh-user">${userCell}</td>
 			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
-		</tr>
-	`).join('');
+		</tr>`;
+	}).join('');
 }
 
 function renderGenerateHistoryTable() {
@@ -2114,6 +2121,17 @@ function bindNewProfileModal() {
 
 let globalHistoryData = [];
 
+async function openItemFromHistory(type, key) {
+	if (!key || key === '-') return;
+	showEditorView();
+	selected = { type, key };
+	setButtonsEnabled(true);
+	setEditorHeader();
+	applySelectionStyles();
+	await loadSelectedItem();
+	setupSelectedItemListener(type, key);
+}
+
 function formatGlobalHistoryDate(createdAt) {
 	if (!createdAt) return '-';
 	let d;
@@ -2208,17 +2226,24 @@ function renderGlobalHistory() {
 		tbody.innerHTML = '<tr><td colspan="6" class="gh-loading">생성 기록이 없습니다.</td></tr>';
 		return;
 	}
-	tbody.innerHTML = globalHistoryData.map((item) => `
+	tbody.innerHTML = globalHistoryData.map((item) => {
+		const profileCell = item.profile
+			? `<span class="gh-link" onclick="openItemFromHistory('profiles','${item.profile}')">${item.profile}</span>`
+			: '-';
+		const userCell = item.userCode
+			? `<span class="gh-link" onclick="openItemFromHistory('users','${item.userCode}')">${item.userCode}</span>`
+			: '-';
+		return `
 		<tr>
 			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
-			<td class="gh-cell gh-profile">${item.profile || '-'}</td>
-			<td class="gh-cell gh-user">${item.userCode || '-'}</td>
+			<td class="gh-cell gh-profile">${profileCell}</td>
+			<td class="gh-cell gh-user">${userCell}</td>
 			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
-		</tr>
-	`).join('');
+		</tr>`;
+	}).join('');
 }
 
 function showHistoryView() {
