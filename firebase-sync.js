@@ -721,17 +721,26 @@ function loadStateFromData(data) {
 	state.genderBalanceEnabled = data.genderBalanceEnabled || false;
 	state.weightBalanceEnabled = data.weightBalanceEnabled || false;
 	state.membersPerTeam = data.membersPerTeam || 4;
-	
+
 	// UI 업데이트
 	if (elements.maxTeamSizeCheckbox) elements.maxTeamSizeCheckbox.checked = state.maxTeamSizeEnabled;
 	if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.checked = state.genderBalanceEnabled;
 	if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.checked = state.weightBalanceEnabled;
 	if (elements.teamSizeInput) elements.teamSizeInput.value = state.membersPerTeam;
-	
+
 	buildForbiddenMap();
 	renderPeople();
 	if (typeof tryResolvePendingConstraints === 'function') tryResolvePendingConstraints();
 	if (typeof tryResolveHiddenGroups === 'function') tryResolveHiddenGroups();
+
+	// 이 세션의 셔플된 groupColors를 Firebase에 즉시 기록 (admin 실시간 동기화용)
+	// syncTrigger를 건드리지 않으므로 토큰 루프 없음. 토큰 모드(읽기 전용)는 건너뜀.
+	if (database && !_readOnlyMode) {
+		const ref = currentProfileKey
+			? database.ref(`profiles/${currentProfileKey}/groupColors`)
+			: (currentUserCode ? database.ref(`users/${currentUserCode}/groupColors`) : null);
+		if (ref) ref.set(state.groupColors).catch(() => {});
+	}
 }
 
 // state를 완전 초기화

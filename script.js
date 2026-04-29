@@ -1030,8 +1030,7 @@ function handleDuplicateCancel() {
 let _profileAutoSaveTimer = null;
 
 // localStorage에 저장
-function saveToLocalStorage() {
-	if (_readOnlyMode) return;
+function saveToLocalStorage(delay = 1000) {
 	try {
 		const data = {
 			people: state.people,
@@ -1050,22 +1049,51 @@ function saveToLocalStorage() {
 			genderBalanceEnabled: state.genderBalanceEnabled,
 			weightBalanceEnabled: state.weightBalanceEnabled,
 			membersPerTeam: state.membersPerTeam,
+			groupColors: state.groupColors,
 			timestamp: getCurrentDbTimestamp(),
 			lastAccess: getCurrentDbTimestamp()
 		};
 
-		// 프로필 로그인 상태 — Firebase 프로필에 자동 저장 (debounce 1초)
+		// 프로필 로그인 상태 — Firebase 프로필에 자동 저장
 		if (currentProfileKey) {
 			if (!database) return;
 			clearTimeout(_profileAutoSaveTimer);
 			_profileAutoSaveTimer = setTimeout(() => {
 				database.ref(`profiles/${currentProfileKey}`).update(data)
 					.catch((e) => { console.error('프로필 자동 저장 실패:', e); });
-			}, 1000);
+			}, delay);
 			return;
 		}
 
-		// 비프로필 유저 — 저장하지 않음 (새로고침 시 빈 화면)
+		// 토큰 모드 — 해당 프로필에 저장 + syncTrigger 발송 + 유저 레코드 동기화
+		if (_readOnlyMode && _readOnlyProfileKey && database) {
+			clearTimeout(_profileAutoSaveTimer);
+			_profileAutoSaveTimer = setTimeout(() => {
+				database.ref(`profiles/${_readOnlyProfileKey}`).update(data)
+					.then(() => {
+						database.ref(`profiles/${_readOnlyProfileKey}/syncTrigger`).set({
+							timestamp: getCurrentDbTimestamp(),
+							tick: Date.now(),
+							type: 'member'
+						}).catch(() => {});
+					})
+					.catch((e) => { console.error('토큰 모드 저장 실패:', e); });
+				if (currentUserCode) {
+					database.ref(`users/${currentUserCode}`).update(data)
+						.catch((e) => { console.error('토큰 유저 동기화 실패:', e); });
+				}
+			}, delay);
+			return;
+		}
+
+		// 비프로필 유저 — Firebase users에 실시간 저장
+		if (currentUserCode && database) {
+			clearTimeout(_profileAutoSaveTimer);
+			_profileAutoSaveTimer = setTimeout(() => {
+				database.ref(`users/${currentUserCode}`).update(data)
+					.catch((e) => { console.error('유저 자동 저장 실패:', e); });
+			}, delay);
+		}
 	} catch (e) {
 		console.error('자동 저장 실패:', e);
 	}
@@ -1093,6 +1121,7 @@ function flushProfileAutoSave() {
 		genderBalanceEnabled: state.genderBalanceEnabled,
 		weightBalanceEnabled: state.weightBalanceEnabled,
 		membersPerTeam: state.membersPerTeam,
+		groupColors: state.groupColors,
 		timestamp: getCurrentDbTimestamp(),
 		lastAccess: getCurrentDbTimestamp()
 	};
@@ -1518,7 +1547,7 @@ function shuffleOrder() {
 			}
 			return arr;
 		});
-		saveToLocalStorage();
+		saveToLocalStorage(0);
 		renderPeople();
 }
 
@@ -5785,7 +5814,19 @@ function saveGenerateHistory(teams) {
 					details.push(person.weight ?? 0);
 				}
 				return details.length > 0 ? `${person.name}(${details.join('/')})` : person.name;
-			}))
+			})),
+			...(() => {
+				const filtered = state.requiredGroups
+					.map((group, i) => ({
+						names: group.map(personId => { const p = state.people.find(q => q.id === personId); return p ? p.name : ''; }).filter(Boolean),
+						color: state.groupColors[i % state.groupColors.length]
+					}))
+					.filter(g => g.names.length > 1);
+				return {
+					appliedGroups: filtered.map(g => g.names),
+					appliedGroupColors: filtered.map(g => g.color)
+				};
+			})()
 		};
 
 		if (reservationItems.length > 0) {

@@ -13,6 +13,8 @@ let database = null;
 let selected = { type: null, key: null };
 let toastTimer = null;
 let memberDraft = { people: [], inactivePeople: [] };
+let groupDraft = []; // requiredGroups: [[id, id], [id, id], ...]
+let groupColorsDraft = []; // groupColors saved from main page
 let constraintDraft = [];
 let ruleDraft = [];
 let reservationDraft = [];
@@ -23,6 +25,7 @@ let _profilesListenerRef = null;
 let _usersListenerRef = null;
 let _selectedListenerRef = null;
 let _selectedListenerCallback = null;
+let _globalHistoryListenerRef = null;
 let _isSaving = false;
 
 const ADMIN_ACCESS_SESSION_KEY = 'adminAccessAuthenticated';
@@ -164,6 +167,33 @@ function setButtonsEnabled(enabled) {
 	});
 }
 
+const GROUP_COLORS = [
+	'#6FE5DD', '#FFB3BA', '#FFD93D', '#6BCB77', '#A78BFA',
+	'#FD9843', '#FF1493', '#38BDF8', '#34D399', '#9900FF',
+	'#5B7FBF', '#0066ff'
+];
+
+function getGroupColorForPersonId(personId) {
+	for (let i = 0; i < groupDraft.length; i++) {
+		if (groupDraft[i].includes(personId)) {
+			const palette = groupColorsDraft.length ? groupColorsDraft : GROUP_COLORS;
+			return palette[i % palette.length];
+		}
+	}
+	return null;
+}
+
+function toGroupsArray(val) {
+	if (!val) return [];
+	const outer = Array.isArray(val) ? val : Object.values(val);
+	return outer.map(inner => {
+		if (!inner) return [];
+		if (Array.isArray(inner)) return inner;
+		if (typeof inner === 'object') return Object.values(inner);
+		return [];
+	});
+}
+
 function normalizeMember(item, index) {
 	return {
 		id: typeof item?.id === 'number' ? item.id : index + 1,
@@ -173,10 +203,19 @@ function normalizeMember(item, index) {
 	};
 }
 
+function toMemberArray(val) {
+	if (!val) return [];
+	if (Array.isArray(val)) return val;
+	if (typeof val === 'object') return Object.values(val);
+	return [];
+}
+
 function cloneMembers(data) {
-	const people = Array.isArray(data?.people) ? data.people.map((item, index) => normalizeMember(item, index)) : [];
-	const inactivePeople = Array.isArray(data?.inactivePeople) ? data.inactivePeople.map((item, index) => normalizeMember(item, index)) : [];
+	const people = toMemberArray(data?.people).map((item, index) => normalizeMember(item, index));
+	const inactivePeople = toMemberArray(data?.inactivePeople).map((item, index) => normalizeMember(item, index));
 	memberDraft = { people, inactivePeople };
+	groupDraft = toGroupsArray(data?.requiredGroups);
+	groupColorsDraft = Array.isArray(data?.groupColors) ? data.groupColors : [];
 }
 
 function normalizeConstraint(item) {
@@ -387,6 +426,31 @@ function normalizeHistoryTeams(value) {
 	}).filter((team) => team.length > 0);
 }
 
+function normalizeHistoryGroups(value) {
+	if (!value) return [];
+	const outer = Array.isArray(value) ? value : Object.values(value);
+	return outer.map(inner => {
+		if (Array.isArray(inner)) return inner.map(String).filter(Boolean);
+		if (inner && typeof inner === 'object') return Object.values(inner).map(String).filter(Boolean);
+		return [];
+	}).filter(g => g.length > 1);
+}
+
+function buildGroupNameColorMap(appliedGroups, appliedGroupColors = []) {
+	const map = new Map(); // name (normalized) -> color
+	appliedGroups.forEach((group, i) => {
+		const color = appliedGroupColors[i] || GROUP_COLORS[i % GROUP_COLORS.length];
+		group.forEach(name => map.set(name.trim().toLowerCase(), color));
+	});
+	return map;
+}
+
+// 이름 문자열에서 접미사(남/여/가중치) 앞의 순수 이름만 추출
+function extractHistoryBaseName(nameStr) {
+	const m = nameStr.match(/^(.+?)\([\s\S]*\)$/);
+	return m ? m[1].trim() : nameStr.trim();
+}
+
 function normalizeHistoryStrings(value, splitter = null) {
 	if (Array.isArray(value)) {
 		return value.map((item) => String(item ?? '').trim()).filter((item) => item.length > 0);
@@ -460,6 +524,8 @@ function cloneGenerateHistory(data) {
 		const appliedReservation = normalizeHistoryStrings(entry?.appliedReservation, null);
 		const appliedRules = normalizeHistoryStrings(entry?.appliedRules, '/');
 		const appliedConstraints = normalizeHistoryStrings(entry?.appliedConstraints, '/');
+		const appliedGroups = normalizeHistoryGroups(entry?.appliedGroups);
+		const appliedGroupColors = Array.isArray(entry?.appliedGroupColors) ? entry.appliedGroupColors : [];
 		const sortTime = Date.parse(createdAt.includes('T') ? createdAt : createdAt.replace(' ', 'T'));
 		return {
 			entryKey,
@@ -470,6 +536,8 @@ function cloneGenerateHistory(data) {
 			appliedReservation,
 			appliedRules,
 			appliedConstraints,
+			appliedGroups,
+			appliedGroupColors,
 			sortTime: Number.isFinite(sortTime) ? sortTime : Number.NEGATIVE_INFINITY
 		};
 	});
@@ -499,12 +567,13 @@ function renderGenerateHistoryTableRows() {
 		const userCell = item.userCode
 			? `<span class="gh-link" onclick="openItemFromHistory('users','${item.userCode}')">${item.userCode}</span>`
 			: '-';
+		const colorMap = item.appliedGroups?.length ? buildGroupNameColorMap(item.appliedGroups, item.appliedGroupColors) : null;
 		return `
 		<tr>
 			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
 			<td class="gh-cell gh-profile">${profileCell}</td>
 			<td class="gh-cell gh-user">${userCell}</td>
-			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams)}</td>
+			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams, colorMap)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
@@ -574,20 +643,58 @@ function updateMemberSummary() {
 	}
 }
 
+// 메인 페이지 renderPeople()과 동일한 시각적 순서를 계산
+// groups 내 멤버를 처음 만나는 시점에 그룹 전체를 삽입 (그룹 내부 순서 유지)
+function getVisualOrder(people, groups) {
+	const groupMap = new Map();
+	groups.forEach((group, groupIndex) => {
+		group.forEach(personId => groupMap.set(personId, groupIndex));
+	});
+
+	const processedGroups = new Set();
+	const result = [];
+
+	people.forEach((person, originalIndex) => {
+		const groupIndex = groupMap.get(person.id);
+		if (groupIndex !== undefined && !processedGroups.has(groupIndex)) {
+			processedGroups.add(groupIndex);
+			groups[groupIndex].forEach(personId => {
+				const idx = people.findIndex(p => p.id === personId);
+				if (idx !== -1) result.push({ person: people[idx], originalIndex: idx });
+			});
+		} else if (groupIndex === undefined) {
+			result.push({ person, originalIndex });
+		}
+		// 이미 처리된 그룹 멤버는 스킵
+	});
+
+	return result;
+}
+
 function renderMemberTableRows(containerId, listKey) {
 	const container = getEl(containerId);
 	if (!container) {
 		return;
 	}
-	const rows = memberDraft[listKey];
-	if (!rows.length) {
+	const source = memberDraft[listKey];
+	if (!source.length) {
 		container.innerHTML = `<tr><td class="member-empty" colspan="5">데이터가 없습니다.</td></tr>`;
 		return;
 	}
-	container.innerHTML = rows.map((person, index) => {
-		return `<tr data-list="${listKey}" data-index="${index}">
+
+	// 참가자(people)만 메인 페이지 시각 순서 적용, 미참가자는 원본 순서 유지
+	const rows = listKey === 'people'
+		? getVisualOrder(source, groupDraft)
+		: source.map((person, originalIndex) => ({ person, originalIndex }));
+
+	container.innerHTML = rows.map(({ person, originalIndex }) => {
+		const groupColor = getGroupColorForPersonId(person.id);
+		const dotHtml = groupColor
+			? `<span class="group-dot" style="background:${groupColor}" title="그룹"></span>`
+			: `<span class="group-dot group-dot-empty"></span>`;
+		return `<tr data-list="${listKey}" data-index="${originalIndex}">
 			<td class="drag-cell" draggable="true" data-role="drag-handle" title="순서 변경"></td>
-			<td><input class="member-input" type="text" data-role="name" value="${person.name.replace(/"/g, '&quot;')}"></td>
+			<td class="member-name-cell">${dotHtml}<input class="member-input" type="text" data-role="name" value="${person.name.replace(/"/g, '&quot;')}"></td>
 			<td><button class="gender-toggle-btn" type="button" data-role="gender">${getGenderLabel(person.gender)}</button></td>
 			<td><input class="member-input" type="number" data-role="weight" min="0" step="1" value="${person.weight}"></td>
 			<td><button class="member-delete-btn" type="button" data-role="delete" aria-label="삭제">×</button></td>
@@ -1216,17 +1323,31 @@ function teardownSelectedListener() {
 	_selectedListenerCallback = null;
 }
 
+function updateEditorIfSelected(type, key, data) {
+	if (selected.type === type && selected.key === key && !_isSaving) {
+		writeFormData(key, type, data);
+	}
+}
+
 function setupRealtimeListeners() {
 	teardownListListeners();
 
 	_profilesListenerRef = database.ref('profiles');
 	_profilesListenerRef.on('value', (snapshot) => {
-		renderList('profiles', snapshot.val() || {});
+		const values = snapshot.val() || {};
+		renderList('profiles', values);
+		if (selected.type === 'profiles' && selected.key && values[selected.key]) {
+			updateEditorIfSelected('profiles', selected.key, values[selected.key]);
+		}
 	});
 
 	_usersListenerRef = database.ref('users');
 	_usersListenerRef.on('value', (snapshot) => {
-		renderList('users', snapshot.val() || {});
+		const values = snapshot.val() || {};
+		renderList('users', values);
+		if (selected.type === 'users' && selected.key && values[selected.key]) {
+			updateEditorIfSelected('users', selected.key, values[selected.key]);
+		}
 	});
 }
 
@@ -2182,12 +2303,26 @@ function formatGlobalHistoryDate(createdAt) {
 	return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-function formatGlobalHistoryTeams(teams) {
+function formatGlobalHistoryTeams(teams, groupNameColorMap = null) {
 	if (!Array.isArray(teams) || teams.length === 0) return '-';
 	return teams.map((team, i) => {
-		const members = Array.isArray(team) ? team.join(', ') : String(team);
-		return `<span class="gh-team-block"><b>팀${i+1}</b> ${members}</span>`;
+		const memberHtml = Array.isArray(team)
+			? team.map(nameStr => {
+				if (!groupNameColorMap) return escapeHtml(nameStr);
+				const baseName = extractHistoryBaseName(nameStr);
+				const color = groupNameColorMap.get(baseName.toLowerCase());
+				if (color) {
+					return `<span class="gh-group-name" style="border-bottom-color:${color}">${escapeHtml(nameStr)}</span>`;
+				}
+				return escapeHtml(nameStr);
+			}).join(', ')
+			: escapeHtml(String(team));
+		return `<span class="gh-team-block"><b>팀${i+1}</b> ${memberHtml}</span>`;
 	}).join('');
+}
+
+function escapeHtml(str) {
+	return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function formatGlobalHistoryList(val) {
@@ -2210,48 +2345,53 @@ function extractHistoryEntries(rootKey, rootData) {
 	}));
 }
 
-async function loadGlobalHistory() {
+function parseGlobalHistoryEntry(pushKey, entry) {
+	const rawProfile = entry?.profile || '';
+	const rawUserCode = entry?.userCode || '';
+	let profile = rawProfile;
+	let userCode = rawUserCode;
+	if (!userCode && rawProfile.startsWith('users/')) {
+		profile = '';
+		userCode = rawProfile.slice(6);
+	}
+	return {
+		key: pushKey,
+		createdAt: entry?.createdAt || pushKey,
+		profile,
+		userCode,
+		teams: normalizeHistoryTeams(entry?.teams),
+		appliedReservation: normalizeHistoryStrings(entry?.appliedReservation, null),
+		appliedRules: normalizeHistoryStrings(entry?.appliedRules, '/'),
+		appliedConstraints: normalizeHistoryStrings(entry?.appliedConstraints, '/'),
+		appliedGroups: normalizeHistoryGroups(entry?.appliedGroups),
+		appliedGroupColors: Array.isArray(entry?.appliedGroupColors) ? entry.appliedGroupColors : []
+	};
+}
+
+function setupGlobalHistoryListener() {
+	if (_globalHistoryListenerRef) return;
 	const tbody = document.getElementById('globalHistoryTableBody');
 	const countEl = document.getElementById('globalHistoryCount');
 	if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="gh-loading">불러오는 중...</td></tr>';
-	try {
-		const snap = await database.ref('generateHistory').once('value');
-		const data = snap.val() || {};
-
-		const allEntries = Object.entries(data).map(([pushKey, entry]) => {
-			const rawProfile = entry?.profile || '';
-			const rawUserCode = entry?.userCode || '';
-			// 구버전 호환: profile = "users/ABCDEF" 형태면 분리
-			let profile = rawProfile;
-			let userCode = rawUserCode;
-			if (!userCode && rawProfile.startsWith('users/')) {
-				profile = '';
-				userCode = rawProfile.slice(6);
-			}
-			return {
-				key: pushKey,
-				createdAt: entry?.createdAt || pushKey,
-				profile,
-				userCode,
-				teams: normalizeHistoryTeams(entry?.teams),
-				appliedReservation: normalizeHistoryStrings(entry?.appliedReservation, null),
-				appliedRules: normalizeHistoryStrings(entry?.appliedRules, '/'),
-				appliedConstraints: normalizeHistoryStrings(entry?.appliedConstraints, '/')
-			};
-		});
-
+	_globalHistoryListenerRef = database.ref('generateHistory');
+	_globalHistoryListenerRef.on('value', (snapshot) => {
+		const data = snapshot.val() || {};
+		const allEntries = Object.entries(data).map(([k, v]) => parseGlobalHistoryEntry(k, v));
 		allEntries.sort((a, b) => {
 			const ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt).getTime() || 0;
 			const tb = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt).getTime() || 0;
 			return tb - ta;
 		});
-
 		globalHistoryData = allEntries;
 		if (countEl) countEl.textContent = globalHistoryData.length;
 		renderGlobalHistory();
-	} catch (e) {
+	}, (e) => {
 		if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="gh-loading">로드 실패: ${e.message}</td></tr>`;
-	}
+	});
+}
+
+function loadGlobalHistory() {
+	setupGlobalHistoryListener();
 }
 
 function renderGlobalHistory() {
@@ -2270,12 +2410,13 @@ function renderGlobalHistory() {
 		const userCell = item.userCode
 			? `<span class="gh-link" onclick="openItemFromHistory('users','${item.userCode}')">${item.userCode}</span>`
 			: '-';
+		const colorMap = item.appliedGroups?.length ? buildGroupNameColorMap(item.appliedGroups, item.appliedGroupColors) : null;
 		return `
 		<tr>
 			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
 			<td class="gh-cell gh-profile">${profileCell}</td>
 			<td class="gh-cell gh-user">${userCell}</td>
-			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams)}</td>
+			<td class="gh-cell gh-teams">${formatGlobalHistoryTeams(item.teams, colorMap)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
