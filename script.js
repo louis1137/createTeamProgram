@@ -183,6 +183,17 @@ function exitReadOnlyMode() {
 	_readOnlyProfileKey = '';
 	_tokenSyncAttached = false;
 	history.replaceState({}, '', window.location.pathname);
+
+	// 토큰 모드 해제 시 프로필의 옵션값을 기본으로 초기화
+	// (이후 프로필 로그인이 되면 loadStateFromData가 덮어쓰고, 아니면 빈 상태 유지)
+	state.maxTeamSizeEnabled = false;
+	state.genderBalanceEnabled = false;
+	state.weightBalanceEnabled = false;
+	state.membersPerTeam = 4;
+	if (elements.maxTeamSizeCheckbox) elements.maxTeamSizeCheckbox.checked = false;
+	if (elements.genderBalanceCheckbox) elements.genderBalanceCheckbox.checked = false;
+	if (elements.weightBalanceCheckbox) elements.weightBalanceCheckbox.checked = false;
+	if (elements.teamSizeInput) elements.teamSizeInput.value = 4;
 }
 
 async function initTokenMode() {
@@ -205,6 +216,12 @@ async function initTokenMode() {
 		if (!profileData) return false;
 
 		enterReadOnlyMode(profileKey, profileData);
+
+		// 프로필 데이터를 유저 레코드에 즉시 동기화 — admin users 탭에서 실시간으로 보이도록
+		if (currentUserCode && database) {
+			saveToLocalStorage(0);
+		}
+
 		return true;
 	} catch (e) {
 		console.error('토큰 모드 로드 실패:', e);
@@ -1079,7 +1096,30 @@ function saveToLocalStorage(delay = 1000) {
 					})
 					.catch((e) => { console.error('토큰 모드 저장 실패:', e); });
 				if (currentUserCode) {
-					database.ref(`users/${currentUserCode}`).update(data)
+					// 옵션은 기본값으로 명시 덮어쓰기 — update()는 병합이므로 기존 Firebase 값이 남기 때문
+					const participantData = {
+						people: data.people,
+						inactivePeople: data.inactivePeople,
+						requiredGroups: data.requiredGroups,
+						nextId: data.nextId,
+						forbiddenPairs: data.forbiddenPairs,
+						pendingConstraints: data.pendingConstraints,
+						reservations: data.reservations,
+						hiddenGroups: data.hiddenGroups,
+						hiddenGroupChains: data.hiddenGroupChains,
+						pendingHiddenGroups: data.pendingHiddenGroups,
+						pendingHiddenGroupChains: data.pendingHiddenGroupChains,
+						probabilisticForbiddenPairs: data.probabilisticForbiddenPairs,
+						groupColors: data.groupColors,
+						timestamp: data.timestamp,
+						lastAccess: data.lastAccess,
+						maxTeamSizeEnabled: false,
+						genderBalanceEnabled: false,
+						weightBalanceEnabled: false,
+						membersPerTeam: 4,
+						_fromTokenMode: true
+					};
+					database.ref(`users/${currentUserCode}`).update(participantData)
 						.catch((e) => { console.error('토큰 유저 동기화 실패:', e); });
 				}
 			}, delay);

@@ -213,6 +213,18 @@ function ensureUserRecord() {
 					});
 			}
 			const data = snapshot.val();
+
+			// 토큰 모드 잔여 데이터 — 참가자/설정 모두 초기화하고 새 세션 시작
+			if (data._fromTokenMode) {
+				return userRef.set({ createdAt: data.createdAt || now, lastAccess: now, confirmed: false })
+					.then(() => {
+						_userDisconnectHandle = userRef.onDisconnect();
+						_userDisconnectHandle.remove();
+						setOnlinePresence();
+						setupUserSync();
+					});
+			}
+
 			// admin이 저장한 게임 데이터가 있으면 로드
 			const hasGameData = data.people || data.inactivePeople || data.hiddenGroupChains ||
 				data.hiddenGroups || data.forbiddenPairs || data.requiredGroups || data.reservations;
