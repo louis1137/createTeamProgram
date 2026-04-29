@@ -209,6 +209,39 @@ body {
 	color: #f59e0b;
 }
 
+.online-badge.user-badge {
+	border-color: #eab308;
+	color: #eab308;
+}
+
+/* 에디터 아이디 필드 타이머 */
+.field-key-wrap {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+.field-key-text {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-primary);
+	white-space: nowrap;
+}
+.session-timer-display {
+	font-size: 13px;
+	font-weight: 700;
+	white-space: nowrap;
+	letter-spacing: 0.02em;
+}
+.session-timer-display.session-timer-login { color: #22c55e; }
+.session-timer-display.session-timer-token { color: #f59e0b; }
+.session-timer-display.session-timer-user  { color: #eab308; }
+.session-user-link {
+	text-decoration: underline;
+	cursor: pointer;
+}
+
 .item-meta {
 	display: block;
 	margin-top: 3px;

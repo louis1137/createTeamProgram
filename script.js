@@ -124,6 +124,112 @@ function logProfileConsole(message) {
 let _readOnlyMode = false;
 let _readOnlyProfileKey = '';
 
+// 체류시간 세션 트래킹
+let _sessionHeartbeatInterval = null;
+let _sessionProfileKey = null;
+const _SESSION_EXPIRY_MS = 3000;
+const _SESSION_HB_MS = 2000;
+
+function _sessionWriteHeartbeat() {
+	const now = Date.now();
+	if (database && currentUserCode) {
+		database.ref(`users/${currentUserCode}/heartbeat`).set(now).catch(() => {});
+	}
+	if (database && _sessionProfileKey) {
+		database.ref(`profiles/${_sessionProfileKey}/heartbeat`).set(now).catch(() => {});
+	}
+}
+
+function startUserSession() {
+	if (!database || !currentUserCode) return;
+	const userRef = database.ref(`users/${currentUserCode}`);
+	const now = Date.now();
+
+	let sessionStart = now;
+	try {
+		const storedStart = localStorage.getItem('_uSessionStart');
+		const storedHb = localStorage.getItem('_uSessionHb');
+		if (storedStart && storedHb) {
+			const hbTime = parseInt(storedHb, 10);
+			if (!isNaN(hbTime) && (now - hbTime) <= _SESSION_EXPIRY_MS) {
+				sessionStart = parseInt(storedStart, 10) || now;
+			}
+		}
+	} catch (_) {}
+
+	try {
+		localStorage.setItem('_uSessionStart', String(sessionStart));
+		localStorage.setItem('_uSessionHb', String(now));
+	} catch (_) {}
+
+	userRef.update({ sessionStart, heartbeat: now }).catch(() => {});
+
+	if (!_sessionHeartbeatInterval) {
+		_sessionHeartbeatInterval = setInterval(() => {
+			_sessionWriteHeartbeat();
+			if (_sessionProfileKey) {
+				try { localStorage.setItem(`_pSessionHb_${_sessionProfileKey}`, String(Date.now())); } catch (_) {}
+			}
+			try { localStorage.setItem('_uSessionHb', String(Date.now())); } catch (_) {}
+		}, _SESSION_HB_MS);
+	}
+}
+
+function startProfileSession(profileKey, type) {
+	if (!database || !profileKey) return;
+	_sessionProfileKey = profileKey;
+	const now = Date.now();
+
+	const lsStartKey = `_pSessionStart_${profileKey}`;
+	const lsHbKey = `_pSessionHb_${profileKey}`;
+	let sessionStart = now;
+	try {
+		const storedStart = localStorage.getItem(lsStartKey);
+		const storedHb = localStorage.getItem(lsHbKey);
+		if (storedStart && storedHb) {
+			const hbTime = parseInt(storedHb, 10);
+			if (!isNaN(hbTime) && (now - hbTime) <= _SESSION_EXPIRY_MS) {
+				sessionStart = parseInt(storedStart, 10) || now;
+			}
+		}
+	} catch (_) {}
+
+	try {
+		localStorage.setItem(lsStartKey, String(sessionStart));
+		localStorage.setItem(lsHbKey, String(now));
+	} catch (_) {}
+
+	database.ref(`profiles/${profileKey}`).update({
+		sessionStart,
+		sessionType: type,
+		heartbeat: now
+	}).catch(() => {});
+
+	if (!_sessionHeartbeatInterval) {
+		_sessionHeartbeatInterval = setInterval(() => {
+			_sessionWriteHeartbeat();
+			if (_sessionProfileKey) {
+				try { localStorage.setItem(`_pSessionHb_${_sessionProfileKey}`, String(Date.now())); } catch (_) {}
+			}
+			try { localStorage.setItem('_uSessionHb', String(Date.now())); } catch (_) {}
+		}, _SESSION_HB_MS);
+	}
+}
+
+function stopProfileSession(profileKey) {
+	if (!database || !profileKey) return;
+	_sessionProfileKey = null;
+	try {
+		localStorage.removeItem(`_pSessionStart_${profileKey}`);
+		localStorage.removeItem(`_pSessionHb_${profileKey}`);
+	} catch (_) {}
+	database.ref(`profiles/${profileKey}`).update({
+		sessionStart: null,
+		sessionType: null,
+		heartbeat: null
+	}).catch(() => {});
+}
+
 function enterReadOnlyMode(profileKey, data) {
 	_readOnlyMode = true;
 	_readOnlyProfileKey = profileKey || '';
@@ -171,6 +277,7 @@ function setupTokenSync() {
 }
 
 function exitReadOnlyMode() {
+	if (_readOnlyMode && _readOnlyProfileKey) stopProfileSession(_readOnlyProfileKey);
 	if (database && _readOnlyProfileKey) {
 		const tokenOnlineRef = database.ref(`profiles/${_readOnlyProfileKey}/tokenOnline`);
 		const tokenOnlineUserRef = database.ref(`profiles/${_readOnlyProfileKey}/tokenOnlineUser`);
@@ -216,6 +323,8 @@ async function initTokenMode() {
 		if (!profileData) return false;
 
 		enterReadOnlyMode(profileKey, profileData);
+		startProfileSession(profileKey, 'token');
+		startUserSession();
 
 		// 프로필 데이터를 유저 레코드에 즉시 동기화 — admin users 탭에서 실시간으로 보이도록
 		if (currentUserCode && database) {
@@ -273,7 +382,7 @@ function init() {
 		initTokenMode().then((isTokenMode) => {
 			if (!isTokenMode) {
 				tryAutoLogin();
-				if (typeof ensureUserRecord === 'function') ensureUserRecord();
+				if (typeof ensureUserRecord === 'function') ensureUserRecord().then(() => startUserSession());
 			}
 		});
 	} else if (database) {
@@ -2892,6 +3001,8 @@ async function handleLoginSubmit() {
 	// 프로필 토큰 자동 생성 (없을 경우)
 	if (typeof ensureProfileToken === 'function') ensureProfileToken(currentProfileKey);
 	if (typeof setOnlinePresence === 'function') setOnlinePresence();
+	startProfileSession(currentProfileKey, 'login');
+	startUserSession();
 
 	// Firebase 초기화 후 데이터 로드
 	initFirebase();
@@ -2925,8 +3036,10 @@ async function handleLoginSubmit() {
 function handleLogout() {
 	closeForbiddenPopup();
 	try { localStorage.removeItem('profileAutoLogin'); } catch (_) {}
+	try { localStorage.removeItem('_uSessionStart'); localStorage.removeItem('_uSessionHb'); } catch (_) {}
 	// debounce 대기 중인 저장이 있으면 로그아웃 전에 즉시 flush (currentProfileKey가 유효한 동안)
 	flushProfileAutoSave();
+	if (currentProfileKey) stopProfileSession(currentProfileKey);
 	if (typeof clearOnlinePresence === 'function') clearOnlinePresence();
 	if (typeof logoutProfile === 'function') logoutProfile();
 	// 로그아웃 후 익명 유저로 users online 유지
@@ -2969,6 +3082,8 @@ async function tryAutoLogin() {
 
 	if (typeof ensureProfileToken === 'function') ensureProfileToken(currentProfileKey);
 	if (typeof setOnlinePresence === 'function') setOnlinePresence();
+	startProfileSession(currentProfileKey, 'login');
+	startUserSession();
 
 	initFirebase();
 	resolveProfileRecord(currentProfileKey)

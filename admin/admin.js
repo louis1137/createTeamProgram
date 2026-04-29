@@ -28,6 +28,10 @@ let _selectedListenerCallback = null;
 let _globalHistoryListenerRef = null;
 let _isSaving = false;
 
+// 에디터 세션 타이머
+let _sessionTimerInterval = null;
+const _ADMIN_SESSION_STALE_MS = 5000; // heartbeat 5초 이상 없으면 비활성으로 간주
+
 const ADMIN_ACCESS_SESSION_KEY = 'adminAccessAuthenticated';
 
 const fieldIds = {
@@ -1134,7 +1138,7 @@ function readFormData() {
 }
 
 function writeFormData(key, type, data) {
-	getEl(fieldIds.key).value = key || '';
+	getEl(fieldIds.key).textContent = key || '';
 	getEl(fieldIds.membersPerTeam).value = Number.isFinite(data.membersPerTeam) ? data.membersPerTeam : '';
 	getEl(fieldIds.genderBalanceEnabled).checked = Boolean(data.genderBalanceEnabled);
 	getEl(fieldIds.maxTeamSizeEnabled).checked = Boolean(data.maxTeamSizeEnabled);
@@ -1162,6 +1166,15 @@ function writeFormData(key, type, data) {
 	renderGenerateHistoryTable();
 	setFieldAvailability(type);
 	updateConditionalRows(type);
+	// 에디터 세션 타이머 (online 상태 + sessionStart 존재 시)
+	if (data?.sessionStart && (data?.online === true || data?.tokenOnline === true)) {
+		const sessionUserCode = type === 'profiles'
+			? (data.sessionType === 'token' ? (data.tokenOnlineUser || data.onlineUser || '') : (data.onlineUser || ''))
+			: '';
+		startSessionTimer(data.sessionStart, data.sessionType, type, sessionUserCode);
+	} else {
+		stopSessionTimer();
+	}
 }
 
 function applySelectionStyles() {
@@ -1178,6 +1191,7 @@ function setEditorHeader() {
 		title.textContent = '항목을 선택하세요';
 		subtitle.textContent = '왼쪽 리스트에서 profiles 또는 users를 선택하면 편집할 수 있습니다.';
 		updateConditionalRows(null);
+		stopSessionTimer();
 		return;
 	}
 	title.textContent = `${selected.type}/${selected.key}`;
@@ -1222,14 +1236,37 @@ function buildItemButton(type, key, data) {
 	const isTokenOnline = type === 'profiles' && data?.tokenOnline === true;
 	const onlineUser = type === 'profiles' ? (data?.onlineUser || '') : '';
 	const tokenOnlineUser = type === 'profiles' ? (data?.tokenOnlineUser || '') : '';
+	const sessionActive = isSessionActive(data);
+	const sessionStart = data?.sessionStart;
+	const sessionType = data?.sessionType || '';
 	let onlineBadge = '';
-	if (isOnline) {
-		const label = type === 'profiles' ? (onlineUser ? `${onlineUser} 로그인중` : '접속중') : '접속중';
-		onlineBadge += ` <span class="online-badge">${label}</span>`;
-	}
-	if (isTokenOnline) {
-		const label = tokenOnlineUser ? `${tokenOnlineUser} 토큰사용중` : '토큰사용중';
-		onlineBadge += ` <span class="online-badge token-badge">${label}</span>`;
+	if (type === 'profiles') {
+		if (sessionActive && sessionStart) {
+			const timeStr = formatSessionElapsed(sessionStart);
+			if (sessionType === 'token') {
+				const who = tokenOnlineUser || onlineUser;
+				onlineBadge += ` <span class="online-badge token-badge">${timeStr}${who ? ` ${escapeHtml(who)}` : ''} 토큰사용중</span>`;
+			} else {
+				const who = onlineUser;
+				onlineBadge += ` <span class="online-badge">${timeStr}${who ? ` ${escapeHtml(who)}` : ''} 로그인중</span>`;
+			}
+		} else {
+			if (isOnline) {
+				const label = onlineUser ? `${escapeHtml(onlineUser)} 로그인중` : '로그인중';
+				onlineBadge += ` <span class="online-badge">${label}</span>`;
+			}
+			if (isTokenOnline) {
+				const label = tokenOnlineUser ? `${escapeHtml(tokenOnlineUser)} 토큰사용중` : '토큰사용중';
+				onlineBadge += ` <span class="online-badge token-badge">${label}</span>`;
+			}
+		}
+	} else {
+		if (sessionActive && sessionStart) {
+			const timeStr = formatSessionElapsed(sessionStart);
+			onlineBadge += ` <span class="online-badge user-badge">${timeStr} 접속중</span>`;
+		} else if (isOnline) {
+			onlineBadge += ` <span class="online-badge user-badge">접속중</span>`;
+		}
 	}
 	button.innerHTML = `<span class="item-title">${displayKey}${onlineBadge}</span><span class="item-meta">${dateValue || 'no timestamp'}</span>`;
 	button.addEventListener('click', async () => {
@@ -1745,6 +1782,10 @@ function initTheme() {
 }
 
 function bindEvents() {
+	getEl('sessionTimerDisplay').addEventListener('click', (e) => {
+		const link = e.target.closest('.session-user-link');
+		if (link) navigateToUser(link.dataset.userCode);
+	});
 	getEl('logoutBtn').addEventListener('click', () => {
 		logoutAdminAccess();
 	});
@@ -2323,6 +2364,53 @@ async function openItemFromHistory(type, key) {
 	applySelectionStyles();
 	await loadSelectedItem();
 	setupSelectedItemListener(type, key);
+}
+
+function isSessionActive(data) {
+	// online/tokenOnline 필드가 Firebase onDisconnect로 관리되므로 presence 기준 사용
+	return Boolean(data?.sessionStart && (data?.online === true || data?.tokenOnline === true));
+}
+
+function formatSessionElapsed(sessionStart) {
+	const elapsed = Math.max(0, Math.floor((Date.now() - sessionStart) / 1000));
+	return elapsed < 60
+		? `${elapsed}초동안`
+		: `${Math.floor(elapsed / 60)}분동안`;
+}
+
+function startSessionTimer(sessionStart, sessionType, itemType, sessionUserCode) {
+	stopSessionTimer();
+	const el = document.getElementById('sessionTimerDisplay');
+	if (!el || !sessionStart) { if (el) el.style.display = 'none'; return; }
+	const colorClass = itemType === 'profiles'
+		? (sessionType === 'token' ? 'session-timer-token' : 'session-timer-login')
+		: 'session-timer-user';
+	el.className = `session-timer-display ${colorClass}`;
+	el.style.display = '';
+	const isProfile = itemType === 'profiles';
+	const tick = () => {
+		const elapsed = Math.max(0, Math.floor((Date.now() - sessionStart) / 1000));
+		const m = Math.floor(elapsed / 60);
+		const s = elapsed % 60;
+		if (isProfile && sessionUserCode) {
+			el.innerHTML = `( <span class="session-user-link" data-user-code="${escapeHtml(sessionUserCode)}">${escapeHtml(sessionUserCode)}</span> - ${m}분 ${s}초 )`;
+		} else {
+			el.textContent = `( ${m}분 ${s}초 )`;
+		}
+	};
+	tick();
+	_sessionTimerInterval = setInterval(tick, 1000);
+}
+
+function navigateToUser(userCode) {
+	const btn = document.querySelector(`.item-btn[data-type="users"][data-key="${CSS.escape(userCode)}"]`);
+	if (btn) btn.click();
+}
+
+function stopSessionTimer() {
+	if (_sessionTimerInterval) { clearInterval(_sessionTimerInterval); _sessionTimerInterval = null; }
+	const el = document.getElementById('sessionTimerDisplay');
+	if (el) el.style.display = 'none';
 }
 
 function formatGlobalHistoryDate(createdAt) {
