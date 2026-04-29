@@ -1071,15 +1071,39 @@ function setEditorHeader() {
 	updateConditionalRows(selected.type);
 }
 
+async function softDeleteItem(type, key) {
+	const label = type === 'profiles' ? `프로필 "${key}"` : `유저 "${key}"`;
+	const isHardDelete = key.toLowerCase().includes('test');
+	const confirmMsg = isHardDelete
+		? `${label}를 완전 삭제하시겠습니까?\n(DB에서 영구적으로 제거됩니다)`
+		: `${label}를 삭제하시겠습니까?\n(DB에서 deleted 상태로 처리됩니다)`;
+	if (!confirm(confirmMsg)) return;
+	try {
+		if (isHardDelete) {
+			await database.ref(`${type}/${key}`).remove();
+		} else {
+			const updates = { deleted: true, deletedAt: new Date().toISOString() };
+			if (type === 'profiles') updates._label = `${key} (deleted)`;
+			await database.ref(`${type}/${key}`).update(updates);
+		}
+		showToast(`${label} 삭제 완료`);
+	} catch (err) {
+		showToast('삭제 중 오류가 발생했습니다.');
+	}
+}
+
 function buildItemButton(type, key, data) {
+	const wrapper = document.createElement('div');
+	wrapper.className = 'item-wrapper';
+
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.className = 'item-btn';
-	if (type === 'profiles' && data?.deleted) button.classList.add('item-btn-deleted');
+	if (data?.deleted) button.classList.add('item-btn-deleted');
 	button.dataset.type = type;
 	button.dataset.key = key;
 	const dateValue = data?.timestamp || data?.lastAccess || data?.createdAt || '';
-	const displayKey = (type === 'profiles' && data?.deleted) ? `${key} (deleted)` : key;
+	const displayKey = data?.deleted ? `${key} (deleted)` : key;
 	const isOnline = data?.online === true;
 	const isTokenOnline = type === 'profiles' && data?.tokenOnline === true;
 	const onlineUser = type === 'profiles' ? (data?.onlineUser || '') : '';
@@ -1103,7 +1127,20 @@ function buildItemButton(type, key, data) {
 		await loadSelectedItem();
 		setupSelectedItemListener(type, key);
 	});
-	return button;
+
+	const deleteBtn = document.createElement('button');
+	deleteBtn.type = 'button';
+	deleteBtn.className = 'item-delete-btn';
+	deleteBtn.title = '삭제';
+	deleteBtn.textContent = '×';
+	deleteBtn.addEventListener('click', (e) => {
+		e.stopPropagation();
+		softDeleteItem(type, key);
+	});
+
+	wrapper.appendChild(button);
+	wrapper.appendChild(deleteBtn);
+	return wrapper;
 }
 
 function toSortableTime(value) {
@@ -1137,7 +1174,7 @@ function renderList(type, values) {
 	const listElement = getEl(type === 'profiles' ? 'profilesList' : 'usersList');
 	const countElement = getEl(type === 'profiles' ? 'profilesCount' : 'usersCount');
 	listElement.innerHTML = '';
-	const entries = Object.entries(values || {});
+	const entries = Object.entries(values || {}).filter(([, data]) => !data?.deleted);
 	countElement.textContent = String(entries.length);
 	if (!entries.length) {
 		const empty = document.createElement('div');
