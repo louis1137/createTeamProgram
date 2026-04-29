@@ -1255,6 +1255,29 @@ tr:hover .drag-cell {
 	padding: 24px;
 	font-size: 13px;
 }
+.gh-del {
+	text-align: center;
+	white-space: nowrap;
+}
+.history-del-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border-radius: 4px;
+	border: 1px solid var(--danger, #e05252);
+	background: transparent;
+	color: var(--danger, #e05252);
+	cursor: pointer;
+	line-height: 1.6;
+	transition: background 0.15s, color 0.15s, opacity 0.15s;
+	opacity: 0;
+}
+.history-del-btn:hover {
+	background: var(--danger, #e05252);
+	color: #fff;
+}
+tr:hover .history-del-btn {
+	opacity: 1;
+}
 
 /* 히스토리 테이블 컬럼 너비 고정 (colgroup col 기준) */
 col.hcol-date     { width: 140px; }
@@ -1264,3 +1287,4 @@ col.hcol-user     { width: 90px; }
 col.hcol-rsv      { width: 90px; }
 col.hcol-rule     { width: 90px; }
 col.hcol-constraint { width: 90px; }
+col.hcol-del      { width: 52px; }

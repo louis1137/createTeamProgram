@@ -529,6 +529,8 @@ function cloneGenerateHistory(data) {
 		const sortTime = Date.parse(createdAt.includes('T') ? createdAt : createdAt.replace(' ', 'T'));
 		return {
 			entryKey,
+			historyId: entry?.historyId || '',
+			rawCreatedAt: entry?.createdAt ?? null,
 			createdAt,
 			profile,
 			userCode,
@@ -556,7 +558,7 @@ function renderGenerateHistoryTableRows() {
 		return;
 	}
 	if (!historyDraft.length) {
-		container.innerHTML = `<tr><td class="member-empty" colspan="7">데이터가 없습니다.</td></tr>`;
+		container.innerHTML = `<tr><td class="member-empty" colspan="8">데이터가 없습니다.</td></tr>`;
 		return;
 	}
 
@@ -569,7 +571,11 @@ function renderGenerateHistoryTableRows() {
 			: '-';
 		const colorMap = item.appliedGroups?.length ? buildGroupNameColorMap(item.appliedGroups, item.appliedGroupColors) : null;
 		return `
-		<tr>
+		<tr
+			data-history-id="${escapeHtml(item.historyId)}"
+			data-raw-created-at="${item.rawCreatedAt ?? ''}"
+			data-profile="${escapeHtml(item.profile)}"
+			data-user-code="${escapeHtml(item.userCode)}">
 			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
 			<td class="gh-cell gh-profile">${profileCell}</td>
 			<td class="gh-cell gh-user">${userCell}</td>
@@ -577,6 +583,7 @@ function renderGenerateHistoryTableRows() {
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
+			<td class="gh-cell gh-del"><button class="history-del-btn" type="button" data-role="delete-history">삭제</button></td>
 		</tr>`;
 	}).join('');
 }
@@ -2093,11 +2100,39 @@ function bindEvents() {
 		});
 	}
 
+	const globalHistoryTableBody = document.getElementById('globalHistoryTableBody');
+	if (globalHistoryTableBody) {
+		globalHistoryTableBody.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) return;
+			const button = target.closest('button[data-role="delete-history"]');
+			if (!(button instanceof HTMLButtonElement)) return;
+			const row = button.closest('tr');
+			if (!row) return;
+			const historyId = row.dataset.historyId || '';
+			const rawCreatedAt = row.dataset.rawCreatedAt !== '' ? row.dataset.rawCreatedAt : null;
+			const profile = row.dataset.profile || '';
+			const userCode = row.dataset.userCode || '';
+			deleteHistoryEntry(historyId, rawCreatedAt, profile, userCode);
+		});
+	}
+
 	const historyTableBody = getEl('historyTableBody');
 	if (historyTableBody) {
 		historyTableBody.addEventListener('click', (event) => {
 			const target = event.target;
 			if (!(target instanceof HTMLElement)) {
+				return;
+			}
+			const delButton = target.closest('button[data-role="delete-history"]');
+			if (delButton instanceof HTMLButtonElement) {
+				const row = delButton.closest('tr');
+				if (!row) return;
+				const historyId = row.dataset.historyId || '';
+				const rawCreatedAt = row.dataset.rawCreatedAt !== '' ? row.dataset.rawCreatedAt : null;
+				const profile = row.dataset.profile || '';
+				const userCode = row.dataset.userCode || '';
+				deleteHistoryEntry(historyId, rawCreatedAt, profile, userCode);
 				return;
 			}
 			const button = target.closest('button[data-role="toggle-history"]');
@@ -2356,6 +2391,8 @@ function parseGlobalHistoryEntry(pushKey, entry) {
 	}
 	return {
 		key: pushKey,
+		historyId: entry?.historyId || '',
+		rawCreatedAt: entry?.createdAt ?? null,
 		createdAt: entry?.createdAt || pushKey,
 		profile,
 		userCode,
@@ -2394,13 +2431,43 @@ function loadGlobalHistory() {
 	setupGlobalHistoryListener();
 }
 
+async function deleteHistoryEntry(historyId, rawCreatedAt, profile, userCode) {
+	if (!database) return;
+	if (!confirm('이 히스토리 항목을 삭제하시겠습니까?\n프로필/사용자/전체 기록에서 모두 삭제됩니다.')) return;
+
+	const deleteMatchingFrom = async (ref) => {
+		let query;
+		if (historyId) {
+			query = ref.orderByChild('historyId').equalTo(historyId);
+		} else if (rawCreatedAt !== null && rawCreatedAt !== undefined && rawCreatedAt !== '') {
+			query = ref.orderByChild('createdAt').equalTo(rawCreatedAt);
+		} else {
+			return;
+		}
+		const snap = await query.once('value');
+		const updates = {};
+		snap.forEach(child => { updates[child.key] = null; });
+		if (Object.keys(updates).length) await ref.update(updates);
+	};
+
+	try {
+		const promises = [deleteMatchingFrom(database.ref('generateHistory'))];
+		if (profile) promises.push(deleteMatchingFrom(database.ref(`profiles/${profile}/generateHistory`)));
+		if (userCode) promises.push(deleteMatchingFrom(database.ref(`users/${userCode}/generateHistory`)));
+		await Promise.all(promises);
+		showToast('히스토리 삭제 완료');
+	} catch (e) {
+		showToast(`삭제 실패: ${e.message}`);
+	}
+}
+
 function renderGlobalHistory() {
 	const tbody = document.getElementById('globalHistoryTableBody');
 	const subtitle = document.getElementById('historyViewSubtitle');
 	if (!tbody) return;
 	if (subtitle) subtitle.textContent = `전체 팀 생성 기록 (${globalHistoryData.length}건)`;
 	if (!globalHistoryData.length) {
-		tbody.innerHTML = '<tr><td colspan="6" class="gh-loading">생성 기록이 없습니다.</td></tr>';
+		tbody.innerHTML = '<tr><td colspan="8" class="gh-loading">생성 기록이 없습니다.</td></tr>';
 		return;
 	}
 	tbody.innerHTML = globalHistoryData.map((item) => {
@@ -2412,7 +2479,11 @@ function renderGlobalHistory() {
 			: '-';
 		const colorMap = item.appliedGroups?.length ? buildGroupNameColorMap(item.appliedGroups, item.appliedGroupColors) : null;
 		return `
-		<tr>
+		<tr
+			data-history-id="${escapeHtml(item.historyId)}"
+			data-raw-created-at="${item.rawCreatedAt ?? ''}"
+			data-profile="${escapeHtml(item.profile)}"
+			data-user-code="${escapeHtml(item.userCode)}">
 			<td class="gh-cell gh-date">${formatGlobalHistoryDate(item.createdAt)}</td>
 			<td class="gh-cell gh-profile">${profileCell}</td>
 			<td class="gh-cell gh-user">${userCell}</td>
@@ -2420,6 +2491,7 @@ function renderGlobalHistory() {
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedReservation)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedRules)}</td>
 			<td class="gh-cell">${formatGlobalHistoryList(item.appliedConstraints)}</td>
+			<td class="gh-cell gh-del"><button class="history-del-btn" type="button" data-role="delete-history">삭제</button></td>
 		</tr>`;
 	}).join('');
 }
@@ -2459,6 +2531,7 @@ async function bootstrap() {
 	setButtonsEnabled(false);
 	setEditorHeader();
 	loadLists();
+	showHistoryView();
 }
 
 bootstrap().catch((error) => {

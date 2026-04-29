@@ -1537,10 +1537,8 @@ function resetAll(e) {
 	if (faqSection) faqSection.style.display = '';
 	saveToLocalStorage();
 	renderPeople();
-	// 상태가 모두 정리된 후 팝업 갱신 (forbiddenPairs 클리어 이후여야 적용/대기 구분이 정확함)
-	if (converted > 0) {
-		safeOpenForbiddenWindow();
-	} else if (forbiddenPopup && !forbiddenPopup.closed) {
+	// 상태가 모두 정리된 후 팝업이 이미 열려 있으면 내용만 갱신
+	if (forbiddenPopup && !forbiddenPopup.closed) {
 		renderForbiddenWindowContent();
 	}
 }
@@ -5838,8 +5836,10 @@ function saveGenerateHistory(teams) {
 			.map((item) => item.trim())
 			.filter((item) => item.length > 0);
 
+		const historyId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 		const timestamp = getCurrentDbTimestamp();
 		const historyData = {
+			historyId,
 			createdAt: timestamp,
 			profile: currentProfileKey || _readOnlyProfileKey || '',
 			userCode: currentUserCode || '',
